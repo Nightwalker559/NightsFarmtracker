@@ -1,0 +1,15 @@
+## Interface: 120005, 120007
+## Title: Night's Farmtracker
+## Notes: Tracks items gathered while farming
+## Author: Nightwalker559
+## Version: 1.0.0
+## SavedVariables: NightsFarmtrackerAccountDB
+## SavedVariablesPerCharacter: NightsFarmtrackerDB
+## IconTexture: Interface\AddOns\NightsFarmtracker\Artwork\Icon.tga
+
+NightsFarmtrackerLocals.lua
+NightsFarmtrackerCore.lua
+NightsFarmtrackerUI.lua
+NightsFarmtrackerHistory.lua
+NightsFarmtrackerSettings.lua
+NightsFarmtracker_Main.lua
