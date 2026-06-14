@@ -10,10 +10,10 @@ local ART = "Interface\\AddOns\\NightsFarmtracker\\Artwork\\"
 ------------------------------------------------------------------------
 local H_W      = 300
 local H_PAD    = 10
-local H_HDR_H  = 36
+local H_HDR_H  = ns.HDR_TOTAL     -- same as main frame header
 local H_FTR_H  = 28
 local H_CONT_W = H_W - H_PAD * 2
-local DAY_H    = 26
+local DAY_H    = ns.CAT_ROW_H     -- same height as category headers in main/detail frame
 local SESS_H   = 38
 local MAX_VIS_H = 10 * SESS_H
 
@@ -22,7 +22,7 @@ local MAX_VIS_H = 10 * SESS_H
 ------------------------------------------------------------------------
 local DET_W      = ns.FRAME_W          -- same as main frame
 local DET_PAD    = ns.PAD
-local DET_HDR_H  = 48
+local DET_HDR_H  = ns.HDR_TOTAL   -- same as main frame header
 local DET_FTR_H  = 30
 local DET_CONT_W = ns.CONTENT_W
 local DET_CAT_H  = ns.CAT_ROW_H
@@ -137,21 +137,22 @@ local function AcquireDayRow()
     local r=table.remove(dayPool)
     if r then r:SetParent(HListFrame); r:Show(); return r end
     r=CreateFrame("Frame",nil,HListFrame); r:SetHeight(DAY_H); r:EnableMouse(true)
-    r.bg=r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); r.bg:SetColorTexture(0.10,0.16,0.18,0.85)
+    r.bg=r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); r.bg:SetColorTexture(unpack(ns.COL_CAT_BG))
     r.sep=r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1); r.sep:SetColorTexture(unpack(ns.COL_BORDER))
     r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
-    r.dateText=r:CreateFontString(nil,"OVERLAY","GameFontNormal")
-    r.dateText:SetPoint("LEFT",6,0); r.dateText:SetFontHeight(11); r.dateText:SetTextColor(unpack(ns.COL_GOLD))
+    r.dateText=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    r.dateText:SetPoint("LEFT",4,0); r.dateText:SetFontHeight(11); r.dateText:SetTextColor(unpack(ns.COL_ACCENT))
     r.infoText=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     r.infoText:SetPoint("LEFT",r.dateText,"RIGHT",10,0); r.infoText:SetFontHeight(10); r.infoText:SetTextColor(0.45,0.45,0.45)
     r.goldText=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    r.goldText:SetPoint("RIGHT",0,0); r.goldText:SetJustifyH("RIGHT"); r.goldText:SetFontHeight(10)
+    r.goldText:SetPoint("RIGHT",0,0); r.goldText:SetJustifyH("RIGHT"); r.goldText:SetFontHeight(11)
     r.goldText:SetTextColor(unpack(ns.COL_GOLD))
     return r
 end
 local function ReleaseDayRow(r)
     r:Hide(); r:ClearAllPoints()
     r:SetScript("OnMouseUp",nil); r:SetScript("OnEnter",nil); r:SetScript("OnLeave",nil)
+    r.dateText:SetTextColor(unpack(ns.COL_ACCENT))
     dayPool[#dayPool+1]=r
 end
 
@@ -230,7 +231,7 @@ local function AcquireDetCat()
     return r
 end
 local function ReleaseDetCat(r)
-    r:Hide(); r:ClearAllPoints(); detCatPool[#detCatPool+1]=r
+    r:Hide(); r:ClearAllPoints(); r:SetHeight(DET_CAT_H); detCatPool[#detCatPool+1]=r
 end
 
 ------------------------------------------------------------------------
@@ -265,7 +266,7 @@ local function EnsureDetailFrame()
 
     local hSep = DetailFrame:CreateTexture(nil,"ARTWORK"); hSep:SetHeight(1)
     hSep:SetColorTexture(unpack(ns.COL_BORDER))
-    hSep:SetPoint("TOPLEFT",DET_PAD,-(DET_HDR_H-4)); hSep:SetPoint("TOPRIGHT",-DET_PAD,-(DET_HDR_H-4))
+    hSep:SetPoint("TOPLEFT",DET_PAD,-(DET_HDR_H-1)); hSep:SetPoint("TOPRIGHT",-DET_PAD,-(DET_HDR_H-1))
 
     local xBtn = CreateFrame("Button",nil,DetailFrame); xBtn:SetSize(14,14); xBtn:SetPoint("TOPRIGHT",-DET_PAD,-10)
     local xTex = xBtn:CreateTexture(nil,"ARTWORK"); xTex:SetAllPoints()
@@ -366,7 +367,7 @@ local function RebuildDetailContent(session)
             return a.name < b.name
         end)
 
-        local ch = AcquireDetCat(); ch:SetWidth(DET_CONT_W); ch:SetPoint("TOPLEFT",0,-yOff)
+        local ch = AcquireDetCat(); ch:SetSize(DET_CONT_W, DET_CAT_H); ch:SetPoint("TOPLEFT",0,-yOff)
         ch.nameText:SetText("- "..catName)
         ch.goldText:SetText(cat.gold > 0 and ns.FormatGold(cat.gold) or "")
         activeDetCats[#activeDetCats+1]=ch; yOff = yOff + DET_CAT_H
@@ -496,7 +497,7 @@ function ns.RebuildHistory()
     local yOffset=0
     for _,dStr in ipairs(dayOrder) do
         local day=days[dStr]; local nSess=#day.sessions
-        local drow=AcquireDayRow(); drow:SetWidth(H_CONT_W); drow:SetPoint("TOPLEFT",0,-yOffset)
+        local drow=AcquireDayRow(); drow:SetSize(H_CONT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
         drow.dateText:SetText(dStr)
         drow.infoText:SetText("")
         drow.goldText:SetText("")
@@ -504,14 +505,14 @@ function ns.RebuildHistory()
             local d=day
             drow:SetScript("OnMouseUp",function(_,btn) if btn=="LeftButton" then MergeDaySessions(d) end end)
             drow:SetScript("OnEnter",function(self)
-                self.bg:SetColorTexture(0.18,0.16,0.08,0.95); self.dateText:SetTextColor(1,1,0.4)
+                self.bg:SetColorTexture(0.16,0.24,0.27,0.95); self.dateText:SetTextColor(1,1,1)
                 GameTooltip:SetOwner(self,"ANCHOR_BOTTOMLEFT")
                 GameTooltip:SetText(string.format(ns.L["merge_sessions"], nSess))
                 GameTooltip:AddLine(ns.L["merge_desc"],0.7,0.7,0.7,true)
                 GameTooltip:Show()
             end)
             drow:SetScript("OnLeave",function(self)
-                self.bg:SetColorTexture(0.10,0.16,0.18,0.85); self.dateText:SetTextColor(unpack(ns.COL_GOLD))
+                self.bg:SetColorTexture(unpack(ns.COL_CAT_BG)); self.dateText:SetTextColor(unpack(ns.COL_ACCENT))
                 GameTooltip:Hide()
             end)
         end
@@ -592,7 +593,7 @@ local function EnsureHistFrame()
 
     local hSep=HistFrame:CreateTexture(nil,"ARTWORK"); hSep:SetHeight(1)
     hSep:SetColorTexture(unpack(ns.COL_BORDER))
-    hSep:SetPoint("TOPLEFT",H_PAD,-(H_HDR_H-4)); hSep:SetPoint("TOPRIGHT",-H_PAD,-(H_HDR_H-4))
+    hSep:SetPoint("TOPLEFT",H_PAD,-(H_HDR_H-1)); hSep:SetPoint("TOPRIGHT",-H_PAD,-(H_HDR_H-1))
 
     local xBtn=CreateFrame("Button",nil,HistFrame); xBtn:SetSize(14,14); xBtn:SetPoint("TOPRIGHT",-H_PAD,-10)
     local xTex=xBtn:CreateTexture(nil,"ARTWORK"); xTex:SetAllPoints()

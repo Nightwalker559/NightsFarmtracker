@@ -21,6 +21,7 @@ local ART = "Interface\\AddOns\\NightsFarmtracker\\Artwork\\"
 local HDR_PAD    = 6
 local BTN_BAR_H  = 26
 local HDR_TOTAL  = HDR_PAD + BTN_BAR_H + 8
+ns.HDR_TOTAL = HDR_TOTAL
 local SCROLL_TOP = HDR_TOTAL + 1
 local COLLAPSED_H = HDR_TOTAL + 1 + FOOTER_H
 
@@ -528,7 +529,9 @@ ns.RefreshHUD = function()
                     end
                 else
                     local gold = fv and (item.vendor or 0) or (item.ah or item.vendor or 0)
-                    if gold > 0 then
+                    -- Show if gold > 0, OR price not yet resolved (sellPrice pending bag scan)
+                    local priceKnown = d.sellPrice or d.noSell
+                    if gold > 0 or not priceKnown then
                         flat[#flat+1] = {
                             isRank=false, name=item.name, d=d,
                             item=item, gold=gold, fv=fv,
@@ -739,13 +742,13 @@ local mmBtn = CreateFrame("Button","NightsFarmtrackerMinimapBtn",Minimap)
 mmBtn:SetSize(31,31); mmBtn:SetFrameStrata("MEDIUM"); mmBtn:SetFixedFrameStrata(true)
 mmBtn:SetFrameLevel(8); mmBtn:SetFixedFrameLevel(true)
 mmBtn:RegisterForClicks("anyUp"); mmBtn:RegisterForDrag("LeftButton")
-mmBtn:SetHighlightTexture(136477)
-mmBtn.bg=mmBtn:CreateTexture(nil,"BACKGROUND"); mmBtn.bg:SetSize(24,24)
-mmBtn.bg:SetPoint("CENTER"); mmBtn.bg:SetTexture(136467)
-mmBtn.icon=mmBtn:CreateTexture(nil,"ARTWORK"); mmBtn.icon:SetSize(20,20)
+mmBtn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-Tracking-Highlight")
+mmBtn.icon=mmBtn:CreateTexture(nil,"BACKGROUND"); mmBtn.icon:SetSize(20,20)
 mmBtn.icon:SetPoint("CENTER"); mmBtn.icon:SetTexture(ART.."Icon")
-mmBtn.border=mmBtn:CreateTexture(nil,"OVERLAY"); mmBtn.border:SetSize(50,50)
-mmBtn.border:SetPoint("TOPLEFT"); mmBtn.border:SetTexture(136430)
+mmBtn.icon:SetTexCoord(0.05,0.95,0.05,0.95)
+mmBtn.border=mmBtn:CreateTexture(nil,"OVERLAY"); mmBtn.border:SetSize(54,54)
+mmBtn.border:SetPoint("TOPLEFT",mmBtn,"TOPLEFT",-1,1)
+mmBtn.border:SetTexture("Interface\\Minimap\\UI-Minimap-Border")
 local function PlaceMinimapBtn(pos)
     local angle=rad(pos or 225); local x,y=cos(angle),sin(angle)
     local q=1; if x<0 then q=q+1 end; if y>0 then q=q+2 end
@@ -760,6 +763,9 @@ local function PlaceMinimapBtn(pos)
 end
 ns.UpdateMinimapPosition = PlaceMinimapBtn
 function ns.UpdateMinimapIcon() end
+function ns.SetMinimapVisible(show)
+    if show then mmBtn:Show() else mmBtn:Hide() end
+end
 mmBtn:SetScript("OnMouseDown",function(self)self.icon:SetSize(17,17)end)
 mmBtn:SetScript("OnMouseUp",  function(self)self.icon:SetSize(20,20)end)
 mmBtn:SetScript("OnDragStart",function(self)

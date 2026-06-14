@@ -51,6 +51,7 @@ L["tsm_hint"]          = "Click to cycle: DBMarket · DBRegionMarketAvg · DBMin
 L["display"]           = "Display"
 L["gold_per_hour"]     = "Gold / hour"
 L["gold_per_min"]      = "Gold / min"
+L["minimap_button"]    = "Show minimap button"
 -- Categories
 L["cat_junk"]       = "Junk"
 -- Category price cycle
@@ -113,6 +114,7 @@ if GetLocale() == "deDE" then
     L["display"]           = "Anzeige"
     L["gold_per_hour"]     = "Gold / Stunde"
     L["gold_per_min"]      = "Gold / Minute"
+    L["minimap_button"]    = "Minimap-Button anzeigen"
     L["cat_junk"]          = "Müll"
     L["price_ah_vendor"]   = "AH + Händler"
     L["price_ah_only"]     = "Nur AH"

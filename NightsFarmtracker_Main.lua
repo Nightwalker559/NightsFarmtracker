@@ -20,6 +20,18 @@ local priceRetryCount   = 0
 -- Cache reagent quality API at load time; nil if unavailable
 local GetReagentQualityInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityInfo or nil
 
+-- Item link color → quality (avoids GetItemInfo cache dependency for quality)
+local LINK_QUALITY = {
+    ["9d9d9d"] = 0,  -- Poor
+    ["ffffff"] = 1,  -- Common
+    ["1eff00"] = 2,  -- Uncommon
+    ["0070dd"] = 3,  -- Rare
+    ["a335ee"] = 4,  -- Epic
+    ["ff8000"] = 5,  -- Legendary
+    ["e6cc80"] = 6,  -- Artifact
+    ["00ccff"] = 7,  -- Heirloom
+}
+
 local pendingLoot = {}
 
 local function ProcessLoot(items)
@@ -34,15 +46,30 @@ local function ProcessLoot(items)
         local name, _, quality, _, _, _, itemSubType, _, _, icon, sellPrice, classID, _, bindType =
             C_Item.GetItemInfo(link)
 
-        -- Cache miss: defer until BAG_UPDATE_DELAYED when item info is available
+        -- Cache miss: recover from link color (quality) + GetItemInfoInstant (classID/icon)
+        -- C_Item.GetItemInfoInstant returns: itemType,itemSubType,itemEquipLoc,icon,classID,subClassID,bindType
         if not name then
-            pendingLoot[#pendingLoot+1] = pending
-            if not ns.pendingPriceUpdate then
-                ns.pendingPriceUpdate = true
-                priceRetryCount       = 0
-                EventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+            local _t, _s, _e, icon2, classID2, _sc, bindType2 = C_Item.GetItemInfoInstant(itemID)
+            ns.Log("CacheMiss", itemID, "classID2=", classID2, "itemName=", pending.itemName)
+            if classID2 and pending.itemName then
+                name      = pending.itemName
+                quality   = pending.linkQuality
+                icon      = icon2
+                classID   = classID2
+                bindType  = bindType2
+            else
+                pendingLoot[#pendingLoot+1] = pending
+                if not ns.pendingPriceUpdate then
+                    ns.pendingPriceUpdate = true
+                    priceRetryCount       = 0
+                    EventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+                end
             end
-        elseif classID then
+        end
+
+        ns.Log("ProcessLoot", name, "classID=", classID, "quality=", quality, "shouldTrack check")
+
+        if name and classID then
             local db          = NightsFarmtrackerDB
             local shouldTrack = false
 
@@ -55,9 +82,7 @@ local function ProcessLoot(items)
                 or (bindType == BIND_ON_PICKUP and quality and quality > 0
                     and not db.excludedNames[ns.CAT_BOP])
                 or (quality and quality >= 2 and (not sellPrice or sellPrice == 0))
-                or (quality and quality > 0 and sellPrice and sellPrice > 0) then
-                -- Last two conditions: no-sell quality items (profession knowledge, crafting tokens)
-                -- and any white+ sellable item (housing dyes/decor, consumables, etc.)
+                or (quality and quality > 0  and sellPrice and sellPrice > 0) then
                 shouldTrack = not db.excludedNames[name]
             end
 
@@ -70,6 +95,8 @@ local function ProcessLoot(items)
                     if filter == "other" and isMat      then shouldTrack = false end
                 end
             end
+
+            ns.Log("shouldTrack=", shouldTrack, "for", name)
 
             if shouldTrack then
                 local entry = db.count[name]
@@ -88,9 +115,8 @@ local function ProcessLoot(items)
                 if bindType == BIND_ON_EQUIP  then entry.isBoE         = true end
                 if bindType == BIND_ON_PICKUP then entry.isBoP         = true end
 
-                -- Trust loot-link sell price for trade goods only;
-                -- equipment prices resolved via bag scan; no-sell items skipped.
-                if sellPrice and sellPrice > 0 and classID == TRADE_GOODS then
+                -- Sell price: trust directly for trade goods and junk (no scaling)
+                if sellPrice and sellPrice > 0 and (classID == TRADE_GOODS or quality == 0) then
                     entry.sellPrice = sellPrice
                 elseif not entry.noSell then
                     needsPriceUpdate = true
@@ -148,7 +174,6 @@ function ns.UpdatePricesFromBags()
     local updated      = false
     local stillMissing = false
 
-    -- Build reverse map: itemID → entry (avoids O(items × bags × slots))
     local byID = {}
     for _, data in pairs(NightsFarmtrackerDB.count) do
         if data.itemID and not data.sellPrice and not data.noSell then
@@ -171,15 +196,14 @@ function ns.UpdatePricesFromBags()
                                 data.itemLink  = bagLink
                                 updated        = true
                             else
-                                data.noSell = true  -- no vendor price; skip future scans
+                                data.noSell = true
                             end
                         end
-                        byID[ci.itemID] = nil  -- matched, remove from map
+                        byID[ci.itemID] = nil
                     end
                 end
             end
         end
-        -- Any entries still in byID were not found in bags
         if next(byID) then stillMissing = true end
     end
 
@@ -222,6 +246,34 @@ function ns.StopTimer()
 end
 
 ------------------------------------------------------------------------
+-- Slash commands
+------------------------------------------------------------------------
+SLASH_FARMTRACK1 = "/nft"
+SlashCmdList["FARMTRACK"] = function(msg)
+    local cmd = (msg or ""):lower():match("^%s*(%S*)")
+    if cmd == "" then
+        -- Toggle main window
+        if MainFrame:IsShown() then
+            NightsFarmtrackerDB.visible = false; MainFrame:Hide()
+        else
+            NightsFarmtrackerDB.visible = true;  MainFrame:Show()
+        end
+    elseif cmd == "debug" then
+        ns.debugMode = not ns.debugMode
+        print("|cff30b0c0Night's Farmtracker:|r Debug " .. (ns.debugMode and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
+    elseif cmd == "test" then
+        local db = NightsFarmtrackerDB
+        local n = 0; for _ in pairs(db.count) do n = n + 1 end
+        print("|cff30b0c0NFT:|r paused=" .. tostring(db.paused) .. " items=" .. n)
+        for name, data in pairs(db.count) do
+            print("  " .. name .. " x" .. data.amount .. " classID=" .. tostring(data.classID) .. " sell=" .. tostring(data.sellPrice))
+        end
+    else
+        print("|cff30b0c0Night's Farmtracker:|r /nft · /nft debug · /nft test")
+    end
+end
+
+------------------------------------------------------------------------
 -- Event frame
 ------------------------------------------------------------------------
 EventFrame = CreateFrame("Frame")
@@ -241,14 +293,9 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         ns.InitAccountDB()
         ns.InitSettings()
 
-        -- Restore frame position
-        MainFrame:ClearAllPoints()
         local p = NightsFarmtrackerDB.pos
-        if #p == 4 then
-            MainFrame:SetPoint(p[1], UIParent, p[2], p[3], p[4])
-        else
-            MainFrame:SetPoint(p[1], UIParent, p[1], p[2], p[3])
-        end
+        MainFrame:ClearAllPoints()
+        MainFrame:SetPoint(p[1], UIParent, p[2], p[3], p[4])
 
         ns.UpdateTimerDisplay(ns.FormatTime(NightsFarmtrackerDB.totalTime))
         ns.ApplyPauseVisuals()
@@ -258,6 +305,8 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "PLAYER_LOGIN" then
         if not NightsFarmtrackerDB.paused then ns.StartTimer() end
+        ns.SetMinimapVisible(not NightsFarmtrackerDB.minimapHidden)
+        ns.SetExpanded(NightsFarmtrackerDB.expanded)
         ns.RefreshHUD()
 
     elseif event == "BAG_UPDATE_DELAYED" and ns.pendingPriceUpdate then
@@ -265,14 +314,21 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         ns.UpdatePricesFromBags()
 
     elseif event == "CHAT_MSG_LOOT" and not NightsFarmtrackerDB.paused then
-        -- Fires for every item entering the bag regardless of loot method:
-        -- normal, auto-loot, fast-loot addons, bonus drops, etc.
         local msg = ...
-        local linkData, itemName = msg:match("|H(item:[^|]+)|h%[([^%]]+)%]|h")
+
+        -- WoW loot messages may or may not include a color prefix before the item link.
+        -- Try with color first (quality extraction), then without as fallback.
+        local color, linkData, itemName =
+            msg:match("|cff(%x%x%x%x%x%x)|H(item:[^|]+)|h%[([^%]]+)%]|h")
+        if not linkData then
+            linkData, itemName = msg:match("|H(item:[^|]+)|h%[([^%]]+)%]|h")
+        end
         if not linkData then return end
 
         local itemID = tonumber(linkData:match("^item:(%d+)"))
         if not itemID then return end
+
+        ns.Log("LOOT itemID=", itemID, "name=", itemName, "color=", color)
 
         -- Prune and check dedup table
         local now = GetTime()
@@ -284,6 +340,12 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
 
         local qty      = tonumber(msg:match("x(%d+)")) or 1
         local fullLink = "|H" .. linkData .. "|h[" .. itemName .. "]|h"
-        ProcessLoot({{ itemID = itemID, qty = qty, link = fullLink }})
+        ProcessLoot({{
+            itemID      = itemID,
+            qty         = qty,
+            link        = fullLink,
+            itemName    = itemName,
+            linkQuality = LINK_QUALITY[color and color:lower()],
+        }})
     end
 end)

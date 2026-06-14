@@ -123,6 +123,40 @@ local function MakeDropdown(parent, yOff)
 end
 
 ------------------------------------------------------------------------
+-- Helper: checkbox
+------------------------------------------------------------------------
+local function MakeCheckbox(parent, label, yOff, getValue, setValue)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetSize(S_W - S_PAD*2, 22)
+    row:SetPoint("TOPLEFT", S_PAD, yOff)
+
+    local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
+    box:SetSize(14, 14); box:SetPoint("LEFT", 0, 0)
+    box:SetBackdrop({bgFile="Interface/Tooltips/UI-Tooltip-Background",
+        edgeFile="Interface/Tooltips/UI-Tooltip-Border",
+        tile=true,tileSize=8,edgeSize=8,insets={left=2,right=2,top=2,bottom=2}})
+    box:SetBackdropColor(0.06,0.09,0.10,1)
+    box:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+
+    local check = box:CreateTexture(nil,"ARTWORK")
+    check:SetSize(7,7); check:SetPoint("CENTER")
+    check:SetColorTexture(unpack(ns.COL_ACCENT))
+
+    local lbl = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    lbl:SetPoint("LEFT", box, "RIGHT", 8, 0)
+    lbl:SetTextColor(0.85,0.85,0.85); lbl:SetText(label)
+
+    local function Refresh()
+        if getValue() then check:Show(); lbl:SetTextColor(1,0.82,0)
+        else               check:Hide(); lbl:SetTextColor(0.85,0.85,0.85) end
+    end
+    Refresh()
+    row:EnableMouse(true)
+    row:SetScript("OnMouseUp", function() setValue(not getValue()); Refresh() end)
+    return row
+end
+
+------------------------------------------------------------------------
 -- Settings content (rebuilt on open / change)
 ------------------------------------------------------------------------
 local settingsContent = {}
@@ -219,6 +253,16 @@ function ns.RebuildSettingsContent()
     rateRow2:SetSelected(getRateMode()=="min"); rateRow2:SetEnabled(true)
     settingsContent[#settingsContent+1] = rateRow2
     y = y - 24
+
+    -- Minimap button toggle
+    local mmRow = MakeCheckbox(SF, ns.L["minimap_button"], y,
+        function() return not db.minimapHidden end,
+        function(v)
+            db.minimapHidden = not v
+            ns.SetMinimapVisible(v)
+        end)
+    settingsContent[#settingsContent+1] = mmRow
+    y = y - 26
 
     -- Resize frame to content
     SF:SetHeight(math.abs(y) + 30)
