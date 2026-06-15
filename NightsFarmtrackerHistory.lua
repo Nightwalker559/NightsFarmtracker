@@ -448,7 +448,8 @@ local function RebuildDetailContent(session)
     DScrollFrame:SetHeight(visH)
     DetailFrame:SetHeight(DET_HDR_H + visH + DET_FTR_H)
     DetailFrame.footLabel:SetText((totalItems==1 and string.format(ns.L["item_singular"],totalItems) or string.format(ns.L["item_plural"],totalItems)))
-    DetailFrame.totalText:SetText("")  -- gold shown in header
+    local lg = (currentDetailSession and currentDetailSession.lootedGold) or 0
+    DetailFrame.totalText:SetText(lg > 0 and (ns.L["looted_gold"]..": "..ns.FormatGold(lg)) or "")
 end
 
 local function ShowDetail(session)
@@ -462,8 +463,6 @@ local function ShowDetail(session)
         date("%d.%m.%Y", session.timestamp) ..
         "  ·  " .. ns.FormatTime(session.duration) .. goldStr
     )
-    local lg = session.lootedGold or 0
-    DetailFrame.totalText:SetText(lg > 0 and (ns.L["looted_gold"]..": "..ns.FormatGold(lg)) or "")
     RebuildDetailContent(session)
     DetailFrame:Show()
 end

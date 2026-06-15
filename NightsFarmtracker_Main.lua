@@ -83,10 +83,13 @@ local function ProcessLoot(items)
                 shouldTrack = not db.excludedNames[ns.CAT_VENDOR] and not db.excludedNames[name]
             elseif classID == TRADE_GOODS
                 or db.trackedNames[name]
-                or (bindType == BIND_ON_EQUIP  and not db.excludedNames[ns.CAT_BOE])
+                or (bindType == BIND_ON_EQUIP  and not db.excludedNames[ns.CAT_BOE]
+                    and sellPrice and sellPrice > 0)
                 or (bindType == BIND_ON_PICKUP and quality and quality > 0
-                    and not db.excludedNames[ns.CAT_BOP])
-                or (quality and quality >= 2 and (not sellPrice or sellPrice == 0))
+                    and not db.excludedNames[ns.CAT_BOP]
+                    and sellPrice and sellPrice > 0)
+                or (quality and quality >= 2 and (not sellPrice or sellPrice == 0)
+                    and classID == 5)  -- Reagent only; TRADE_GOODS covered above
                 or (quality and quality > 0  and sellPrice and sellPrice > 0) then
                 shouldTrack = not db.excludedNames[name]
             end
@@ -199,12 +202,13 @@ function ns.UpdatePricesFromBags()
                             if sp and sp > 0 then
                                 data.sellPrice = sp
                                 data.itemLink  = bagLink
-                                updated        = true
                             else
                                 data.noSell = true
                             end
+                            updated            = true
+                            byID[ci.itemID]    = nil
                         end
-                        byID[ci.itemID] = nil
+                        -- bagLink nil: keep in byID, try other slots / next retry
                     end
                 end
             end

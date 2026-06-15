@@ -73,6 +73,10 @@ L["mm_drag"]     = "Drag to reposition"
 -- Gold rate suffix
 L["rate_hr"]  = "/hr"
 L["rate_min"] = "/min"
+-- Gold overview tooltip
+L["gold_overview"] = "Gold Overview"
+L["gold_items"]    = "Items"
+L["gold_total"]    = "Total"
 
 ------------------------------------------------------------------------
 -- German (deDE)
@@ -135,4 +139,8 @@ if GetLocale() == "deDE" then
     -- Gold rate suffix
     L["rate_hr"]  = "/Std"
     L["rate_min"] = "/Min"
+    -- Gold overview tooltip
+    L["gold_overview"] = "Gold-Übersicht"
+    L["gold_items"]    = "Items"
+    L["gold_total"]    = "Gesamt"
 end
