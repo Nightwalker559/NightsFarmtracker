@@ -8,7 +8,7 @@ local ART = "Interface\\AddOns\\NightsFarmtracker\\Artwork\\"
 ------------------------------------------------------------------------
 -- Layout — history list
 ------------------------------------------------------------------------
-local H_W      = 300
+local H_W      = ns.FRAME_W
 local H_PAD    = 10
 local H_HDR_H  = ns.HDR_TOTAL     -- same as main frame header
 local H_FTR_H  = 28
@@ -188,11 +188,11 @@ local function AcquireDetRow()
     -- Single-line: icon | name | count | gold (y=0 = centered with icon)
     r.nameText = r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 8,    0)
-    r.nameText:SetPoint("RIGHT", r,      "RIGHT", -108, 0)
+    r.nameText:SetPoint("RIGHT", r,      "RIGHT", -128, 0)
     r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(11); r.nameText:SetWordWrap(false)
 
     r.countText = r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    r.countText:SetPoint("RIGHT", r, "RIGHT", -70, 0)
+    r.countText:SetPoint("RIGHT", r, "RIGHT", -90, 0)
     r.countText:SetJustifyH("RIGHT"); r.countText:SetTextColor(0.78,0.78,0.78); r.countText:SetFontHeight(11)
 
     r.goldText = r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
@@ -223,7 +223,7 @@ local function AcquireDetCat()
     r.sep = r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1); r.sep:SetColorTexture(unpack(ns.COL_BORDER))
     r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
     r.nameText = r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    r.nameText:SetPoint("LEFT",4,0); r.nameText:SetPoint("RIGHT",r,"RIGHT",-80,0)
+    r.nameText:SetPoint("LEFT",4,0); r.nameText:SetPoint("RIGHT",r,"RIGHT",-100,0)
     r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(11); r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
     r.goldText = r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     r.goldText:SetPoint("RIGHT",r,"RIGHT",-4,0); r.goldText:SetJustifyH("RIGHT")
@@ -380,7 +380,7 @@ local function RebuildDetailContent(session)
             ir.icon:ClearAllPoints(); ir.icon:SetPoint("LEFT", 4 + ns.CAT_INDENT, 0)
             ir.nameText:ClearAllPoints()
             ir.nameText:SetPoint("LEFT",  ir.icon, "RIGHT", 8,    0)
-            ir.nameText:SetPoint("RIGHT", ir,      "RIGHT", -108, 0)
+            ir.nameText:SetPoint("RIGHT", ir,      "RIGHT", -128, 0)
             ir.icon:SetTexture(entry.d.icon or ns.FALLBACK_ICON)
             local q = entry.d.quality
             if q then

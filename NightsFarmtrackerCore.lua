@@ -36,7 +36,7 @@ ns.CAT_BOP    = "Equipment"
 ns.CAT_MATS   = "Tradeskill"
 
 -- UI layout
-ns.FRAME_W     = 320
+ns.FRAME_W     = 340
 ns.PAD         = 10
 ns.ROW_H       = 34
 ns.CAT_ROW_H   = 22
@@ -72,8 +72,10 @@ end
 function ns.FormatGold(copper)
     if not copper or copper <= 0 then return "" end
     if copper >= 10000 then
-        return GetCoinTextureString(math.floor(copper/10000)*10000)
+        -- Gold + Silber (auf nächste Silbermünze runden)
+        return GetCoinTextureString(math.floor(copper / 100) * 100)
     end
+    -- Unter 1g: Silber + Kupfer
     return GetCoinTextureString(copper)
 end
 
