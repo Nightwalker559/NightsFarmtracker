@@ -17,6 +17,11 @@ local EventFrame
 local PRICE_MAX_RETRIES = 3
 local priceRetryCount   = 0
 
+-- Localized self-loot prefix derived from WoW's own global string.
+-- EN: "You receive loot: "  /  DE: "Ihr erhaltet Beute: "
+-- Only messages starting with this prefix belong to the player.
+local SELF_LOOT_PREFIX = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(.-)%%s") or nil
+
 -- Cache reagent quality API at load time; nil if unavailable
 local GetReagentQualityInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityInfo or nil
 
@@ -338,6 +343,9 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "CHAT_MSG_LOOT" and not NightsFarmtrackerDB.paused then
         local msg = ...
+
+        -- Ignore loot that belongs to other players
+        if SELF_LOOT_PREFIX and not msg:find(SELF_LOOT_PREFIX, 1, true) then return end
 
         -- WoW loot messages may or may not include a color prefix before the item link.
         -- Try with color first (quality extraction), then without as fallback.

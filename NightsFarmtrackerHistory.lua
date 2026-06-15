@@ -45,6 +45,7 @@ function ns.SaveCurrentSession()
         timestamp=time(), duration=math.floor(db.totalTime),
         totalGold=0, totalVendor=0, totalAH=0, items={},
         qAtlas=db.qAtlas or {},
+        lootedGold=db.lootedGold or 0,
     }
     for name, data in pairs(db.count) do
         local vendor = ns.VendorTotal(data)
@@ -69,6 +70,7 @@ function ns.SaveCurrentSession()
         ex.totalGold   = ex.totalGold   + newEntry.totalGold
         ex.totalVendor = ex.totalVendor + newEntry.totalVendor
         ex.totalAH     = ex.totalAH     + newEntry.totalAH
+        ex.lootedGold  = (ex.lootedGold or 0) + (newEntry.lootedGold or 0)
         -- merge qAtlas: keep any tier atlas already known, add new ones
         if newEntry.qAtlas then
             ex.qAtlas = ex.qAtlas or {}
@@ -454,13 +456,14 @@ local function ShowDetail(session)
     detCollapsed = {}
     DetailFrame:ClearAllPoints()
     DetailFrame:SetPoint("TOPRIGHT", HistFrame, "TOPLEFT", -4, 0)
-    local goldStr = session.totalGold > 0 and ("  ·  "..ns.FormatGold(session.totalGold)) or ""
+    local combinedGold = (session.totalGold or 0) + (session.lootedGold or 0)
+    local goldStr = combinedGold > 0 and ("  ·  "..ns.FormatGold(combinedGold)) or ""
     DetailFrame.dateText:SetText(
         date("%d.%m.%Y", session.timestamp) ..
         "  ·  " .. ns.FormatTime(session.duration) .. goldStr
     )
-    DetailFrame.durationText:SetText("")
-    DetailFrame.summaryText:SetText("")
+    local lg = session.lootedGold or 0
+    DetailFrame.totalText:SetText(lg > 0 and (ns.L["looted_gold"]..": "..ns.FormatGold(lg)) or "")
     RebuildDetailContent(session)
     DetailFrame:Show()
 end
@@ -470,13 +473,14 @@ end
 ------------------------------------------------------------------------
 local function MergeDaySessions(day)
     if #day.sessions<=1 then return end
-    local merged={timestamp=day.sessions[1].session.timestamp,duration=0,totalGold=0,totalVendor=0,totalAH=0,items={},qAtlas={}}
+    local merged={timestamp=day.sessions[1].session.timestamp,duration=0,totalGold=0,totalVendor=0,totalAH=0,items={},qAtlas={},lootedGold=0}
     for _,entry in ipairs(day.sessions) do
         local s=entry.session
         merged.duration    = merged.duration    + s.duration
         merged.totalGold   = merged.totalGold   + s.totalGold
         merged.totalVendor = merged.totalVendor + (s.totalVendor or 0)
         merged.totalAH     = merged.totalAH     + (s.totalAH     or 0)
+        merged.lootedGold  = merged.lootedGold  + (s.lootedGold  or 0)
         if s.qAtlas then
             for tier, atlas in pairs(s.qAtlas) do
                 merged.qAtlas[tier] = merged.qAtlas[tier] or atlas
@@ -565,9 +569,10 @@ function ns.RebuildHistory()
                     if gold>0 then n=n+1 end
                 end
             end
+            local combinedGold = (session.totalGold or 0) + (session.lootedGold or 0)
             row.dateText:SetText(ns.FormatTime(session.duration))
             row.infoText:SetText(n==1 and string.format(ns.L["item_singular"],n) or string.format(ns.L["item_plural"],n))
-            row.goldText:SetText(session.totalGold>0 and ns.FormatGold(session.totalGold) or "")
+            row.goldText:SetText(combinedGold>0 and ns.FormatGold(combinedGold) or "")
             local sess=session
             row:SetScript("OnMouseUp",function(self,btn)
                 if btn=="LeftButton" and not self.delBtn:IsMouseOver() then ShowDetail(sess) end
