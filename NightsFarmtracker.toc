@@ -5,7 +5,7 @@
 ## Version: 1.0.0
 ## SavedVariables: NightsFarmtrackerAccountDB
 ## SavedVariablesPerCharacter: NightsFarmtrackerDB
-## IconTexture: Interface\AddOns\NightsFarmtracker\Artwork\Icon.tga
+## IconTexture: Interface\AddOns\NightsFarmtracker\Media\Icon.tga
 
 NightsFarmtrackerLocals.lua
 NightsFarmtrackerCore.lua

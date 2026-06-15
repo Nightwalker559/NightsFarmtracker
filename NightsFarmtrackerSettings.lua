@@ -5,7 +5,7 @@
 ------------------------------------------------------------------------
 local _, ns = ...
 
-local ART = "Interface\\AddOns\\NightsFarmtracker\\Artwork\\"
+local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
 local SF   -- settings frame (lazy built)
 
 local S_W   = 320
@@ -99,9 +99,11 @@ local function MakeDropdown(parent, yOff)
     frame.lbl:SetPoint("LEFT",6,0)
     frame.lbl:SetTextColor(0.85,0.85,0.85)
 
-    local arrow = frame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    arrow:SetPoint("RIGHT",-6,0); arrow:SetText("▾")
-    arrow:SetTextColor(unpack(ns.COL_ACCENT))
+    local arrow = frame:CreateTexture(nil,"ARTWORK")
+    arrow:SetSize(10, 8)
+    arrow:SetPoint("RIGHT", -6, 0)
+    arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+    arrow:SetVertexColor(unpack(ns.COL_ACCENT))
 
     local sources = ns.TSM_SOURCES
     frame:EnableMouse(true)
@@ -116,9 +118,48 @@ local function MakeDropdown(parent, yOff)
     end)
 
     function frame:Refresh()
-        self.lbl:SetText(NightsFarmtrackerDB.tsmPriceSource or "DBMarket")
+        local db     = NightsFarmtrackerDB
+        local custom = db.tsmCustomSource and db.tsmCustomSource ~= ""
+        self.lbl:SetText(db.tsmPriceSource or "DBMarket")
+        self.lbl:SetTextColor(custom and 0.40 or 0.85, custom and 0.40 or 0.85, custom and 0.40 or 0.85)
     end
 
+    return frame
+end
+
+------------------------------------------------------------------------
+-- Helper: EditBox for custom TSM price source
+------------------------------------------------------------------------
+local function MakeCustomSourceEB(parent, yOff)
+    local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    frame:SetSize(180, 24)
+    frame:SetPoint("TOPLEFT", S_PAD, yOff)
+    frame:SetBackdrop({bgFile="Interface/Tooltips/UI-Tooltip-Background",
+        edgeFile="Interface/Tooltips/UI-Tooltip-Border",
+        tile=true,tileSize=8,edgeSize=8,insets={left=2,right=2,top=2,bottom=2}})
+    frame:SetBackdropColor(0.05,0.08,0.09,1)
+    frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+
+    local eb = CreateFrame("EditBox", nil, frame)
+    eb:SetSize(164, 18)
+    eb:SetPoint("LEFT", 6, 0)
+    eb:SetAutoFocus(false)
+    eb:SetMaxLetters(64)
+    eb:SetFontObject(GameFontNormalSmall)
+    eb:SetTextColor(0.85, 0.85, 0.85)
+    eb:SetScript("OnTextChanged", function(self)
+        NightsFarmtrackerDB.tsmCustomSource = self:GetText()
+        if tsmDropdown then tsmDropdown:Refresh() end
+    end)
+    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEditFocusGained", function()
+        frame:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
+    end)
+    eb:SetScript("OnEditFocusLost", function()
+        frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+    end)
+    frame.eb = eb
     return frame
 end
 
@@ -161,6 +202,7 @@ end
 ------------------------------------------------------------------------
 local settingsContent = {}
 local tsmDropdown
+local tsmCustomEB
 
 function ns.RebuildSettingsContent()
     if not SF then return end
@@ -199,6 +241,15 @@ function ns.RebuildSettingsContent()
         row:SetEnabled(opt.avail)
         settingsContent[#settingsContent+1] = row
         y = y - 24
+        -- Info line below "auto" when both sources are present
+        if opt.value == "auto" and ns.HasAuctionator() and ns.HasTSM() then
+            local infoLbl = SF:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+            infoLbl:SetPoint("TOPLEFT", pad + 22, y)
+            infoLbl:SetTextColor(0.38, 0.38, 0.38)
+            infoLbl:SetText(ns.L["ah_auto_info"])
+            settingsContent[#settingsContent+1] = infoLbl
+            y = y - 16
+        end
     end
 
     y = y - 8
@@ -228,6 +279,23 @@ function ns.RebuildSettingsContent()
         end
         tsmDropdown:Refresh()
         settingsContent[#settingsContent+1] = tsmDropdown
+        y = y - 32
+
+        local customLbl = SF:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+        customLbl:SetPoint("TOPLEFT", pad, y)
+        customLbl:SetTextColor(0.50, 0.50, 0.50)
+        customLbl:SetText(ns.L["tsm_custom"])
+        settingsContent[#settingsContent+1] = customLbl
+        y = y - 18
+
+        if not tsmCustomEB then
+            tsmCustomEB = MakeCustomSourceEB(SF, y)
+        else
+            tsmCustomEB:SetPoint("TOPLEFT", S_PAD, y)
+            tsmCustomEB:Show()
+        end
+        tsmCustomEB.eb:SetText(db.tsmCustomSource or "")
+        settingsContent[#settingsContent+1] = tsmCustomEB
         y = y - 32
     end
 

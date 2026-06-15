@@ -106,7 +106,9 @@ ns.TSM_SOURCES = {"DBMarket","DBRegionMarketAvg","DBMinBuyout","VendorSell"}
 
 function ns.GetTSMPrice(itemID)
     if not ns.HasTSM() or not itemID then return nil end
-    local source = NightsFarmtrackerDB.tsmPriceSource or "DBMarket"
+    local db     = NightsFarmtrackerDB
+    local custom = db.tsmCustomSource and db.tsmCustomSource ~= "" and db.tsmCustomSource
+    local source = custom or db.tsmPriceSource or "DBMarket"
     local ok, p  = pcall(TSM_API.GetCustomPriceValue, source, "i:"..itemID)
     return ok and type(p)=="number" and p > 0 and p or nil
 end
@@ -138,6 +140,10 @@ function ns.CategoryName(data)
     end
     -- Use stored classID → WoW localized class name (most accurate)
     if data.classID then
+        -- Waffe (2) und Rüstung (4) → gemeinsame Kategorie
+        if data.classID == 2 or data.classID == 4 then
+            return ns.L and ns.L["cat_gear"] or "Equipment"
+        end
         local name = C_Item.GetItemClassInfo(data.classID)
         if name and name ~= "" then return name end
     end
@@ -208,12 +214,13 @@ function ns.InitDB()
     if db.goldRateMode  == nil then db.goldRateMode  = "hour"                  end
     if db.minimapPos    == nil then db.minimapPos    = 225                     end
     if db.minimapHidden == nil then db.minimapHidden = false                   end
-    if db.filterMode    == nil then db.filterMode    = "all"                   end
+    if db.lootedGold    == nil then db.lootedGold    = 0                      end
     if db.priceMode     == nil or type(db.priceMode) ~= "table" then
         db.priceMode = {}
     end
-    if db.ahSource       == nil then db.ahSource       = "auto"     end
-    if db.tsmPriceSource == nil then db.tsmPriceSource = "DBMarket" end
+    if db.ahSource        == nil then db.ahSource        = "auto"     end
+    if db.tsmPriceSource  == nil then db.tsmPriceSource  = "DBMarket" end
+    if db.tsmCustomSource == nil then db.tsmCustomSource = ""         end
 end
 
 function ns.InitAccountDB()

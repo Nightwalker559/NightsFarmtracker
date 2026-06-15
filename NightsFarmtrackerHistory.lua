@@ -3,7 +3,7 @@
 -- Narrower windows. Detail matches main frame width & single-line rows.
 ------------------------------------------------------------------------
 local _, ns = ...
-local ART = "Interface\\AddOns\\NightsFarmtracker\\Artwork\\"
+local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
 
 ------------------------------------------------------------------------
 -- Layout — history list
@@ -44,6 +44,7 @@ function ns.SaveCurrentSession()
     local newEntry = {
         timestamp=time(), duration=math.floor(db.totalTime),
         totalGold=0, totalVendor=0, totalAH=0, items={},
+        qAtlas=db.qAtlas or {},
     }
     for name, data in pairs(db.count) do
         local vendor = ns.VendorTotal(data)
@@ -68,6 +69,13 @@ function ns.SaveCurrentSession()
         ex.totalGold   = ex.totalGold   + newEntry.totalGold
         ex.totalVendor = ex.totalVendor + newEntry.totalVendor
         ex.totalAH     = ex.totalAH     + newEntry.totalAH
+        -- merge qAtlas: keep any tier atlas already known, add new ones
+        if newEntry.qAtlas then
+            ex.qAtlas = ex.qAtlas or {}
+            for tier, atlas in pairs(newEntry.qAtlas) do
+                ex.qAtlas[tier] = ex.qAtlas[tier] or atlas
+            end
+        end
         for name, d in pairs(newEntry.items) do
             if not ex.items[name] then
                 ex.items[name]={amount=0,icon=d.icon,quality=d.quality,itemSubType=d.itemSubType,
@@ -163,6 +171,8 @@ local activeDetRows = {}
 local activeDetCats = {}
 local detRowPool    = {}
 local detCatPool    = {}
+local detCollapsed  = {}
+local currentDetailSession = nil
 
 local function AcquireDetRow()
     local r = table.remove(detRowPool)
@@ -219,6 +229,7 @@ local function AcquireDetCat()
     local r = table.remove(detCatPool)
     if r then r:SetParent(DListFrame); r:Show(); return r end
     r = CreateFrame("Frame", nil, DListFrame); r:SetHeight(DET_CAT_H)
+    r:EnableMouse(true)
     r.bg = r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); r.bg:SetColorTexture(unpack(ns.COL_CAT_BG))
     r.sep = r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1); r.sep:SetColorTexture(unpack(ns.COL_BORDER))
     r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
@@ -302,6 +313,7 @@ local function EnsureDetailFrame()
 end
 
 local function RebuildDetailContent(session)
+    currentDetailSession = session
     for _,r in ipairs(activeDetRows) do ReleaseDetRow(r) end
     for _,r in ipairs(activeDetCats) do ReleaseDetCat(r)  end
     activeDetRows={}; activeDetCats={}
@@ -318,7 +330,7 @@ local function RebuildDetailContent(session)
             catOrder[#catOrder+1]=cat
         end
         local isJunk = d.isVendorTrash or (d.quality == 0)
-        local qAtlas = NightsFarmtrackerDB.qAtlas or {}
+        local qAtlas = session.qAtlas or NightsFarmtrackerDB.qAtlas or {}
 
         if not isJunk and d.q and d.qIDs then
             -- Split crafting reagents into per-tier rows
@@ -352,10 +364,10 @@ local function RebuildDetailContent(session)
         end
     end
     table.sort(catOrder, function(a,b)
+        if cats[a].gold ~= cats[b].gold then return cats[a].gold > cats[b].gold end
         local oa = (cats[a].classID and ns.CLASS_PRIORITY[cats[a].classID]) or 50
         local ob = (cats[b].classID and ns.CLASS_PRIORITY[cats[b].classID]) or 50
-        if oa ~= ob then return oa < ob end
-        return cats[a].gold > cats[b].gold
+        return oa < ob
     end)
 
     local yOff = 0; local totalItems = 0
@@ -368,10 +380,16 @@ local function RebuildDetailContent(session)
         end)
 
         local ch = AcquireDetCat(); ch:SetSize(DET_CONT_W, DET_CAT_H); ch:SetPoint("TOPLEFT",0,-yOff)
-        ch.nameText:SetText("- "..catName)
+        local isCollapsed = detCollapsed[catName]
+        ch.nameText:SetText((isCollapsed and "+ " or "- ")..catName)
         ch.goldText:SetText(cat.gold > 0 and ns.FormatGold(cat.gold) or "")
+        ch:SetScript("OnMouseUp", function()
+            detCollapsed[catName] = not detCollapsed[catName]
+            RebuildDetailContent(currentDetailSession)
+        end)
         activeDetCats[#activeDetCats+1]=ch; yOff = yOff + DET_CAT_H
 
+        if not isCollapsed then
         for _, entry in ipairs(cat.items) do
             totalItems = totalItems + 1
             local ir = AcquireDetRow(); ir:SetWidth(DET_CONT_W); ir:SetPoint("TOPLEFT",0,-yOff)
@@ -418,6 +436,7 @@ local function RebuildDetailContent(session)
             activeDetRows[#activeDetRows+1]=ir; yOff = yOff + DET_ROW_H
         end
         yOff = yOff + 2
+        end  -- not isCollapsed
         end  -- if #cat.items > 0
     end
 
@@ -432,6 +451,7 @@ end
 
 local function ShowDetail(session)
     EnsureDetailFrame()
+    detCollapsed = {}
     DetailFrame:ClearAllPoints()
     DetailFrame:SetPoint("TOPRIGHT", HistFrame, "TOPLEFT", -4, 0)
     local goldStr = session.totalGold > 0 and ("  ·  "..ns.FormatGold(session.totalGold)) or ""
@@ -450,13 +470,18 @@ end
 ------------------------------------------------------------------------
 local function MergeDaySessions(day)
     if #day.sessions<=1 then return end
-    local merged={timestamp=day.sessions[1].session.timestamp,duration=0,totalGold=0,totalVendor=0,totalAH=0,items={}}
+    local merged={timestamp=day.sessions[1].session.timestamp,duration=0,totalGold=0,totalVendor=0,totalAH=0,items={},qAtlas={}}
     for _,entry in ipairs(day.sessions) do
         local s=entry.session
         merged.duration    = merged.duration    + s.duration
         merged.totalGold   = merged.totalGold   + s.totalGold
         merged.totalVendor = merged.totalVendor + (s.totalVendor or 0)
         merged.totalAH     = merged.totalAH     + (s.totalAH     or 0)
+        if s.qAtlas then
+            for tier, atlas in pairs(s.qAtlas) do
+                merged.qAtlas[tier] = merged.qAtlas[tier] or atlas
+            end
+        end
         for name,d in pairs(s.items) do
             if not merged.items[name] then
                 merged.items[name]={amount=0,icon=d.icon,quality=d.quality,itemSubType=d.itemSubType,

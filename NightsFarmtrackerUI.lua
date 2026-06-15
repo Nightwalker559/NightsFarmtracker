@@ -16,7 +16,7 @@ local CONTENT_W   = ns.CONTENT_W
 local MAX_ROWS    = ns.MAX_ROWS
 local SCROLL_STEP = ns.SCROLL_STEP
 
-local ART = "Interface\\AddOns\\NightsFarmtracker\\Artwork\\"
+local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
 
 local HDR_PAD    = 6
 local BTN_BAR_H  = 26
@@ -144,10 +144,25 @@ MainFrame.TimerText:SetText("00:00:00")
 local btnRate = CreateFrame("Frame", nil, MainFrame)
 btnRate:SetPoint("BOTTOMRIGHT", -PAD, 4)
 btnRate:SetSize(130, 20)
+btnRate:EnableMouse(true)
 btnRate.text = btnRate:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
 btnRate.text:SetPoint("RIGHT")
 btnRate.text:SetTextColor(0.55, 0.55, 0.55)
 btnRate.text:SetFontHeight(11)
+btnRate:SetScript("OnEnter", function(self)
+    local db = NightsFarmtrackerDB
+    local itemGold   = cachedGold - (db.lootedGold or 0)
+    local lootedGold = db.lootedGold or 0
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:AddLine("Gold-Übersicht", unpack(ns.COL_ACCENT))
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddDoubleLine("Items:",  ns.FormatGold(itemGold)   or "0", 0.85,0.85,0.85, unpack(ns.COL_GOLD))
+    GameTooltip:AddDoubleLine("Direkt:", ns.FormatGold(lootedGold) or "0", 0.85,0.85,0.85, unpack(ns.COL_GOLD))
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddDoubleLine("Gesamt:", ns.FormatGold(cachedGold) or "0", 1,1,1, unpack(ns.COL_GOLD))
+    GameTooltip:Show()
+end)
+btnRate:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 ------------------------------------------------------------------------
 -- Scroll frame (visible only when expanded)
@@ -241,6 +256,7 @@ local function UpdateSummary()
         end
     end
     MainFrame.totalGoldText:SetText(cachedGold > 0 and ns.FormatGold(cachedGold) or "")
+    cachedGold = cachedGold + (NightsFarmtrackerDB.lootedGold or 0)
     ns.UpdateGoldRate()
 end
 
@@ -452,10 +468,10 @@ ns.RefreshHUD = function()
     local sorted = {}
     for catName, cat in pairs(cats) do sorted[#sorted+1]={name=catName,cat=cat} end
     table.sort(sorted, function(a,b)
+        if a.cat.totalGold ~= b.cat.totalGold then return a.cat.totalGold > b.cat.totalGold end
         local oa = (a.cat.classID and ns.CLASS_PRIORITY[a.cat.classID]) or 50
         local ob = (b.cat.classID and ns.CLASS_PRIORITY[b.cat.classID]) or 50
-        if oa ~= ob then return oa < ob end
-        return a.cat.totalGold > b.cat.totalGold
+        return oa < ob
     end)
 
     local hasAH   = ns.HasAnyAH() and db.ahSource ~= "none"
@@ -620,7 +636,7 @@ function ns.Reset()
     ns.SaveCurrentSession()
     local db = NightsFarmtrackerDB
     db.count={}; db.collapsed={}; db.excludedNames={}
-    db.totalTime=0; db.qAtlas={}; db.paused=true
+    db.totalTime=0; db.qAtlas={}; db.paused=true; db.lootedGold=0
     ns.StopTimer(); ns.CleanupPriceUpdate()
     for _, row in pairs(itemRows) do ReleaseRow(row) end
     itemRows, itemOrder = {}, {}

@@ -208,6 +208,14 @@ function ns.UpdatePricesFromBags()
     end
 
     if not stillMissing or priceRetryCount >= PRICE_MAX_RETRIES then
+        -- Items still in byID were never found in any bag slot.
+        -- After max retries, mark them noSell so they only show if they have an AH price.
+        if stillMissing then
+            for _, data in pairs(byID) do
+                data.noSell = true
+            end
+            updated = true
+        end
         EventFrame:UnregisterEvent("BAG_UPDATE_DELAYED")
         ns.pendingPriceUpdate = false
         priceRetryCount       = 0
@@ -285,6 +293,7 @@ local DEDUP_WINDOW = 0.1  -- seconds
 EventFrame:RegisterEvent("ADDON_LOADED")
 EventFrame:RegisterEvent("PLAYER_LOGIN")
 EventFrame:RegisterEvent("CHAT_MSG_LOOT")
+EventFrame:RegisterEvent("CHAT_MSG_MONEY")
 
 EventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -312,6 +321,20 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "BAG_UPDATE_DELAYED" and ns.pendingPriceUpdate then
         FlushPendingLoot()
         ns.UpdatePricesFromBags()
+
+    elseif event == "CHAT_MSG_MONEY" and not NightsFarmtrackerDB.paused then
+        local msg = ...
+        local copper = 0
+        local g = msg:match("(%d+)%s*[Gg]old")
+        local s = msg:match("(%d+)%s*[Ss]il") -- Silber / Silver
+        local c = msg:match("(%d+)%s*[Kk]up") -- Kupfer / Copper
+        if g then copper = copper + tonumber(g) * 10000 end
+        if s then copper = copper + tonumber(s) * 100   end
+        if c then copper = copper + tonumber(c)         end
+        if copper > 0 then
+            NightsFarmtrackerDB.lootedGold = (NightsFarmtrackerDB.lootedGold or 0) + copper
+            ns.RefreshHUD()
+        end
 
     elseif event == "CHAT_MSG_LOOT" and not NightsFarmtrackerDB.paused then
         local msg = ...
