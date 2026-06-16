@@ -6,10 +6,15 @@
 local _, ns = ...
 
 local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
-local SF   -- settings frame (lazy built)
+local SF           -- settings frame (lazy built)
+local SScrollFrame -- scroll container for content
+local SListFrame   -- scroll child (all widgets live here)
 
-local S_W   = 320
-local S_PAD = 14
+local S_W          = 320
+local S_PAD        = 14
+local S_HDR_H      = 34    -- header (title + sep)
+local S_MAX_VIS    = 380   -- max visible scroll area height
+local S_SCROLL_STEP = 22
 
 ------------------------------------------------------------------------
 -- Helper: radio button row
@@ -19,7 +24,6 @@ local function MakeRadio(parent, label, yOff, value, getGroup, setGroup)
     row:SetSize(S_W - S_PAD*2, 22)
     row:SetPoint("TOPLEFT", S_PAD, yOff)
 
-    -- Circle
     local dot = CreateFrame("Frame", nil, row, "BackdropTemplate")
     dot:SetSize(14, 14)
     dot:SetPoint("LEFT", 0, 0)
@@ -40,7 +44,6 @@ local function MakeRadio(parent, label, yOff, value, getGroup, setGroup)
     lbl:SetText(label)
     row.label = lbl
 
-    -- Disabled overlay
     local grayLbl = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     grayLbl:SetPoint("LEFT", lbl, "RIGHT", 6, 0)
     grayLbl:SetTextColor(0.4,0.4,0.4)
@@ -108,7 +111,6 @@ local function MakeDropdown(parent, yOff)
     local sources = ns.TSM_SOURCES
     frame:EnableMouse(true)
     frame:SetScript("OnMouseUp", function()
-        -- Simple cycle through options
         local cur = NightsFarmtrackerDB.tsmPriceSource or "DBMarket"
         local idx = 1
         for i,v in ipairs(sources) do if v==cur then idx=i; break end end
@@ -199,23 +201,25 @@ end
 
 ------------------------------------------------------------------------
 -- Settings content (rebuilt on open / change)
+-- All widgets are parented to SListFrame (the scroll child).
 ------------------------------------------------------------------------
 local settingsContent = {}
 local tsmDropdown
 local tsmCustomEB
 
 function ns.RebuildSettingsContent()
-    if not SF then return end
+    if not SListFrame then return end
     for _, w in ipairs(settingsContent) do w:Hide() end
     settingsContent = {}
 
     local db  = NightsFarmtrackerDB
-    local pad = S_PAD
-    local y   = -40   -- start below header
+    local y   = -8   -- start with small top padding within scroll area
 
+    -- ----------------------------------------------------------------
     -- Section: AH Price Source
-    local secLbl = SF:CreateFontString(nil,"OVERLAY","GameFontNormal")
-    secLbl:SetPoint("TOPLEFT", pad, y)
+    -- ----------------------------------------------------------------
+    local secLbl = SListFrame:CreateFontString(nil,"OVERLAY","GameFontNormal")
+    secLbl:SetPoint("TOPLEFT", S_PAD, y)
     secLbl:SetTextColor(unpack(ns.COL_ACCENT))
     secLbl:SetText(ns.L["ah_source"])
     settingsContent[#settingsContent+1] = secLbl
@@ -223,11 +227,9 @@ function ns.RebuildSettingsContent()
 
     local ahOptions = {
         {label=ns.L["ah_auctionator"], value="auctionator", avail=ns.HasAuctionator()},
-        {label=ns.L["ah_tsm"], value="tsm",          avail=ns.HasTSM()},
-        {label=ns.L["ah_none"],     value="none",         avail=true},
+        {label=ns.L["ah_tsm"],         value="tsm",         avail=ns.HasTSM()},
+        {label=ns.L["ah_none"],        value="none",        avail=true},
     }
-
-    -- Also add auto if at least one is available
     if ns.HasAuctionator() or ns.HasTSM() then
         table.insert(ahOptions, 1, {label=ns.L["ah_auto"], value="auto", avail=true})
     end
@@ -236,15 +238,14 @@ function ns.RebuildSettingsContent()
     local function setAH(v) db.ahSource = v end
 
     for _, opt in ipairs(ahOptions) do
-        local row = MakeRadio(SF, opt.label, y, opt.value, getAH, setAH)
+        local row = MakeRadio(SListFrame, opt.label, y, opt.value, getAH, setAH)
         row:SetSelected(getAH() == opt.value)
         row:SetEnabled(opt.avail)
         settingsContent[#settingsContent+1] = row
         y = y - 24
-        -- Info line below "auto" when both sources are present
         if opt.value == "auto" and ns.HasAuctionator() and ns.HasTSM() then
-            local infoLbl = SF:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-            infoLbl:SetPoint("TOPLEFT", pad + 22, y)
+            local infoLbl = SListFrame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+            infoLbl:SetPoint("TOPLEFT", S_PAD + 22, y)
             infoLbl:SetTextColor(0.38, 0.38, 0.38)
             infoLbl:SetText(ns.L["ah_auto_info"])
             settingsContent[#settingsContent+1] = infoLbl
@@ -252,27 +253,29 @@ function ns.RebuildSettingsContent()
         end
     end
 
-    y = y - 8
+    -- ----------------------------------------------------------------
     -- Section: TSM Price Source (only if TSM available)
+    -- ----------------------------------------------------------------
     if ns.HasTSM() then
-        local tsmLbl = SF:CreateFontString(nil,"OVERLAY","GameFontNormal")
-        tsmLbl:SetPoint("TOPLEFT", pad, y)
+        y = y - 8
+        local tsmLbl = SListFrame:CreateFontString(nil,"OVERLAY","GameFontNormal")
+        tsmLbl:SetPoint("TOPLEFT", S_PAD, y)
         tsmLbl:SetTextColor(unpack(ns.COL_ACCENT))
         tsmLbl:SetText(ns.L["tsm_source"])
         settingsContent[#settingsContent+1] = tsmLbl
         y = y - 26
 
-        local hint = SF:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-        hint:SetPoint("TOPLEFT", pad, y)
+        local hint = SListFrame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+        hint:SetPoint("TOPLEFT", S_PAD, y)
         hint:SetTextColor(0.5,0.5,0.5)
         hint:SetText(ns.L["tsm_hint"])
-        hint:SetWidth(S_W - pad*2)
+        hint:SetWidth(S_W - S_PAD*2)
         hint:SetJustifyH("LEFT")
         settingsContent[#settingsContent+1] = hint
         y = y - 28
 
         if not tsmDropdown then
-            tsmDropdown = MakeDropdown(SF, y)
+            tsmDropdown = MakeDropdown(SListFrame, y)
         else
             tsmDropdown:SetPoint("TOPLEFT", S_PAD, y)
             tsmDropdown:Show()
@@ -281,15 +284,15 @@ function ns.RebuildSettingsContent()
         settingsContent[#settingsContent+1] = tsmDropdown
         y = y - 32
 
-        local customLbl = SF:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-        customLbl:SetPoint("TOPLEFT", pad, y)
+        local customLbl = SListFrame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+        customLbl:SetPoint("TOPLEFT", S_PAD, y)
         customLbl:SetTextColor(0.50, 0.50, 0.50)
         customLbl:SetText(ns.L["tsm_custom"])
         settingsContent[#settingsContent+1] = customLbl
         y = y - 18
 
         if not tsmCustomEB then
-            tsmCustomEB = MakeCustomSourceEB(SF, y)
+            tsmCustomEB = MakeCustomSourceEB(SListFrame, y)
         else
             tsmCustomEB:SetPoint("TOPLEFT", S_PAD, y)
             tsmCustomEB:Show()
@@ -299,31 +302,31 @@ function ns.RebuildSettingsContent()
         y = y - 32
     end
 
-    y = y - 8
+    -- ----------------------------------------------------------------
     -- Section: Display
-    local dispLbl = SF:CreateFontString(nil,"OVERLAY","GameFontNormal")
-    dispLbl:SetPoint("TOPLEFT", pad, y)
+    -- ----------------------------------------------------------------
+    y = y - 8
+    local dispLbl = SListFrame:CreateFontString(nil,"OVERLAY","GameFontNormal")
+    dispLbl:SetPoint("TOPLEFT", S_PAD, y)
     dispLbl:SetTextColor(unpack(ns.COL_ACCENT))
     dispLbl:SetText(ns.L["display"])
     settingsContent[#settingsContent+1] = dispLbl
     y = y - 26
 
-    -- Gold rate toggle
     local function getRateMode() return db.goldRateMode=="min" and "min" or "hour" end
-    local rateRow1 = MakeRadio(SF,ns.L["gold_per_hour"], y, "hour", getRateMode,
+    local rateRow1 = MakeRadio(SListFrame, ns.L["gold_per_hour"], y, "hour", getRateMode,
         function(v) db.goldRateMode=v; ns.UpdateGoldRate() end)
     rateRow1:SetSelected(getRateMode()=="hour"); rateRow1:SetEnabled(true)
     settingsContent[#settingsContent+1] = rateRow1
     y = y - 24
 
-    local rateRow2 = MakeRadio(SF,ns.L["gold_per_min"], y, "min", getRateMode,
+    local rateRow2 = MakeRadio(SListFrame, ns.L["gold_per_min"], y, "min", getRateMode,
         function(v) db.goldRateMode=v; ns.UpdateGoldRate() end)
     rateRow2:SetSelected(getRateMode()=="min"); rateRow2:SetEnabled(true)
     settingsContent[#settingsContent+1] = rateRow2
     y = y - 24
 
-    -- Minimap button toggle
-    local mmRow = MakeCheckbox(SF, ns.L["minimap_button"], y,
+    local mmRow = MakeCheckbox(SListFrame, ns.L["minimap_button"], y,
         function() return not db.minimapHidden end,
         function(v)
             db.minimapHidden = not v
@@ -332,10 +335,36 @@ function ns.RebuildSettingsContent()
     settingsContent[#settingsContent+1] = mmRow
     y = y - 26
 
-    -- Resize frame to content
-    SF:SetHeight(math.abs(y) + 30)
+    -- ----------------------------------------------------------------
+    -- Section: Tracking
+    -- ----------------------------------------------------------------
+    y = y - 8
+    local trackLbl = SListFrame:CreateFontString(nil,"OVERLAY","GameFontNormal")
+    trackLbl:SetPoint("TOPLEFT", S_PAD, y)
+    trackLbl:SetTextColor(unpack(ns.COL_ACCENT))
+    trackLbl:SetText(ns.L["tracking"])
+    settingsContent[#settingsContent+1] = trackLbl
+    y = y - 26
 
-    -- Show all
+    local histRow = MakeCheckbox(SListFrame, ns.L["session_history_enabled"], y,
+        function() return db.sessionHistoryEnabled ~= false end,
+        function(v)
+            db.sessionHistoryEnabled = v
+            ns.UpdateHistoryBtn()
+        end)
+    settingsContent[#settingsContent+1] = histRow
+    y = y - 26
+
+    -- ----------------------------------------------------------------
+    -- Resize scroll area and outer frame
+    -- ----------------------------------------------------------------
+    local contentH = math.abs(y) + 8
+    SListFrame:SetHeight(contentH)
+    SScrollFrame:SetVerticalScroll(0)
+    local visH = math.min(contentH, S_MAX_VIS)
+    SScrollFrame:SetHeight(visH)
+    SF:SetHeight(S_HDR_H + visH + 10)
+
     for _, w in ipairs(settingsContent) do w:Show() end
 end
 
@@ -368,7 +397,7 @@ local function EnsureSettingsFrame()
     sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
     sep:SetPoint("TOPLEFT",S_PAD,-30); sep:SetPoint("TOPRIGHT",-S_PAD,-30)
 
-    -- Close button (custom TGA)
+    -- Close button
     local xBtn = CreateFrame("Button",nil,SF)
     xBtn:SetSize(16,16); xBtn:SetPoint("TOPRIGHT",-S_PAD,-10)
     local xTex = xBtn:CreateTexture(nil,"ARTWORK")
@@ -377,6 +406,26 @@ local function EnsureSettingsFrame()
     xBtn:SetScript("OnClick", function() SF:Hide() end)
     xBtn:SetScript("OnEnter",function()xTex:SetAlpha(1)end)
     xBtn:SetScript("OnLeave",function()xTex:SetAlpha(0.7)end)
+
+    -- Scroll container — spans full width, below header sep
+    SScrollFrame = CreateFrame("ScrollFrame", nil, SF)
+    SScrollFrame:SetPoint("TOPLEFT",  0, -S_HDR_H)
+    SScrollFrame:SetPoint("TOPRIGHT", 0, -S_HDR_H)
+    SScrollFrame:EnableMouseWheel(true)
+
+    SListFrame = CreateFrame("Frame", nil, SScrollFrame)
+    SListFrame:SetWidth(S_W)
+    SListFrame:SetHeight(1)
+    SScrollFrame:SetScrollChild(SListFrame)
+
+    local function OnWheel(_, delta)
+        local cur  = SScrollFrame:GetVerticalScroll()
+        local maxS = math.max(0, SListFrame:GetHeight() - SScrollFrame:GetHeight())
+        SScrollFrame:SetVerticalScroll(math.max(0, math.min(cur - delta * S_SCROLL_STEP, maxS)))
+    end
+    SScrollFrame:SetScript("OnMouseWheel", OnWheel)
+    SListFrame:EnableMouseWheel(true)
+    SListFrame:SetScript("OnMouseWheel", OnWheel)
 end
 
 ------------------------------------------------------------------------
@@ -392,7 +441,6 @@ function ns.ToggleSettings()
     end
 end
 
--- Legacy: called from Main for ADDON_LOADED compatibility
 function ns.InitSettings()
     -- nothing to register — our settings are self-contained
 end

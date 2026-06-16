@@ -18,6 +18,7 @@ L["session_history"]   = "Session History"
 L["settings"]          = "Settings"
 L["collapse"]          = "Collapse"
 L["expand"]            = "Expand"
+L["close"]             = "Close"
 L["gathering_start"]   = "Hit start and begin gathering"
 L["gathering_active"]  = "Gathering... loot will appear here"
 -- Help tooltip
@@ -77,6 +78,11 @@ L["rate_min"] = "/min"
 L["gold_overview"] = "Gold Overview"
 L["gold_items"]    = "Items"
 L["gold_total"]    = "Total"
+-- Settings
+L["tracking"]                 = "Tracking"
+L["session_history_enabled"]  = "Save session history"
+L["ah_auto_info"]             = "Prefers Auctionator, falls back to TSM"
+L["tsm_custom"]               = "Custom TSM expression (overrides above)"
 
 ------------------------------------------------------------------------
 -- German (deDE)
@@ -90,6 +96,7 @@ if GetLocale() == "deDE" then
     L["settings"]          = "Einstellungen"
     L["collapse"]          = "Einklappen"
     L["expand"]            = "Ausklappen"
+    L["close"]             = "Schließen"
     L["gathering_start"]   = "Start drücken und farmen"
     L["gathering_active"]  = "Sammle... Beute erscheint hier"
     L["help_categories"]   = "Kategorien:"
@@ -143,4 +150,9 @@ if GetLocale() == "deDE" then
     L["gold_overview"] = "Gold-Übersicht"
     L["gold_items"]    = "Items"
     L["gold_total"]    = "Gesamt"
+    -- Settings
+    L["tracking"]                = "Tracking"
+    L["session_history_enabled"] = "Session-Verlauf speichern"
+    L["ah_auto_info"]            = "Bevorzugt Auctionator, fällt auf TSM zurück"
+    L["tsm_custom"]              = "Eigener TSM-Ausdruck (überschreibt oben)"
 end

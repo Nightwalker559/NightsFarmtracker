@@ -158,7 +158,12 @@ end
 
 function ns.VendorTotal(data)
     local sp = data.sellPrice
-    if not sp and data.itemID then sp = select(11, C_Item.GetItemInfo(data.itemID)) end
+    if not sp then
+        -- itemLink hat die vollen Bonus-IDs (Skalierung, ilvl) → korrekter Vendorpreis
+        -- itemID allein gibt nur den Basispreis ohne Skalierung zurück
+        local src = data.itemLink or data.itemID
+        if src then sp = select(11, C_Item.GetItemInfo(src)) end
+    end
     return (sp and sp > 0) and (sp * data.amount) or nil
 end
 
@@ -181,7 +186,8 @@ function ns.AHTotal(data)
 end
 
 function ns.ItemValue(data)
-    if data.isBoP then return ns.VendorTotal(data) end
+    -- Kein AH-Verkauf möglich: BoP, oder explizit als nicht-AH-fähig markiert (BoA, Kriegsmeute-gebunden)
+    if data.isBoP or data.canAH == false then return ns.VendorTotal(data) end
     local mode = NightsFarmtrackerDB.priceMode[ns.CategoryName(data)] or "both"
     local v = ns.VendorTotal(data)
     local a = ns.AHTotal(data)
@@ -215,6 +221,7 @@ function ns.InitDB()
     if db.minimapPos    == nil then db.minimapPos    = 225                     end
     if db.minimapHidden == nil then db.minimapHidden = false                   end
     if db.lootedGold    == nil then db.lootedGold    = 0                      end
+    if db.sessionHistoryEnabled == nil then db.sessionHistoryEnabled = true   end
     if db.priceMode     == nil or type(db.priceMode) ~= "table" then
         db.priceMode = {}
     end

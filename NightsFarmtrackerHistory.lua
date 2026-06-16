@@ -38,6 +38,7 @@ function ns.SaveCurrentSession()
     local db = NightsFarmtrackerDB
     if not db or not next(db.count or {}) then return end
     if (db.totalTime or 0) < 10 then return end
+    if db.sessionHistoryEnabled == false then return end
     if not NightsFarmtrackerAccountDB then NightsFarmtrackerAccountDB = {} end
     if not NightsFarmtrackerAccountDB.sessions then NightsFarmtrackerAccountDB.sessions = {} end
     local sessions = NightsFarmtrackerAccountDB.sessions
@@ -591,9 +592,12 @@ function ns.RebuildHistory()
     HistFrame:SetHeight(H_HDR_H+visH+H_FTR_H)
     local nDays=#dayOrder; local nTotal=#sessions
     if nTotal==0 then
-        HistFrame.countLabel:SetText(ns.L["no_sessions"])
+        HistFrame.countLabel:SetText("")
+        HistFrame.emptyLabel:SetText(ns.L["no_sessions"])
+        HistFrame.emptyLabel:Show()
         if HistFrame.clrBtn then HistFrame.clrBtn:Hide() end
     else
+        HistFrame.emptyLabel:Hide()
         if HistFrame.clrBtn then HistFrame.clrBtn:Show() end
         local key = (nTotal == 1) and ns.L["sessions_summary"] or ns.L["sessions_summary_pl"]
         HistFrame.countLabel:SetText(string.format(key, nTotal, nDays, MAX_SESSIONS))
@@ -651,6 +655,12 @@ local function EnsureHistFrame()
 
     HistFrame.countLabel=HistFrame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     HistFrame.countLabel:SetPoint("BOTTOMLEFT",H_PAD,8); HistFrame.countLabel:SetTextColor(0.40,0.40,0.40)
+
+    HistFrame.emptyLabel=HistFrame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    HistFrame.emptyLabel:SetPoint("TOP",HistFrame,"TOP",0,-(H_HDR_H+22))
+    HistFrame.emptyLabel:SetJustifyH("CENTER")
+    HistFrame.emptyLabel:SetTextColor(0.55,0.55,0.55)
+    HistFrame.emptyLabel:Hide()
 
     HistFrame.clrBtn=CreateFrame("Button",nil,HistFrame); HistFrame.clrBtn:SetSize(70,18); HistFrame.clrBtn:SetPoint("BOTTOMRIGHT",-H_PAD,6)
     local clrLabel=HistFrame.clrBtn:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")

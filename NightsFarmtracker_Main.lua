@@ -20,7 +20,10 @@ local priceRetryCount   = 0
 -- Localized self-loot prefix derived from WoW's own global string.
 -- EN: "You receive loot: "  /  DE: "Ihr erhaltet Beute: "
 -- Only messages starting with this prefix belong to the player.
-local SELF_LOOT_PREFIX = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(.-)%%s") or nil
+-- "Ihr " (DE) / "You " (EN) — erstes Wort aus LOOT_ITEM_SELF.
+-- Deckt alle eigenen Loot-Varianten ab: Beute, Gegenstände, einen Gegenstand, etc.
+-- Andere Spieler beginnen mit ihrem Charakternamen → werden gefiltert.
+local SELF_LOOT_PREFIX    = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(%S+%s)") or nil
 
 -- Cache reagent quality API at load time; nil if unavailable
 local GetReagentQualityInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityInfo or nil
@@ -78,20 +81,22 @@ local function ProcessLoot(items)
             local db          = NightsFarmtrackerDB
             local shouldTrack = false
 
-            if quality == 0 and sellPrice and sellPrice > 0 then
-                -- Junk with vendor value
-                shouldTrack = not db.excludedNames[ns.CAT_VENDOR] and not db.excludedNames[name]
-            elseif classID == TRADE_GOODS
-                or db.trackedNames[name]
-                or (bindType == BIND_ON_EQUIP  and not db.excludedNames[ns.CAT_BOE]
-                    and sellPrice and sellPrice > 0)
-                or (bindType == BIND_ON_PICKUP and quality and quality > 0
-                    and not db.excludedNames[ns.CAT_BOP]
-                    and sellPrice and sellPrice > 0)
-                or (quality and quality >= 2 and (not sellPrice or sellPrice == 0)
-                    and classID == 5)  -- Reagent only; TRADE_GOODS covered above
-                or (quality and quality > 0  and sellPrice and sellPrice > 0) then
-                shouldTrack = not db.excludedNames[name]
+            if db.excludedNames[name] then
+                -- name explicitly excluded
+            elseif db.trackedNames and db.trackedNames[name] then
+                shouldTrack = true
+            elseif quality == 0 then
+                -- grey: nur wenn vendorbar + Junk-Kategorie nicht excluded
+                shouldTrack = (sellPrice and sellPrice > 0)
+                           and not db.excludedNames[ns.CAT_VENDOR]
+            else
+                -- quality > 0: tracken sofern nicht definitiv unverkäuflich.
+                -- sellPrice == nil = Cache-Miss = unbekannt → tracken und Preis später auflösen.
+                -- Nur überspringen wenn sellPrice explizit 0 UND BoP UND kein Trade Good.
+                local definitelyUnsellable = (sellPrice == 0)
+                                          and (bindType == BIND_ON_PICKUP)
+                                          and (classID ~= TRADE_GOODS)
+                shouldTrack = not definitelyUnsellable
             end
 
             -- Apply filter mode
@@ -122,6 +127,13 @@ local function ProcessLoot(items)
                 if quality == 0               then entry.isVendorTrash = true end
                 if bindType == BIND_ON_EQUIP  then entry.isBoE         = true end
                 if bindType == BIND_ON_PICKUP then entry.isBoP         = true end
+                -- canAH: nur BoE und ungebundene Items (0/nil) sowie Trade Goods dürfen auf dem AH.
+                -- BoP (1), Kriegsmeute-/Account-gebunden und alles andere → nur Vendor.
+                if entry.canAH == nil then
+                    entry.canAH = (bindType == BIND_ON_EQUIP)
+                               or (bindType == 0 or bindType == nil)
+                               or (classID == TRADE_GOODS)
+                end
 
                 -- Sell price: trust directly for trade goods and junk (no scaling)
                 if sellPrice and sellPrice > 0 and (classID == TRADE_GOODS or quality == 0) then
@@ -204,6 +216,20 @@ function ns.UpdatePricesFromBags()
                                 data.itemLink  = bagLink
                             else
                                 data.noSell = true
+                            end
+                            -- classID / Bind-Flags nachladen wenn beim Looten nicht aufgelöst
+                            if not data.classID then
+                                local _, _, _, _, cID, _, bType = C_Item.GetItemInfoInstant(bagLink)
+                                if cID then data.classID = cID end
+                                if bType then
+                                    if bType == BIND_ON_EQUIP  then data.isBoE = true end
+                                    if bType == BIND_ON_PICKUP then data.isBoP = true end
+                                    if data.canAH == nil then
+                                        data.canAH = (bType == BIND_ON_EQUIP)
+                                                  or (bType == 0)
+                                                  or (data.classID == TRADE_GOODS)
+                                    end
+                                end
                             end
                             updated            = true
                             byID[ci.itemID]    = nil
@@ -295,14 +321,20 @@ end
 ------------------------------------------------------------------------
 EventFrame = CreateFrame("Frame")
 
--- Dedup table: prevents double-counting the same item within a short window
+-- Within-CHAT_MSG_LOOT dedup: verhindert dass dasselbe Event doppelt feuert
 local recentLoot   = {}
 local DEDUP_WINDOW = 0.1  -- seconds
+
+-- Cross-event dedup: verhindert Doppelzählung zwischen CHAT_MSG_LOOT und ENCOUNTER_LOOT_RECEIVED
+local recentChatLoot      = {}  -- gesehen von CHAT_MSG_LOOT
+local recentEncounterLoot = {}  -- gesehen von ENCOUNTER_LOOT_RECEIVED
+local CROSS_DEDUP_TTL     = 2   -- seconds
 
 EventFrame:RegisterEvent("ADDON_LOADED")
 EventFrame:RegisterEvent("PLAYER_LOGIN")
 EventFrame:RegisterEvent("CHAT_MSG_LOOT")
 EventFrame:RegisterEvent("CHAT_MSG_MONEY")
+EventFrame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
 
 EventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -325,6 +357,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         if not NightsFarmtrackerDB.paused then ns.StartTimer() end
         ns.SetMinimapVisible(not NightsFarmtrackerDB.minimapHidden)
         ns.SetExpanded(NightsFarmtrackerDB.expanded)
+        ns.UpdateHistoryBtn()
         ns.RefreshHUD()
 
     elseif event == "BAG_UPDATE_DELAYED" and ns.pendingPriceUpdate then
@@ -346,13 +379,14 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "CHAT_MSG_LOOT" and not NightsFarmtrackerDB.paused then
-        local msg = ...
+        local msg, _, _, _, sender = ...
 
-        -- Ignore loot that belongs to other players
-        if SELF_LOOT_PREFIX and not msg:find(SELF_LOOT_PREFIX, 1, true) then return end
+        -- isMe: Prefix-Check ("Ihr "/"You ") ODER Sender = eigener Spielername
+        local prefixMatch = SELF_LOOT_PREFIX and msg:find(SELF_LOOT_PREFIX, 1, true)
+        local senderShort = sender and sender:match("^([^%-]+)") or ""
+        local senderMatch = senderShort ~= "" and senderShort == UnitName("player")
+        if not prefixMatch and not senderMatch then return end
 
-        -- WoW loot messages may or may not include a color prefix before the item link.
-        -- Try with color first (quality extraction), then without as fallback.
         local color, linkData, itemName =
             msg:match("|cff(%x%x%x%x%x%x)|H(item:[^|]+)|h%[([^%]]+)%]|h")
         if not linkData then
@@ -363,21 +397,69 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         local itemID = tonumber(linkData:match("^item:(%d+)"))
         if not itemID then return end
 
-        ns.Log("LOOT itemID=", itemID, "name=", itemName, "color=", color)
-
-        -- Prune and check dedup table
-        local now = GetTime()
-        for id, t in pairs(recentLoot) do
-            if (now - t) > DEDUP_WINDOW * 10 then recentLoot[id] = nil end
-        end
-        if recentLoot[itemID] and (now - recentLoot[itemID]) < DEDUP_WINDOW then return end
-        recentLoot[itemID] = now
-
         local qty      = tonumber(msg:match("x(%d+)")) or 1
         local fullLink = "|H" .. linkData .. "|h[" .. itemName .. "]|h"
+
+        -- Within-event dedup (itemID:qty Key, 0.1s Fenster)
+        local now      = GetTime()
+        local dedupKey = itemID .. ":" .. qty
+        for k, t in pairs(recentLoot) do
+            if (now - t) > DEDUP_WINDOW * 10 then recentLoot[k] = nil end
+        end
+        if recentLoot[dedupKey] and (now - recentLoot[dedupKey]) < DEDUP_WINDOW then return end
+        recentLoot[dedupKey] = now
+
+        -- Cross-event dedup: ENCOUNTER_LOOT_RECEIVED war schneller → überspringen
+        if recentEncounterLoot[itemID] and recentEncounterLoot[itemID] > 0 then
+            recentEncounterLoot[itemID] = recentEncounterLoot[itemID] - 1
+            return
+        end
+        -- Markieren damit ENCOUNTER_LOOT_RECEIVED es überspringt falls es danach kommt
+        recentChatLoot[itemID] = (recentChatLoot[itemID] or 0) + 1
+        C_Timer.After(CROSS_DEDUP_TTL, function()
+            if recentChatLoot[itemID] and recentChatLoot[itemID] > 0 then
+                recentChatLoot[itemID] = recentChatLoot[itemID] - 1
+            end
+        end)
+
         ProcessLoot({{
             itemID      = itemID,
             qty         = qty,
+            link        = fullLink,
+            itemName    = itemName,
+            linkQuality = LINK_QUALITY[color and color:lower()],
+        }})
+
+    elseif event == "ENCOUNTER_LOOT_RECEIVED" and not NightsFarmtrackerDB.paused then
+        -- Feuert für Encounter-Loot (Boss-Drops etc.) locale-unabhängig
+        -- Args: encounterID, encounterName, difficultyID, groupSize, itemLink, quantity, playerName
+        local _, _, _, _, link, qty, playerName = ...
+        if not link or link == "" then return end
+        if playerName ~= UnitName("player") then return end
+
+        local itemID = tonumber(link:match("item:(%d+)"))
+        if not itemID then return end
+
+        -- Cross-event dedup: CHAT_MSG_LOOT war schneller → überspringen
+        if recentChatLoot[itemID] and recentChatLoot[itemID] > 0 then
+            recentChatLoot[itemID] = recentChatLoot[itemID] - 1
+            return
+        end
+        -- Markieren damit CHAT_MSG_LOOT es überspringt falls es danach kommt
+        recentEncounterLoot[itemID] = (recentEncounterLoot[itemID] or 0) + 1
+        C_Timer.After(CROSS_DEDUP_TTL, function()
+            if recentEncounterLoot[itemID] and recentEncounterLoot[itemID] > 0 then
+                recentEncounterLoot[itemID] = recentEncounterLoot[itemID] - 1
+            end
+        end)
+
+        local color    = link:match("|cff(%x%x%x%x%x%x)|H")
+        local itemName = link:match("%[(.-)%]")
+        local fullLink = link:match("(|H.+|h%[.-%]|h)") or link
+
+        ProcessLoot({{
+            itemID      = itemID,
+            qty         = tonumber(qty) or 1,
             link        = fullLink,
             itemName    = itemName,
             linkQuality = LINK_QUALITY[color and color:lower()],

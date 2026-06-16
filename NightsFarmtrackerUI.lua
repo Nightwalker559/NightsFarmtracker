@@ -1,6 +1,6 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - UI
--- BtnBar always visible: [▶][↺][⏱] left · [⚙][?][▼/▲] right
+-- BtnBar always visible: [▶][↺][⏱] left · [⚙][?][▼/▲][✕] right
 -- Footer always visible: total gold | timer | gold/rate
 ------------------------------------------------------------------------
 local ADDON_NAME, ns = ...
@@ -77,8 +77,8 @@ ns.MainFrame = MainFrame
 
 ------------------------------------------------------------------------
 -- Button bar — always visible
--- Left:  [▶] [↺] [⏱] [⚙]
--- Right: [?] [▼/▲]
+-- Left:  [▶] [↺] [⏱]
+-- Right: [⚙] [?] [▼/▲] [✕]
 ------------------------------------------------------------------------
 local BtnBar = CreateFrame("Frame", nil, MainFrame)
 BtnBar:SetSize(CONTENT_W, BTN_BAR_H)
@@ -93,9 +93,12 @@ btnReset:SetPoint("LEFT", btnPause, "RIGHT", 6, 0)
 local btnHistory  = MakeBtn(BtnBar, 16, "btn_history.tga")
 btnHistory:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
 
--- Right side (anchored from right): collapse → help → settings
+-- Right side (anchored from right): close → collapse → help → settings
+local btnClose = MakeBtn(BtnBar, 16, "btn_close.tga")
+btnClose:SetPoint("RIGHT", BtnBar, "RIGHT", 0, 0)
+
 local btnToggle = MakeBtn(BtnBar, 16, "btn_expand.tga")
-btnToggle:SetPoint("RIGHT", BtnBar, "RIGHT", 0, 0)
+btnToggle:SetPoint("RIGHT", btnClose, "LEFT", -6, 0)
 
 local btnHelp = MakeBtn(BtnBar, 16, "btn_help.tga")
 btnHelp:SetPoint("RIGHT", btnToggle, "LEFT", -6, 0)
@@ -129,10 +132,16 @@ footerSep:SetColorTexture(unpack(ns.COL_BORDER))
 footerSep:SetPoint("BOTTOMLEFT",  PAD,  FOOTER_H - 2)
 footerSep:SetPoint("BOTTOMRIGHT", -PAD, FOOTER_H - 2)
 
-MainFrame.totalGoldText = MainFrame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-MainFrame.totalGoldText:SetPoint("BOTTOMLEFT", MainFrame, "BOTTOMLEFT", PAD, 9)
+local goldBtn = CreateFrame("Button", nil, MainFrame)
+goldBtn:SetPoint("BOTTOMLEFT", MainFrame, "BOTTOMLEFT", PAD, 4)
+goldBtn:SetSize(140, 22)
+MainFrame.totalGoldText = goldBtn:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+MainFrame.totalGoldText:SetPoint("LEFT")
 MainFrame.totalGoldText:SetTextColor(unpack(ns.COL_GOLD))
 MainFrame.totalGoldText:SetFontHeight(11)
+goldBtn:SetScript("OnClick", function() ns.ToggleGoldFrame() end)
+goldBtn:SetScript("OnEnter", function() MainFrame.totalGoldText:SetTextColor(1, 1, 0.6) end)
+goldBtn:SetScript("OnLeave", function() MainFrame.totalGoldText:SetTextColor(unpack(ns.COL_GOLD)) end)
 
 MainFrame.TimerText = MainFrame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
 MainFrame.TimerText:SetPoint("BOTTOM", MainFrame, "BOTTOM", 0, 9)
@@ -144,25 +153,10 @@ MainFrame.TimerText:SetText("00:00:00")
 local btnRate = CreateFrame("Frame", nil, MainFrame)
 btnRate:SetPoint("BOTTOMRIGHT", -PAD, 4)
 btnRate:SetSize(130, 20)
-btnRate:EnableMouse(true)
 btnRate.text = btnRate:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
 btnRate.text:SetPoint("RIGHT")
 btnRate.text:SetTextColor(0.55, 0.55, 0.55)
 btnRate.text:SetFontHeight(11)
-btnRate:SetScript("OnEnter", function(self)
-    local db = NightsFarmtrackerDB
-    local itemGold   = cachedGold - (db.lootedGold or 0)
-    local lootedGold = db.lootedGold or 0
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:AddLine(ns.L["gold_overview"], unpack(ns.COL_ACCENT))
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddDoubleLine(ns.L["gold_items"]..":",  ns.FormatGold(itemGold)   or "0", 0.85,0.85,0.85, unpack(ns.COL_GOLD))
-    GameTooltip:AddDoubleLine(ns.L["looted_gold"]..":", ns.FormatGold(lootedGold) or "0", 0.85,0.85,0.85, unpack(ns.COL_GOLD))
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddDoubleLine(ns.L["gold_total"]..":",  ns.FormatGold(cachedGold) or "0", 1,1,1, unpack(ns.COL_GOLD))
-    GameTooltip:Show()
-end)
-btnRate:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 ------------------------------------------------------------------------
 -- Scroll frame (visible only when expanded)
@@ -185,6 +179,73 @@ ScrollFrame:EnableMouseWheel(true)
 ScrollFrame:SetScript("OnMouseWheel", OnWheel)
 ListFrame:EnableMouseWheel(true)
 ListFrame:SetScript("OnMouseWheel", OnWheel)
+
+------------------------------------------------------------------------
+-- Gold Overview Frame
+------------------------------------------------------------------------
+local GoldFrame = CreateFrame("Frame","NightsFarmtrackerGoldFrame",UIParent,"BackdropTemplate")
+GoldFrame:SetWidth(FRAME_W)
+GoldFrame:SetPoint("TOPLEFT", MainFrame, "BOTTOMLEFT", 0, -2)
+GoldFrame:SetFrameStrata("HIGH")
+GoldFrame:SetClampedToScreen(true)
+ns.ApplyFrameStyle(GoldFrame)
+GoldFrame:Hide()
+
+do
+    local gp = PAD
+    local titleFS = GoldFrame:CreateFontString(nil,"OVERLAY","GameFontNormal")
+    titleFS:SetPoint("TOPLEFT", gp, -10)
+    titleFS:SetTextColor(unpack(ns.COL_ACCENT))
+    titleFS:SetText(ns.L["gold_overview"])
+
+    local sep1 = GoldFrame:CreateTexture(nil,"ARTWORK"); sep1:SetHeight(1)
+    sep1:SetColorTexture(unpack(ns.COL_BORDER))
+    sep1:SetPoint("TOPLEFT", gp, -26); sep1:SetPoint("TOPRIGHT", -gp, -26)
+
+    local function MakeRow(yOff, labelKey, bold)
+        local font = bold and "GameFontNormal" or "GameFontNormalSmall"
+        local lbl = GoldFrame:CreateFontString(nil,"OVERLAY",font)
+        lbl:SetPoint("TOPLEFT", gp, yOff)
+        lbl:SetTextColor(0.75, 0.75, 0.75)
+        lbl:SetText(ns.L[labelKey] or labelKey)
+        local val = GoldFrame:CreateFontString(nil,"OVERLAY",font)
+        val:SetPoint("TOPRIGHT", -gp, yOff)
+        val:SetJustifyH("RIGHT")
+        val:SetTextColor(unpack(ns.COL_GOLD))
+        return val
+    end
+
+    local itemsVal  = MakeRow(-33, "gold_items")
+    local direktVal = MakeRow(-49, "looted_gold")
+
+    local sep2 = GoldFrame:CreateTexture(nil,"ARTWORK"); sep2:SetHeight(1)
+    sep2:SetColorTexture(unpack(ns.COL_BORDER))
+    sep2:SetPoint("TOPLEFT", gp, -63); sep2:SetPoint("TOPRIGHT", -gp, -63)
+
+    local totalVal = MakeRow(-72, "gold_total", true)
+
+    GoldFrame:SetHeight(88)
+    GoldFrame.itemsVal  = itemsVal
+    GoldFrame.direktVal = direktVal
+    GoldFrame.totalVal  = totalVal
+end
+
+function ns.UpdateGoldFrame()
+    if not GoldFrame:IsShown() then return end
+    local db         = NightsFarmtrackerDB
+    local lootedGold = db.lootedGold or 0
+    local itemGold   = cachedGold - lootedGold
+    GoldFrame.itemsVal:SetText( itemGold   > 0 and ns.FormatGold(itemGold)   or "0")
+    GoldFrame.direktVal:SetText(lootedGold > 0 and ns.FormatGold(lootedGold) or "0")
+    GoldFrame.totalVal:SetText( cachedGold > 0 and ns.FormatGold(cachedGold) or "0")
+end
+
+function ns.ToggleGoldFrame()
+    if GoldFrame:IsShown() then GoldFrame:Hide()
+    else GoldFrame:Show(); ns.UpdateGoldFrame() end
+end
+
+MainFrame:HookScript("OnHide", function() GoldFrame:Hide() end)
 
 ------------------------------------------------------------------------
 -- Timer / rate
@@ -255,9 +316,10 @@ local function UpdateSummary()
             if val then cachedGold = cachedGold + val end
         end
     end
-    MainFrame.totalGoldText:SetText(cachedGold > 0 and ns.FormatGold(cachedGold) or "")
     cachedGold = cachedGold + (NightsFarmtrackerDB.lootedGold or 0)
+    MainFrame.totalGoldText:SetText(cachedGold > 0 and ns.FormatGold(cachedGold) or "")
     ns.UpdateGoldRate()
+    ns.UpdateGoldFrame()
 end
 
 ------------------------------------------------------------------------
@@ -467,14 +529,33 @@ ns.RefreshHUD = function()
 
     local sorted = {}
     for catName, cat in pairs(cats) do sorted[#sorted+1]={name=catName,cat=cat} end
+
+    -- hasAH muss vor dem Sort bekannt sein
+    local hasAH = ns.HasAnyAH() and db.ahSource ~= "none"
+
+    -- displayGold pro Kategorie: gleiche Logik wie der Header-Text
+    local junkLabel = ns.L["cat_junk"] or "Junk"
+    for _, entry in ipairs(sorted) do
+        local catName = entry.name
+        local cat     = entry.cat
+        local isJunkCat = (catName == junkLabel)
+        local mode      = db.priceMode[catName] or "both"
+        local useVendor = (mode == "vendor")
+        if useVendor or not hasAH or isJunkCat then
+            cat.displayGold = cat.totalVendor
+        elseif cat.totalAH > 0 then
+            cat.displayGold = cat.totalAH
+        else
+            cat.displayGold = cat.totalGold
+        end
+    end
+
     table.sort(sorted, function(a,b)
-        if a.cat.totalGold ~= b.cat.totalGold then return a.cat.totalGold > b.cat.totalGold end
+        if a.cat.displayGold ~= b.cat.displayGold then return a.cat.displayGold > b.cat.displayGold end
         local oa = (a.cat.classID and ns.CLASS_PRIORITY[a.cat.classID]) or 50
         local ob = (b.cat.classID and ns.CLASS_PRIORITY[b.cat.classID]) or 50
         return oa < ob
     end)
-
-    local hasAH   = ns.HasAnyAH() and db.ahSource ~= "none"
     local yOffset = 0
 
     for _, entry in ipairs(sorted) do
@@ -545,14 +626,10 @@ ns.RefreshHUD = function()
                     end
                 else
                     local gold = fv and (item.vendor or 0) or (item.ah or item.vendor or 0)
-                    -- Show if gold > 0, OR price not yet resolved (sellPrice pending bag scan)
-                    local priceKnown = d.sellPrice or d.noSell
-                    if gold > 0 or not priceKnown then
-                        flat[#flat+1] = {
-                            isRank=false, name=item.name, d=d,
-                            item=item, gold=gold, fv=fv,
-                        }
-                    end
+                    flat[#flat+1] = {
+                        isRank=false, name=item.name, d=d,
+                        item=item, gold=gold, fv=fv,
+                    }
                 end
             end
 
@@ -638,6 +715,7 @@ function ns.Reset()
     db.count={}; db.collapsed={}; db.excludedNames={}
     db.totalTime=0; db.qAtlas={}; db.paused=true; db.lootedGold=0
     ns.StopTimer(); ns.CleanupPriceUpdate()
+    GoldFrame:Hide()
     for _, row in pairs(itemRows) do ReleaseRow(row) end
     itemRows, itemOrder = {}, {}
     cachedGold = 0
@@ -671,6 +749,19 @@ end
 ------------------------------------------------------------------------
 -- Button scripts
 ------------------------------------------------------------------------
+btnClose:SetScript("OnClick", function()
+    NightsFarmtrackerDB.visible = false
+    MainFrame:Hide()
+    GoldFrame:Hide()
+end)
+btnClose:SetScript("OnEnter", function(self)
+    self.tex:SetAlpha(1)
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:SetText(ns.L["close"])
+    GameTooltip:Show()
+end)
+btnClose:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+
 btnToggle:SetScript("OnClick", function()
     ns.SetExpanded(not NightsFarmtrackerDB.expanded)
 end)
@@ -738,8 +829,6 @@ btnHelp:SetScript("OnEnter", function(self)
 end)
 btnHelp:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
 
--- gold rate display (toggle in settings)
-
 ------------------------------------------------------------------------
 -- Minimap button
 ------------------------------------------------------------------------
@@ -781,6 +870,15 @@ ns.UpdateMinimapPosition = PlaceMinimapBtn
 function ns.UpdateMinimapIcon() end
 function ns.SetMinimapVisible(show)
     if show then mmBtn:Show() else mmBtn:Hide() end
+end
+
+function ns.UpdateHistoryBtn()
+    local enabled = NightsFarmtrackerDB.sessionHistoryEnabled ~= false
+    if enabled then
+        btnHistory:Show(); btnHistory:EnableMouse(true)
+    else
+        btnHistory:Hide(); btnHistory:EnableMouse(false)
+    end
 end
 mmBtn:SetScript("OnMouseDown",function(self)self.icon:SetSize(17,17)end)
 mmBtn:SetScript("OnMouseUp",  function(self)self.icon:SetSize(20,20)end)
