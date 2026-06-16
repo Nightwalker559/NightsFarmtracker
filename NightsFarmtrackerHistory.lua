@@ -63,7 +63,7 @@ function ns.SaveCurrentSession()
         }
     end
     local today = date("%d.%m.%Y")
-    if #sessions > 0 and date("%d.%m.%Y", sessions[1].timestamp) == today then
+    if db.mergeDaily ~= false and #sessions > 0 and date("%d.%m.%Y", sessions[1].timestamp) == today then
         local ex = sessions[1]
         ex.timestamp=newEntry.timestamp
         ex.duration    = ex.duration    + newEntry.duration
@@ -461,49 +461,6 @@ end
 ------------------------------------------------------------------------
 -- Merge sessions
 ------------------------------------------------------------------------
-local function MergeDaySessions(day)
-    if #day.sessions<=1 then return end
-    local merged={timestamp=day.sessions[1].session.timestamp,duration=0,totalGold=0,totalVendor=0,totalAH=0,items={},qAtlas={},lootedGold=0}
-    for _,entry in ipairs(day.sessions) do
-        local s=entry.session
-        merged.duration    = merged.duration    + s.duration
-        merged.totalGold   = merged.totalGold   + s.totalGold
-        merged.totalVendor = merged.totalVendor + (s.totalVendor or 0)
-        merged.totalAH     = merged.totalAH     + (s.totalAH     or 0)
-        merged.lootedGold  = merged.lootedGold  + (s.lootedGold  or 0)
-        if s.qAtlas then
-            for tier, atlas in pairs(s.qAtlas) do
-                merged.qAtlas[tier] = merged.qAtlas[tier] or atlas
-            end
-        end
-        for name,d in pairs(s.items) do
-            if not merged.items[name] then
-                merged.items[name]={amount=0,icon=d.icon,quality=d.quality,itemSubType=d.itemSubType,
-                    sellPrice=d.sellPrice,vendorTotal=0,ahTotal=0,
-                    isVendorTrash=d.isVendorTrash,isBoE=d.isBoE,isBoP=d.isBoP,
-                    classID=d.classID,itemID=d.itemID}
-            end
-            local mi=merged.items[name]
-            mi.amount      = mi.amount      + d.amount
-            mi.vendorTotal = (mi.vendorTotal or 0) + (d.vendorTotal or 0)
-            mi.ahTotal     = (mi.ahTotal     or 0) + (d.ahTotal     or 0)
-            if d.q then
-                if not mi.q then mi.q={}; mi.qIDs={} end
-                for tier=1,3 do
-                    if d.q[tier] then mi.q[tier]=(mi.q[tier] or 0)+d.q[tier] end
-                    if d.qIDs and d.qIDs[tier] and not mi.qIDs[tier] then mi.qIDs[tier]=d.qIDs[tier] end
-                end
-            end
-        end
-    end
-    local indices={}
-    for _,e in ipairs(day.sessions) do indices[#indices+1]=e.idx end
-    table.sort(indices,function(a,b) return a>b end)
-    for _,idx in ipairs(indices) do table.remove(NightsFarmtrackerAccountDB.sessions,idx) end
-    table.insert(NightsFarmtrackerAccountDB.sessions,indices[#indices],merged)
-    ns.RebuildHistory()
-end
-
 ------------------------------------------------------------------------
 -- RebuildHistory
 ------------------------------------------------------------------------
@@ -522,26 +479,11 @@ function ns.RebuildHistory()
     end
     local yOffset=0
     for _,dStr in ipairs(dayOrder) do
-        local day=days[dStr]; local nSess=#day.sessions
+        local day=days[dStr]
         local drow=AcquireDayRow(); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
         drow.dateText:SetText(dStr)
         drow.infoText:SetText("")
         drow.goldText:SetText("")
-        if nSess>1 then
-            local d=day
-            drow:SetScript("OnMouseUp",function(_,btn) if btn=="LeftButton" then MergeDaySessions(d) end end)
-            drow:SetScript("OnEnter",function(self)
-                self.bg:SetColorTexture(0.16,0.24,0.27,0.95); self.dateText:SetTextColor(1,1,1)
-                GameTooltip:SetOwner(self,"ANCHOR_BOTTOMLEFT")
-                GameTooltip:SetText(string.format(ns.L["merge_sessions"], nSess))
-                GameTooltip:AddLine(ns.L["merge_desc"],0.7,0.7,0.7,true)
-                GameTooltip:Show()
-            end)
-            drow:SetScript("OnLeave",function(self)
-                self.bg:SetColorTexture(unpack(ns.COL_CAT_BG)); self.dateText:SetTextColor(unpack(ns.COL_ACCENT))
-                GameTooltip:Hide()
-            end)
-        end
         activeDayRows[#activeDayRows+1]=drow; yOffset=yOffset+DAY_H
         for _,entry in ipairs(day.sessions) do
             local session=entry.session; local idx=entry.idx

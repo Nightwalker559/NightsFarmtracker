@@ -10,7 +10,7 @@ local SF           -- settings frame (lazy built)
 local SScrollFrame -- scroll container for content
 local SListFrame   -- scroll child (all widgets live here)
 
-local S_W          = 310
+local S_W          = 320
 local S_PAD        = 14
 local S_HDR_H      = 34    -- header (title + sep)
 local S_MAX_VIS    = 380   -- max visible scroll area height
@@ -34,7 +34,7 @@ local function MakeRadio(parent, label, yOff, value, getGroup, setGroup)
     dot:SetBackdropBorderColor(unpack(ns.COL_BORDER))
 
     local fill = dot:CreateTexture(nil,"ARTWORK")
-    fill:SetSize(6,6); fill:SetPoint("CENTER")
+    fill:SetSize(7,7); fill:SetPoint("CENTER")
     fill:SetColorTexture(unpack(ns.COL_ACCENT)); fill:Hide()
     dot.fill = fill
 
@@ -90,7 +90,7 @@ end
 ------------------------------------------------------------------------
 local function MakeDropdown(parent, yOff)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    frame:SetSize(180, 24)
+    frame:SetSize(S_W - S_PAD*2 - 40, 24)
     frame:SetPoint("TOPLEFT", S_PAD, yOff)
     frame:SetBackdrop({bgFile="Interface/Tooltips/UI-Tooltip-Background",
         edgeFile="Interface/Tooltips/UI-Tooltip-Border",
@@ -134,7 +134,7 @@ end
 ------------------------------------------------------------------------
 local function MakeCustomSourceEB(parent, yOff)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    frame:SetSize(180, 24)
+    frame:SetSize(S_W - S_PAD*2 - 40, 24)
     frame:SetPoint("TOPLEFT", S_PAD, yOff)
     frame:SetBackdrop({bgFile="Interface/Tooltips/UI-Tooltip-Background",
         edgeFile="Interface/Tooltips/UI-Tooltip-Border",
@@ -143,7 +143,7 @@ local function MakeCustomSourceEB(parent, yOff)
     frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
 
     local eb = CreateFrame("EditBox", nil, frame)
-    eb:SetSize(164, 18)
+    eb:SetSize(S_W - S_PAD*2 - 56, 18)
     eb:SetPoint("LEFT", 6, 0)
     eb:SetAutoFocus(false)
     eb:SetMaxLetters(64)
@@ -170,11 +170,11 @@ end
 ------------------------------------------------------------------------
 local function MakeCheckbox(parent, label, yOff, getValue, setValue)
     local row = CreateFrame("Frame", nil, parent)
-    row:SetSize(S_W - S_PAD*2, 22)
+    row:SetSize(S_W - S_PAD*2, 36)
     row:SetPoint("TOPLEFT", S_PAD, yOff)
 
     local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
-    box:SetSize(14, 14); box:SetPoint("LEFT", 0, 0)
+    box:SetSize(14, 14); box:SetPoint("TOPLEFT", 0, -4)
     box:SetBackdrop({bgFile="Interface/Tooltips/UI-Tooltip-Background",
         edgeFile="Interface/Tooltips/UI-Tooltip-Border",
         tile=true,tileSize=8,edgeSize=8,insets={left=2,right=2,top=2,bottom=2}})
@@ -186,7 +186,10 @@ local function MakeCheckbox(parent, label, yOff, getValue, setValue)
     check:SetColorTexture(unpack(ns.COL_ACCENT))
 
     local lbl = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    lbl:SetPoint("LEFT", box, "RIGHT", 8, 0)
+    lbl:SetPoint("TOPLEFT", box, "TOPRIGHT", 8, 0)
+    lbl:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    lbl:SetJustifyH("LEFT")
+    lbl:SetWordWrap(true)
     lbl:SetTextColor(0.85,0.85,0.85); lbl:SetText(label)
 
     local function Refresh()
@@ -333,7 +336,7 @@ function ns.RebuildSettingsContent()
             ns.SetMinimapVisible(v)
         end)
     settingsContent[#settingsContent+1] = mmRow
-    y = y - 26
+    y = y - 38
 
     -- ----------------------------------------------------------------
     -- Section: Tracking
@@ -353,7 +356,7 @@ function ns.RebuildSettingsContent()
             ns.UpdateHistoryBtn()
         end)
     settingsContent[#settingsContent+1] = histRow
-    y = y - 26
+    y = y - 38
 
     local splitRow = MakeCheckbox(SListFrame, ns.L["split_trade_goods"], y,
         function() return db.splitTradeGoods == true end,
@@ -362,7 +365,15 @@ function ns.RebuildSettingsContent()
             ns.RefreshHUD()
         end)
     settingsContent[#settingsContent+1] = splitRow
-    y = y - 26
+    y = y - 38
+
+    local mergeRow = MakeCheckbox(SListFrame, ns.L["merge_daily_sessions"], y,
+        function() return db.mergeDaily ~= false end,
+        function(v)
+            db.mergeDaily = v
+        end)
+    settingsContent[#settingsContent+1] = mergeRow
+    y = y - 38
 
     -- ----------------------------------------------------------------
     -- Resize scroll area and outer frame

@@ -343,18 +343,8 @@ local function AcquireRow()
     row:SetScript("OnMouseUp", function(self, btn)
         if self.isCategoryHeader then
             if btn == "LeftButton" then
-                if IsShiftKeyDown() then
-                    local cycle  = {both="ah",ah="vendor",vendor="both"}
-                    local labels = {both=ns.L["price_ah_vendor"],ah=ns.L["price_ah_only"],vendor=ns.L["price_vendor_only"]}
-                    local cat    = self.categoryName
-                    local cur    = NightsFarmtrackerDB.priceMode[cat] or "both"
-                    NightsFarmtrackerDB.priceMode[cat] = cycle[cur]
-                    print("|cff30b0c0Night's Farmtracker:|r "..cat.." → "..labels[NightsFarmtrackerDB.priceMode[cat]])
-                    ns.RefreshHUD()
-                else
-                    NightsFarmtrackerDB.collapsed[self.categoryName] = not NightsFarmtrackerDB.collapsed[self.categoryName]
-                    ns.RefreshHUD()
-                end
+                NightsFarmtrackerDB.collapsed[self.categoryName] = not NightsFarmtrackerDB.collapsed[self.categoryName]
+                ns.RefreshHUD()
             elseif btn == "RightButton" and IsShiftKeyDown() then
                 ns.ExcludeItem(self.categoryName)
             end
@@ -367,13 +357,10 @@ local function AcquireRow()
 
     row:SetScript("OnEnter", function(self)
         if self.isCategoryHeader then
-            local labels  = {both=ns.L["price_ah_vendor"],ah=ns.L["price_ah_only"],vendor=ns.L["price_vendor_only"]}
-            local catMode = NightsFarmtrackerDB.priceMode[self.categoryName] or "both"
             GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
             GameTooltip:AddLine(self.categoryName, 1,1,1)
-            GameTooltip:AddLine(ns.L["cat_tip_click"],                                        0.5,0.5,0.5)
-            GameTooltip:AddLine(string.format(ns.L["cat_tip_shift_click"],labels[catMode]),   0.5,0.5,0.5)
-            GameTooltip:AddLine(ns.L["cat_tip_shift_rclick"],                                 0.5,0.5,0.5)
+            GameTooltip:AddLine(ns.L["cat_tip_click"],      0.5,0.5,0.5)
+            GameTooltip:AddLine(ns.L["cat_tip_shift_rclick"],0.5,0.5,0.5)
             GameTooltip:Show()
         elseif self.itemName then
             GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
@@ -530,12 +517,10 @@ ns.RefreshHUD = function()
     -- displayGold pro Kategorie: gleiche Logik wie der Header-Text
     local junkLabel = ns.L["cat_junk"] or "Junk"
     for _, entry in ipairs(sorted) do
-        local catName = entry.name
-        local cat     = entry.cat
+        local catName   = entry.name
+        local cat       = entry.cat
         local isJunkCat = (catName == junkLabel)
-        local mode      = db.priceMode[catName] or "both"
-        local useVendor = (mode == "vendor")
-        if useVendor or not hasAH or isJunkCat then
+        if not hasAH or isJunkCat then
             cat.displayGold = cat.totalVendor
         elseif cat.totalAH > 0 then
             cat.displayGold = cat.totalAH
@@ -556,8 +541,6 @@ ns.RefreshHUD = function()
         local catName     = entry.name
         local cat         = entry.cat
         local isCollapsed = db.collapsed[catName]
-        local mode        = db.priceMode[catName] or "both"
-        local useVendor   = (mode == "vendor")
 
         local hdr = AcquireRow()
         hdr:SetSize(CONTENT_W, CAT_ROW_H)
@@ -576,7 +559,7 @@ ns.RefreshHUD = function()
         hdr.goldText:SetFontHeight(11)
 
         local isJunkCat = (catName == (ns.L["cat_junk"] or "Junk"))
-        if useVendor or not hasAH or isJunkCat then
+        if not hasAH or isJunkCat then
             hdr.goldText:SetText(cat.totalVendor > 0 and ns.FormatGold(cat.totalVendor) or "")
         elseif cat.totalAH > 0 then
             hdr.goldText:SetText(ns.FormatGold(cat.totalAH))
@@ -592,7 +575,7 @@ ns.RefreshHUD = function()
             local flat = {}
             for _, item in ipairs(cat.items) do
                 local d = item.data
-                local fv = useVendor or not hasAH or (d.quality==0) or d.isVendorTrash or d.isBoP
+                local fv = not hasAH or (d.quality==0) or d.isVendorTrash or d.isBoP
                 if d.q and d.qIDs then
                     for tier = 1, 3 do
                         local tc = d.q[tier] or 0

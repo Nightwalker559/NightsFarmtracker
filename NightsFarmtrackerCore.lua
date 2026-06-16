@@ -196,14 +196,10 @@ function ns.AHTotal(data)
 end
 
 function ns.ItemValue(data)
-    -- Kein AH-Verkauf möglich: BoP, oder explizit als nicht-AH-fähig markiert (BoA, Kriegsmeute-gebunden)
     if data.isBoP or data.canAH == false then return ns.VendorTotal(data) end
-    local mode = NightsFarmtrackerDB.priceMode[ns.CategoryName(data)] or "both"
     local v = ns.VendorTotal(data)
     local a = ns.AHTotal(data)
-    if mode == "vendor" then return v end
-    if mode == "ah"     then return a or v end
-    if a and v          then return math.max(a, v) end
+    if a and v then return math.max(a, v) end
     return a or v
 end
 
@@ -231,11 +227,9 @@ function ns.InitDB()
     if db.minimapPos    == nil then db.minimapPos    = 225                     end
     if db.minimapHidden == nil then db.minimapHidden = false                   end
     if db.lootedGold    == nil then db.lootedGold    = 0                      end
-    if db.sessionHistoryEnabled == nil then db.sessionHistoryEnabled = true   end
-    if db.splitTradeGoods       == nil then db.splitTradeGoods       = false  end
-    if db.priceMode     == nil or type(db.priceMode) ~= "table" then
-        db.priceMode = {}
-    end
+    if db.sessionHistoryEnabled == nil then db.sessionHistoryEnabled = true  end
+    if db.mergeDaily            == nil then db.mergeDaily            = true  end
+    if db.splitTradeGoods       == nil then db.splitTradeGoods       = false end
     if db.ahSource        == nil then db.ahSource        = "auto"     end
     if db.tsmPriceSource  == nil then db.tsmPriceSource  = "DBMarket" end
     if db.tsmCustomSource == nil then db.tsmCustomSource = ""         end

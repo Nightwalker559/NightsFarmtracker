@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.4] - 2026-06-16
+
+### Changed
+
+- Session history: clicking the day header no longer merges sessions; merging is now handled automatically via the Settings option
+
+---
+
+## [1.0.3] - 2026-06-16
+
+### New
+
+- Settings: option to disable automatic same-day session merging; when off, each session is saved individually
+
+### Changed
+
+- Per-category price mode (Shift+Click to cycle AH/Vendor) removed; price source is now controlled globally via Settings
+- Settings frame width increased to 320; long labels now wrap instead of being cut off
+- Radio buttons and checkboxes in Settings now use identical indicator size
+
+---
+
 ## [1.0.2] - 2026-06-16
 
 ### New
@@ -17,7 +39,9 @@
 
 ### Fixed
 
-- German help tooltip strings no longer show placeholder characters for unsupported Unicode symbols (arrows, plus signs replaced with ASCII equivalents)
+- English client: copper amounts from direct gold drops were not tracked
+- Day-merge (history): crafting reagent quality tier data (Q1/Q2/Q3) was lost when merging sessions of the same day
+- German help tooltip strings no longer show placeholder characters for unsupported Unicode symbols
 
 ---
 

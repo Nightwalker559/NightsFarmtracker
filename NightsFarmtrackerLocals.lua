@@ -33,8 +33,6 @@ L["delete_session"]    = "Delete this session"
 L["delete_all"]        = "Delete all saved sessions"
 L["clear_all"]         = "Clear All"
 L["no_sessions"]       = "No sessions saved yet"
-L["merge_sessions"]    = "Merge %d sessions"
-L["merge_desc"]        = "Combines all items and durations from this day."
 L["item_singular"]     = "%d item"
 L["item_plural"]       = "%d items"
 L["sessions_summary"]  = "%d session across %d day (max %d)"
@@ -57,14 +55,8 @@ L["minimap_button"]    = "Show minimap button"
 -- Categories
 L["cat_junk"]       = "Junk"
 L["cat_gear"]       = "Equipment"
--- Category price cycle
-L["price_ah_vendor"]   = "AH + Vendor"
-L["price_ah_only"]     = "AH only"
-L["price_vendor_only"] = "Vendor only"
-
 -- Category row tooltips
 L["cat_tip_click"]         = "Click to expand/collapse"
-L["cat_tip_shift_click"]   = "Shift+Click to cycle price (%s)"
 L["cat_tip_shift_rclick"]  = "Shift+Right-click to exclude"
 L["item_tip_shift_rclick"] = "Shift+Right-click to stop tracking"
 -- Minimap
@@ -82,6 +74,7 @@ L["gold_total"]    = "Total"
 L["tracking"]                 = "Tracking"
 L["session_history_enabled"]  = "Save session history"
 L["split_trade_goods"]        = "Split trade goods by subtype"
+L["merge_daily_sessions"]     = "Merge same-day sessions automatically"
 L["ah_auto_info"]             = "Prefers Auctionator, falls back to TSM"
 L["tsm_custom"]               = "Custom TSM expression (overrides above)"
 
@@ -110,8 +103,6 @@ if GetLocale() == "deDE" then
     L["delete_all"]        = "Alle Sessions löschen"
     L["clear_all"]         = "Alles löschen"
     L["no_sessions"]       = "Keine Sessions gespeichert"
-    L["merge_sessions"]    = "%d Sessions zusammenführen"
-    L["merge_desc"]        = "Kombiniert alle Items und Zeiten dieses Tages."
     L["item_singular"]     = "%d Item"
     L["item_plural"]       = "%d Items"
     L["sessions_summary"]    = "%d Session über %d Tag (max %d)"
@@ -132,12 +123,8 @@ if GetLocale() == "deDE" then
     L["minimap_button"]    = "Minimap-Button anzeigen"
     L["cat_junk"]          = "Müll"
     L["cat_gear"]          = "Ausrüstung"
-    L["price_ah_vendor"]   = "AH + Händler"
-    L["price_ah_only"]     = "Nur AH"
-    L["price_vendor_only"] = "Nur Händler"
     -- Tooltips
     L["cat_tip_click"]         = "Klick zum Ein-/Ausklappen"
-    L["cat_tip_shift_click"]   = "Shift-Klick: Preis wechseln (%s)"
     L["cat_tip_shift_rclick"]  = "Shift-Rechtsklick: Ausschliessen"
     L["item_tip_shift_rclick"] = "Shift-Rechtsklick: Nicht mehr tracken"
     -- Minimap
@@ -155,6 +142,7 @@ if GetLocale() == "deDE" then
     L["tracking"]                = "Tracking"
     L["session_history_enabled"] = "Session-Verlauf speichern"
     L["split_trade_goods"]       = "Handwerksmaterialien nach Typ aufteilen"
+    L["merge_daily_sessions"]    = "Sessions desselben Tages automatisch zusammenführen"
     L["ah_auto_info"]            = "Bevorzugt Auctionator, fällt auf TSM zurück"
     L["tsm_custom"]              = "Eigener TSM-Ausdruck (überschreibt oben)"
 end
