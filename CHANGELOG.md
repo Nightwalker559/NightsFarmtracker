@@ -5,6 +5,19 @@
 ### New
 
 - Main frame header now has a close button (X) to hide the window directly
+- Session timer turns green while tracking is active
+- Settings: option to split trade goods and reagents into WoW subtypes (Herb, Metal & Stone, Leather, etc.) instead of one combined category
+
+### Changed
+
+- Frame width reduced from 340 to 310
+- Crafting reagent quality rank indicator (Q1/Q2/Q3) moved from item name to the count column, keeping item names readable
+- Item names truncated to 20 characters to keep columns aligned
+- "No sessions saved" message shortened
+
+### Fixed
+
+- German help tooltip strings no longer show placeholder characters for unsupported Unicode symbols (arrows, plus signs replaced with ASCII equivalents)
 
 ---
 

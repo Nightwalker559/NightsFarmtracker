@@ -10,10 +10,9 @@ local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
 ------------------------------------------------------------------------
 local H_W      = ns.FRAME_W
 local H_PAD    = 10
-local H_HDR_H  = ns.HDR_TOTAL     -- same as main frame header
+local H_HDR_H  = ns.HDR_TOTAL
 local H_FTR_H  = 28
-local H_CONT_W = H_W - H_PAD * 2
-local DAY_H    = ns.CAT_ROW_H     -- same height as category headers in main/detail frame
+local DAY_H    = ns.CAT_ROW_H
 local SESS_H   = 38
 local MAX_VIS_H = 10 * SESS_H
 
@@ -269,15 +268,6 @@ local function EnsureDetailFrame()
     DetailFrame.dateText:SetPoint("TOPRIGHT", -(DET_PAD+20), -12)
     DetailFrame.dateText:SetTextColor(unpack(ns.COL_GOLD)); DetailFrame.dateText:SetFontHeight(12)
 
-    -- kept but unused (content set to "" in ShowDetail)
-    DetailFrame.durationText = DetailFrame:CreateFontString(nil,"OVERLAY","GameFontNormal")
-    DetailFrame.durationText:SetPoint("TOPLEFT",DET_PAD,-12)
-    DetailFrame.durationText:SetTextColor(0,0,0,0)  -- transparent, unused
-
-    DetailFrame.summaryText = DetailFrame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    DetailFrame.summaryText:SetPoint("TOPLEFT",DET_PAD,-12)
-    DetailFrame.summaryText:SetTextColor(0,0,0,0)  -- transparent, unused
-
     local hSep = DetailFrame:CreateTexture(nil,"ARTWORK"); hSep:SetHeight(1)
     hSep:SetColorTexture(unpack(ns.COL_BORDER))
     hSep:SetPoint("TOPLEFT",DET_PAD,-(DET_HDR_H-1)); hSep:SetPoint("TOPRIGHT",-DET_PAD,-(DET_HDR_H-1))
@@ -414,8 +404,8 @@ local function RebuildDetailContent(session)
             ir.goldText:SetTextColor(unpack(ns.COL_GOLD))  -- immer gold, wie Hauptframe
             if entry.isRank then
                 ir.itemID = entry.tid
-                ir.nameText:SetText(entry.name .. " " .. entry.rankIcon)
-                ir.countText:SetText(tostring(entry.tc))
+                ir.nameText:SetText(ns.TruncateName(entry.name))
+                ir.countText:SetText(entry.rankIcon.." "..tostring(entry.tc))
                 if entry.tAH and entry.tAH > 0 then
                     ir.goldText:SetText(ns.FormatGold(entry.tAH))
                 elseif entry.tV and entry.tV > 0 then
@@ -425,7 +415,7 @@ local function RebuildDetailContent(session)
                 end
             else
                 ir.itemID = entry.d.itemID
-                ir.nameText:SetText(entry.name)
+                ir.nameText:SetText(ns.TruncateName(entry.name))
                 ir.countText:SetText(tostring(entry.d.amount))
                 local isJunk = entry.d.isVendorTrash or (entry.d.quality == 0)
                 if not isJunk and hasAH and (entry.d.ahTotal or 0) > 0 then
@@ -497,6 +487,13 @@ local function MergeDaySessions(day)
             mi.amount      = mi.amount      + d.amount
             mi.vendorTotal = (mi.vendorTotal or 0) + (d.vendorTotal or 0)
             mi.ahTotal     = (mi.ahTotal     or 0) + (d.ahTotal     or 0)
+            if d.q then
+                if not mi.q then mi.q={}; mi.qIDs={} end
+                for tier=1,3 do
+                    if d.q[tier] then mi.q[tier]=(mi.q[tier] or 0)+d.q[tier] end
+                    if d.qIDs and d.qIDs[tier] and not mi.qIDs[tier] then mi.qIDs[tier]=d.qIDs[tier] end
+                end
+            end
         end
     end
     local indices={}
@@ -526,7 +523,7 @@ function ns.RebuildHistory()
     local yOffset=0
     for _,dStr in ipairs(dayOrder) do
         local day=days[dStr]; local nSess=#day.sessions
-        local drow=AcquireDayRow(); drow:SetSize(H_CONT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
+        local drow=AcquireDayRow(); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
         drow.dateText:SetText(dStr)
         drow.infoText:SetText("")
         drow.goldText:SetText("")
@@ -548,7 +545,7 @@ function ns.RebuildHistory()
         activeDayRows[#activeDayRows+1]=drow; yOffset=yOffset+DAY_H
         for _,entry in ipairs(day.sessions) do
             local session=entry.session; local idx=entry.idx
-            local row=AcquireSessRow(); row:SetWidth(H_CONT_W); row:SetPoint("TOPLEFT",0,-yOffset)
+            local row=AcquireSessRow(); row:SetWidth(ns.CONTENT_W); row:SetPoint("TOPLEFT",0,-yOffset)
             row.sessionIdx=idx
             local hasAH = ns.HasAnyAH() and NightsFarmtrackerDB.ahSource ~= "none"
             local n=0
@@ -639,7 +636,7 @@ local function EnsureHistFrame()
     HScrollFrame:SetPoint("TOPLEFT",H_PAD,-H_HDR_H); HScrollFrame:SetPoint("BOTTOMRIGHT",-H_PAD,H_FTR_H)
     HScrollFrame:EnableMouseWheel(true)
     HListFrame=CreateFrame("Frame",nil,HScrollFrame)
-    HListFrame:SetWidth(H_CONT_W); HListFrame:SetHeight(1)
+    HListFrame:SetWidth(ns.CONTENT_W); HListFrame:SetHeight(1)
     HScrollFrame:SetScrollChild(HListFrame)
     local function OnWheel(_,delta)
         local cur=HScrollFrame:GetVerticalScroll()

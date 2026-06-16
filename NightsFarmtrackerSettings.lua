@@ -10,7 +10,7 @@ local SF           -- settings frame (lazy built)
 local SScrollFrame -- scroll container for content
 local SListFrame   -- scroll child (all widgets live here)
 
-local S_W          = 320
+local S_W          = 310
 local S_PAD        = 14
 local S_HDR_H      = 34    -- header (title + sep)
 local S_MAX_VIS    = 380   -- max visible scroll area height
@@ -353,6 +353,15 @@ function ns.RebuildSettingsContent()
             ns.UpdateHistoryBtn()
         end)
     settingsContent[#settingsContent+1] = histRow
+    y = y - 26
+
+    local splitRow = MakeCheckbox(SListFrame, ns.L["split_trade_goods"], y,
+        function() return db.splitTradeGoods == true end,
+        function(v)
+            db.splitTradeGoods = v
+            ns.RefreshHUD()
+        end)
+    settingsContent[#settingsContent+1] = splitRow
     y = y - 26
 
     -- ----------------------------------------------------------------

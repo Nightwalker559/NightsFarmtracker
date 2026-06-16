@@ -368,8 +368,8 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         local msg = ...
         local copper = 0
         local g = msg:match("(%d+)%s*[Gg]old")
-        local s = msg:match("(%d+)%s*[Ss]il") -- Silber / Silver
-        local c = msg:match("(%d+)%s*[Kk]up") -- Kupfer / Copper
+        local s = msg:match("(%d+)%s*[Ss]il")                                    -- Silber / Silver
+        local c = msg:match("(%d+)%s*[Kk]upfer") or msg:match("(%d+)%s*[Cc]opper") -- Kupfer / Copper
         if g then copper = copper + tonumber(g) * 10000 end
         if s then copper = copper + tonumber(s) * 100   end
         if c then copper = copper + tonumber(c)         end

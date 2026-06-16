@@ -423,11 +423,6 @@ local function AcquireRow()
     row.countText:SetTextColor(0.78, 0.78, 0.78)
     row.countText:SetFontHeight(11)
 
-    row.qualityText = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    row.qualityText:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
-    row.qualityText:SetFontHeight(10)
-    row.qualityText:Hide()
-
     row.goldText = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     row.goldText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.goldText:SetJustifyH("RIGHT")
@@ -455,7 +450,6 @@ local function ReleaseRow(row)
     row.goldText:ClearAllPoints()
     row.goldText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.goldText:SetFontHeight(11)
-    row.qualityText:Hide()
     rowPool[#rowPool+1] = row
 end
 
@@ -569,7 +563,7 @@ ns.RefreshHUD = function()
         hdr:SetSize(CONTENT_W, CAT_ROW_H)
         PlaceRow(hdr, yOffset, catName, nil, ns.COL_ACCENT)
         hdr.icon:Hide(); hdr.iconBorder:Hide()
-        hdr.countText:SetText(""); hdr.qualityText:Hide()
+        hdr.countText:SetText("")
         hdr.isCategoryHeader=true; hdr.categoryName=catName
         hdr.catBg:SetAlpha(1)
         hdr.nameText:ClearAllPoints()
@@ -657,7 +651,6 @@ ns.RefreshHUD = function()
                 row.icon:SetTexCoord(0.08,0.92,0.08,0.92); row.icon:Show()
                 row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", 4+CAT_INDENT, 0)
                 row:SetPoint("TOPLEFT", 0, -yOffset)
-                row.qualityText:Hide()
                 if d.quality then
                     local r,g,b = GetItemQualityColor(d.quality)
                     row.nameText:SetTextColor(r,g,b)
@@ -672,8 +665,8 @@ ns.RefreshHUD = function()
                 if fi.isRank then
                     local key = fi.name.."_q"..fi.tier
                     row.itemName = fi.name; row.itemID = fi.tid; row.itemLink = nil
-                    row.nameText:SetText(fi.name.." "..fi.rankIcon)
-                    row.countText:SetText(tostring(fi.tc))
+                    row.nameText:SetText(ns.TruncateName(fi.name))
+                    row.countText:SetText(fi.rankIcon.." "..tostring(fi.tc))
                     if fi.fv then
                         row.goldText:SetText(fi.tV and ns.FormatGold(fi.tV) or "")
                     elseif fi.tAH and fi.tAH > 0 then
@@ -687,7 +680,7 @@ ns.RefreshHUD = function()
                 else
                     local it = fi.item
                     row.itemName = fi.name; row.itemID = d.itemID; row.itemLink = d.itemLink
-                    row.nameText:SetText(fi.name)
+                    row.nameText:SetText(ns.TruncateName(fi.name))
                     row.countText:SetText(tostring(d.amount))
                     if fi.fv then ShowGold(row,nil,it.vendor,true)
                     else ShowGold(row,it.ah,it.vendor,false) end
@@ -730,8 +723,10 @@ end
 function ns.ApplyPauseVisuals()
     if NightsFarmtrackerDB.paused then
         btnPause.tex:SetTexture(ART.."btn_play.tga")
+        MainFrame.TimerText:SetTextColor(0.65, 0.70, 0.72)
     else
         btnPause.tex:SetTexture(ART.."btn_pause.tga")
+        MainFrame.TimerText:SetTextColor(0.2, 0.85, 0.2)
     end
     ns.UpdateMinimapIcon()
 end

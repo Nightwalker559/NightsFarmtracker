@@ -36,7 +36,7 @@ ns.CAT_BOP    = "Equipment"
 ns.CAT_MATS   = "Tradeskill"
 
 -- UI layout
-ns.FRAME_W     = 340
+ns.FRAME_W     = 310
 ns.PAD         = 10
 ns.ROW_H       = 34
 ns.CAT_ROW_H   = 22
@@ -80,6 +80,17 @@ function ns.FormatGold(copper)
 end
 
 local Q_FALLBACK = {"Q1:","Q2:","Q3:"}
+
+-- Truncate item names to a fixed max length so columns stay aligned.
+-- "Quasischweinefleisch" (20 chars) is the reference maximum.
+local NAME_MAX = 20
+function ns.TruncateName(name)
+    if not name then return "" end
+    if #name > NAME_MAX then
+        return name:sub(1, NAME_MAX - 2) .. ".."
+    end
+    return name
+end
 
 ------------------------------------------------------------------------
 -- Price source detection
@@ -132,27 +143,26 @@ function ns.IsMat(data)
     return not data.isVendorTrash and not data.isBoE and not data.isBoP
 end
 
--- Three broad categories (not WoW subtypes)
 function ns.CategoryName(data)
-    -- Junk/trash always in their own category
     if data.isVendorTrash or (data.quality == 0) then
         return ns.L and ns.L["cat_junk"] or "Junk"
     end
-    -- Use stored classID → WoW localized class name (most accurate)
     if data.classID then
-        -- Waffe (2) und Rüstung (4) → gemeinsame Kategorie
         if data.classID == 2 or data.classID == 4 then
             return ns.L and ns.L["cat_gear"] or "Equipment"
+        end
+        -- Split trade goods (7) and reagents (5) by WoW subtype when enabled
+        if (data.classID == 7 or data.classID == 5)
+        and NightsFarmtrackerDB and NightsFarmtrackerDB.splitTradeGoods
+        and data.itemSubType and data.itemSubType ~= "" then
+            return data.itemSubType
         end
         local name = C_Item.GetItemClassInfo(data.classID)
         if name and name ~= "" then return name end
     end
-    -- Fallback for legacy data without classID:
-    -- BoE/BoP only fallback to Armor if no classID (old data)
     if data.isBoE or data.isBoP then
         return C_Item.GetItemClassInfo(Enum.ItemClass.Armor) or "Equipment"
     end
-    -- Default: trade goods class name
     return C_Item.GetItemClassInfo(Enum.ItemClass.Tradegoods) or "Tradeskill"
 end
 
@@ -222,6 +232,7 @@ function ns.InitDB()
     if db.minimapHidden == nil then db.minimapHidden = false                   end
     if db.lootedGold    == nil then db.lootedGold    = 0                      end
     if db.sessionHistoryEnabled == nil then db.sessionHistoryEnabled = true   end
+    if db.splitTradeGoods       == nil then db.splitTradeGoods       = false  end
     if db.priceMode     == nil or type(db.priceMode) ~= "table" then
         db.priceMode = {}
     end
