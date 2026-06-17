@@ -6,6 +6,16 @@
 local _, ns = ...
 
 local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
+
+StaticPopupDialogs["NFT_MINIMAP_RELOAD"] = {
+    text        = ns.L and ns.L["reload_required"] or "Reload required.",
+    button1     = OKAY,
+    button2     = CANCEL,
+    OnAccept    = function() ReloadUI() end,
+    timeout     = 0,
+    whileDead   = true,
+    hideOnEscape = true,
+}
 local SF           -- settings frame (lazy built)
 local SScrollFrame -- scroll container for content
 local SListFrame   -- scroll child (all widgets live here)
@@ -333,7 +343,12 @@ function ns.RebuildSettingsContent()
         function() return not db.minimapHidden end,
         function(v)
             db.minimapHidden = not v
-            ns.SetMinimapVisible(v)
+            db.minimap.hide  = not v
+            if v then
+                StaticPopup_Show("NFT_MINIMAP_RELOAD")
+            else
+                ns.SetMinimapVisible(false)
+            end
         end)
     settingsContent[#settingsContent+1] = mmRow
     y = y - 38
@@ -419,9 +434,9 @@ local function EnsureSettingsFrame()
 
     -- Close button
     local xBtn = CreateFrame("Button",nil,SF)
-    xBtn:SetSize(16,16); xBtn:SetPoint("TOPRIGHT",-S_PAD,-10)
+    xBtn:SetSize(18,18); xBtn:SetPoint("TOPRIGHT",-S_PAD,-10)
     local xTex = xBtn:CreateTexture(nil,"ARTWORK")
-    xTex:SetAllPoints(); xTex:SetTexture(ART.."btn_close.tga")
+    xTex:SetAllPoints(); xTex:SetTexture(ART.."btn_close.png")
     xTex:SetAlpha(0.7)
     xBtn:SetScript("OnClick", function() SF:Hide() end)
     xBtn:SetScript("OnEnter",function()xTex:SetAlpha(1)end)

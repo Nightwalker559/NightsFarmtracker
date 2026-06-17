@@ -332,7 +332,7 @@ local CROSS_DEDUP_TTL     = 2   -- seconds
 
 EventFrame:RegisterEvent("ADDON_LOADED")
 EventFrame:RegisterEvent("PLAYER_LOGIN")
-EventFrame:RegisterEvent("CHAT_MSG_LOOT")
+EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")EventFrame:RegisterEvent("CHAT_MSG_LOOT")
 EventFrame:RegisterEvent("CHAT_MSG_MONEY")
 EventFrame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
 
@@ -349,16 +349,24 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
 
         ns.UpdateTimerDisplay(ns.FormatTime(NightsFarmtrackerDB.totalTime))
         ns.ApplyPauseVisuals()
-        ns.UpdateMinimapPosition(NightsFarmtrackerDB.minimapPos)
+        ns.InitMinimapButton()
         if NightsFarmtrackerDB.visible then MainFrame:Show() end
         self:UnregisterEvent("ADDON_LOADED")
 
     elseif event == "PLAYER_LOGIN" then
         if not NightsFarmtrackerDB.paused then ns.StartTimer() end
-        ns.SetMinimapVisible(not NightsFarmtrackerDB.minimapHidden)
+        ns.SetMinimapVisible(not (NightsFarmtrackerDB.minimap and NightsFarmtrackerDB.minimap.hide))
         ns.SetExpanded(NightsFarmtrackerDB.expanded)
         ns.UpdateHistoryBtn()
         ns.RefreshHUD()
+
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- ElvUI repositioniert die Minimap; Refresh korrigiert die Button-Position.
+        local DBIcon = LibStub and LibStub("LibDBIcon-1.0", true)
+        if DBIcon then
+            C_Timer.After(0, function() DBIcon:Refresh("NightsFarmtracker") end)
+        end
+        self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 
     elseif event == "BAG_UPDATE_DELAYED" and ns.pendingPriceUpdate then
         FlushPendingLoot()

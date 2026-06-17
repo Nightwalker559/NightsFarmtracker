@@ -52,6 +52,7 @@ L["display"]           = "Display"
 L["gold_per_hour"]     = "Gold / hour"
 L["gold_per_min"]      = "Gold / min"
 L["minimap_button"]    = "Show minimap button"
+L["reload_required"]   = "Reload required."
 -- Categories
 L["cat_junk"]       = "Junk"
 L["cat_gear"]       = "Equipment"
@@ -121,6 +122,7 @@ if GetLocale() == "deDE" then
     L["gold_per_hour"]     = "Gold / Stunde"
     L["gold_per_min"]      = "Gold / Minute"
     L["minimap_button"]    = "Minimap-Button anzeigen"
+    L["reload_required"]   = "Neustart erforderlich."
     L["cat_junk"]          = "Müll"
     L["cat_gear"]          = "Ausrüstung"
     -- Tooltips

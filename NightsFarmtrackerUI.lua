@@ -84,26 +84,26 @@ local BtnBar = CreateFrame("Frame", nil, MainFrame)
 BtnBar:SetSize(CONTENT_W, BTN_BAR_H)
 BtnBar:SetPoint("TOPLEFT", PAD, -HDR_PAD)
 
-local btnPause    = MakeBtn(BtnBar, 18, "btn_play.tga")
+local btnPause    = MakeBtn(BtnBar, 18, "btn_play.png")
 btnPause:SetPoint("LEFT", BtnBar, "LEFT", 0, 0)
 
-local btnReset    = MakeBtn(BtnBar, 18, "btn_reset.tga")
+local btnReset    = MakeBtn(BtnBar, 18, "btn_reset.png")
 btnReset:SetPoint("LEFT", btnPause, "RIGHT", 6, 0)
 
-local btnHistory  = MakeBtn(BtnBar, 16, "btn_history.tga")
+local btnHistory  = MakeBtn(BtnBar, 18, "btn_history.png")
 btnHistory:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
 
 -- Right side (anchored from right): close → collapse → help → settings
-local btnClose = MakeBtn(BtnBar, 16, "btn_close.tga")
+local btnClose = MakeBtn(BtnBar, 18, "btn_close.png")
 btnClose:SetPoint("RIGHT", BtnBar, "RIGHT", 0, 0)
 
-local btnToggle = MakeBtn(BtnBar, 16, "btn_expand.tga")
+local btnToggle = MakeBtn(BtnBar, 18, "btn_expand.png")
 btnToggle:SetPoint("RIGHT", btnClose, "LEFT", -6, 0)
 
-local btnHelp = MakeBtn(BtnBar, 16, "btn_help.tga")
+local btnHelp = MakeBtn(BtnBar, 18, "btn_help.png")
 btnHelp:SetPoint("RIGHT", btnToggle, "LEFT", -6, 0)
 
-local btnSettings = MakeBtn(BtnBar, 16, "btn_settings.tga")
+local btnSettings = MakeBtn(BtnBar, 18, "btn_settings.png")
 btnSettings:SetPoint("RIGHT", btnHelp, "LEFT", -6, 0)
 
 -- Separator below BtnBar
@@ -277,7 +277,7 @@ end
 function ns.SetExpanded(expand)
     NightsFarmtrackerDB.expanded = expand
     if expand then
-        btnToggle.tex:SetTexture(ART.."btn_collapse.tga")
+        btnToggle.tex:SetTexture(ART.."btn_collapse.png")
         if #itemOrder == 0 then
             emptyHint:Show(); ScrollFrame:Hide()
             MainFrame:SetHeight(SCROLL_TOP + 60 + FOOTER_H)
@@ -287,7 +287,7 @@ function ns.SetExpanded(expand)
         end
     else
         emptyHint:Hide(); ScrollFrame:Hide()
-        btnToggle.tex:SetTexture(ART.."btn_expand.tga")
+        btnToggle.tex:SetTexture(ART.."btn_expand.png")
         MainFrame:SetHeight(COLLAPSED_H)
     end
 end
@@ -705,10 +705,10 @@ end
 
 function ns.ApplyPauseVisuals()
     if NightsFarmtrackerDB.paused then
-        btnPause.tex:SetTexture(ART.."btn_play.tga")
+        btnPause.tex:SetTexture(ART.."btn_play.png")
         MainFrame.TimerText:SetTextColor(0.65, 0.70, 0.72)
     else
-        btnPause.tex:SetTexture(ART.."btn_pause.tga")
+        btnPause.tex:SetTexture(ART.."btn_pause.png")
         MainFrame.TimerText:SetTextColor(0.2, 0.85, 0.2)
     end
     ns.UpdateMinimapIcon()
@@ -808,47 +808,62 @@ end)
 btnHelp:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
 
 ------------------------------------------------------------------------
--- Minimap button
+-- Minimap button (LibDBIcon-1.0)
 ------------------------------------------------------------------------
-local rad,deg,cos,sin,sqrt = math.rad,math.deg,math.cos,math.sin,math.sqrt
-local atan2,mmax,mmin      = math.atan2,math.max,math.min
-local mmShapes = {
-    ["ROUND"]={true,true,true,true},["SQUARE"]={false,false,false,false},
-    ["CORNER-TOPLEFT"]={false,false,false,true},["CORNER-TOPRIGHT"]={false,false,true,false},
-    ["CORNER-BOTTOMLEFT"]={false,true,false,false},["CORNER-BOTTOMRIGHT"]={true,false,false,false},
-    ["SIDE-LEFT"]={false,true,false,true},["SIDE-RIGHT"]={true,false,true,false},
-    ["SIDE-TOP"]={false,false,true,true},["SIDE-BOTTOM"]={true,true,false,false},
-    ["TRICORNER-TOPLEFT"]={false,true,true,true},["TRICORNER-TOPRIGHT"]={true,false,true,true},
-    ["TRICORNER-BOTTOMLEFT"]={true,true,false,true},["TRICORNER-BOTTOMRIGHT"]={true,true,true,false},
-}
-local mmBtn = CreateFrame("Button","NightsFarmtrackerMinimapBtn",Minimap)
-mmBtn:SetSize(31,31); mmBtn:SetFrameStrata("MEDIUM"); mmBtn:SetFixedFrameStrata(true)
-mmBtn:SetFrameLevel(8); mmBtn:SetFixedFrameLevel(true)
-mmBtn:RegisterForClicks("anyUp"); mmBtn:RegisterForDrag("LeftButton")
-mmBtn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-Tracking-Highlight")
-mmBtn.icon=mmBtn:CreateTexture(nil,"BACKGROUND"); mmBtn.icon:SetSize(20,20)
-mmBtn.icon:SetPoint("CENTER"); mmBtn.icon:SetTexture(ART.."Icon")
-mmBtn.icon:SetTexCoord(0.05,0.95,0.05,0.95)
-mmBtn.border=mmBtn:CreateTexture(nil,"OVERLAY"); mmBtn.border:SetSize(54,54)
-mmBtn.border:SetPoint("TOPLEFT",mmBtn,"TOPLEFT",-1,1)
-mmBtn.border:SetTexture("Interface\\Minimap\\UI-Minimap-Border")
-local function PlaceMinimapBtn(pos)
-    local angle=rad(pos or 225); local x,y=cos(angle),sin(angle)
-    local q=1; if x<0 then q=q+1 end; if y>0 then q=q+2 end
-    local quad=mmShapes[GetMinimapShape and GetMinimapShape() or "ROUND"] or mmShapes["ROUND"]
-    local w=Minimap:GetWidth()/2+5; local h=Minimap:GetHeight()/2+5
-    if quad[q] then x,y=x*w,y*h
-    else
-        local dw=sqrt(2*w^2)-10; local dh=sqrt(2*h^2)-10
-        x=mmax(-w,mmin(x*dw,w)); y=mmax(-h,mmin(y*dh,h))
+local nftLDB  -- wird lazy in InitMinimapButton erzeugt
+
+function ns.InitMinimapButton()
+    local LDB    = LibStub("LibDataBroker-1.1")
+    local DBIcon = LibStub("LibDBIcon-1.0")
+
+    if not nftLDB then
+        nftLDB = LDB:NewDataObject("NightsFarmtracker", {
+            type  = "launcher",
+            label = "Night's Farmtracker",
+            icon  = ART.."Icon",
+            OnClick = function(_, btn)
+                if btn == "RightButton" then
+                    ns.ToggleSettings()
+                else
+                    if MainFrame:IsShown() then
+                        NightsFarmtrackerDB.visible = false; MainFrame:Hide()
+                    else
+                        NightsFarmtrackerDB.visible = true;  MainFrame:Show()
+                    end
+                end
+            end,
+            OnTooltipShow = function(tt)
+                tt:AddLine("Night's Farmtracker", unpack(ns.COL_ACCENT))
+                tt:AddLine(ns.L["mm_toggle"],   1, 1, 1)
+                tt:AddLine(ns.L["mm_settings"], 0.7, 0.7, 0.7)
+                tt:AddLine(ns.L["mm_drag"],     0.5, 0.5, 0.5)
+            end,
+        })
     end
-    mmBtn:ClearAllPoints(); mmBtn:SetPoint("CENTER",Minimap,"CENTER",x,y)
+
+    local db = NightsFarmtrackerDB
+    if not db.minimap then
+        db.minimap = {
+            minimapPos = db.minimapPos or 225,
+            hide       = db.minimapHidden or false,
+        }
+    end
+    if not DBIcon:IsRegistered("NightsFarmtracker") then
+        DBIcon:Register("NightsFarmtracker", nftLDB, db.minimap)
+    end
 end
-ns.UpdateMinimapPosition = PlaceMinimapBtn
-function ns.UpdateMinimapIcon() end
+
 function ns.SetMinimapVisible(show)
-    if show then mmBtn:Show() else mmBtn:Hide() end
+    local DBIcon = LibStub("LibDBIcon-1.0")
+    NightsFarmtrackerDB.minimap.hide  = not show
+    NightsFarmtrackerDB.minimapHidden = not show
+    if show then DBIcon:Show("NightsFarmtracker")
+    else         DBIcon:Hide("NightsFarmtracker") end
 end
+
+-- Stubs – nicht mehr benötigt, aber Aufrufer bleiben kompatibel
+function ns.UpdateMinimapIcon()     end
+function ns.UpdateMinimapPosition() end
 
 function ns.UpdateHistoryBtn()
     local enabled = NightsFarmtrackerDB.sessionHistoryEnabled ~= false
@@ -858,29 +873,3 @@ function ns.UpdateHistoryBtn()
         btnHistory:Hide(); btnHistory:EnableMouse(false)
     end
 end
-mmBtn:SetScript("OnMouseDown",function(self)self.icon:SetSize(17,17)end)
-mmBtn:SetScript("OnMouseUp",  function(self)self.icon:SetSize(20,20)end)
-mmBtn:SetScript("OnDragStart",function(self)
-    self:LockHighlight()
-    self:SetScript("OnUpdate",function()
-        local mx,my=Minimap:GetCenter(); local cx,cy=GetCursorPosition()
-        local sc=Minimap:GetEffectiveScale(); cx,cy=cx/sc,cy/sc
-        local p=deg(atan2(cy-my,cx-mx))%360
-        NightsFarmtrackerDB.minimapPos=p; PlaceMinimapBtn(p)
-    end)
-end)
-mmBtn:SetScript("OnDragStop",function(self)
-    self:SetScript("OnUpdate",nil); self:UnlockHighlight(); self.icon:SetSize(20,20)
-end)
-mmBtn:SetScript("OnClick",function(_,btn)
-    if btn=="RightButton" then ns.ToggleSettings()
-    else
-        if MainFrame:IsShown() then
-            NightsFarmtrackerDB.visible=false; MainFrame:Hide()
-        else
-            NightsFarmtrackerDB.visible=true; MainFrame:Show()
-        end
-    end
-end)
-mmBtn:SetScript("OnEnter", nil)
-mmBtn:SetScript("OnLeave", nil)

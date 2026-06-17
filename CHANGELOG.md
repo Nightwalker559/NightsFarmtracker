@@ -1,10 +1,24 @@
 # Changelog
 
+## [1.0.5] - 2026-06-17
+
+### Changed
+
+- Minimap button migrated to LibDBIcon-1.0 — button now integrates correctly with MinimapButtonButton, ElvUI, Bazooka, and other minimap managers
+- Embedded libs added: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibDBIcon-1.0
+- ElvUI: minimap button position now correctly updated after UI load
+- Re-enabling the minimap button via Settings now prompts for a UI reload so minimap bar managers (e.g. WindTools) pick it up immediately
+
+---
+
 ## [1.0.4] - 2026-06-16
 
 ### Changed
 
 - Session history: clicking the day header no longer merges sessions; merging is now handled automatically via the Settings option
+- All icon buttons (main frame, history, detail, settings) standardized to 18×18 px
+- Button icons replaced with new artwork
+- Texture format switched from TGA to PNG across all media files
 
 ---
 

@@ -226,6 +226,10 @@ function ns.InitDB()
     if db.goldRateMode  == nil then db.goldRateMode  = "hour"                  end
     if db.minimapPos    == nil then db.minimapPos    = 225                     end
     if db.minimapHidden == nil then db.minimapHidden = false                   end
+    -- LibDBIcon sub-table (migriert legacy keys beim ersten Load)
+    if db.minimap == nil then
+        db.minimap = { minimapPos = db.minimapPos, hide = db.minimapHidden }
+    end
     if db.lootedGold    == nil then db.lootedGold    = 0                      end
     if db.sessionHistoryEnabled == nil then db.sessionHistoryEnabled = true  end
     if db.mergeDaily            == nil then db.mergeDaily            = true  end
