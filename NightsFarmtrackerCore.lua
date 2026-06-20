@@ -27,8 +27,10 @@ ns.CLASS_PRIORITY = {
     [1]  = 9,   -- Container
     [12] = 10,  -- Quest
     [14] = 11,  -- Miscellaneous
-    [20] = 12,  -- Housing (fallback; actual classID confirmed at load)
 }
+-- Housing classID is not hardcoded above (varies by patch); ns.InitDB()
+-- registers it at runtime via ns.HOUSING so it always gets the correct
+-- priority instead of silently falling through to the default (50).
 -- Legacy aliases (used in History fallback)
 ns.CAT_VENDOR = "Vendor Trash"
 ns.CAT_BOE    = "Equipment"
@@ -195,10 +197,14 @@ function ns.AHTotal(data)
     return total > 0 and total or nil
 end
 
-function ns.ItemValue(data)
-    if data.isBoP or data.canAH == false then return ns.VendorTotal(data) end
-    local v = ns.VendorTotal(data)
-    local a = ns.AHTotal(data)
+-- vendor/ah are optional precomputed values (avoids recalculating
+-- VendorTotal/AHTotal when the caller already has them, e.g. RefreshHUD).
+function ns.ItemValue(data, vendor, ah)
+    if data.isVendorTrash or (data.quality == 0) then return vendor or ns.VendorTotal(data) end
+    if data.itemID and ns.IsForceVendor(data.itemID) then return vendor or ns.VendorTotal(data) end
+    if data.isBoP or data.canAH == false then return vendor or ns.VendorTotal(data) end
+    local v = vendor or ns.VendorTotal(data)
+    local a = ah     or ns.AHTotal(data)
     if a and v then return math.max(a, v) end
     return a or v
 end
@@ -232,6 +238,7 @@ function ns.InitDB()
     end
     if db.lootedGold    == nil then db.lootedGold    = 0                      end
     if db.sessionHistoryEnabled == nil then db.sessionHistoryEnabled = true  end
+    if db.vendorFilterEnabled   == nil then db.vendorFilterEnabled   = true  end
     if db.mergeDaily            == nil then db.mergeDaily            = true  end
     if db.splitTradeGoods       == nil then db.splitTradeGoods       = false end
     if db.ahSource        == nil then db.ahSource        = "auto"     end
@@ -244,6 +251,31 @@ function ns.InitAccountDB()
     if not NightsFarmtrackerAccountDB.sessions then
         NightsFarmtrackerAccountDB.sessions = {}
     end
+    if not NightsFarmtrackerAccountDB.forceVendor then
+        NightsFarmtrackerAccountDB.forceVendor = {}
+    end
+end
+
+------------------------------------------------------------------------
+-- Forced-vendor filter (account-wide, persistent)
+-- Items in this list always use VendorTotal, never AH price.
+------------------------------------------------------------------------
+function ns.IsForceVendor(itemID)
+    if NightsFarmtrackerDB and NightsFarmtrackerDB.vendorFilterEnabled == false then return false end
+    return itemID ~= nil
+       and NightsFarmtrackerAccountDB ~= nil
+       and NightsFarmtrackerAccountDB.forceVendor ~= nil
+       and NightsFarmtrackerAccountDB.forceVendor[itemID] ~= nil
+end
+
+function ns.AddForceVendor(itemID, name, icon, quality)
+    if not itemID then return end
+    NightsFarmtrackerAccountDB.forceVendor[itemID] = { name = name, icon = icon, quality = quality }
+end
+
+function ns.RemoveForceVendor(itemID)
+    if not itemID then return end
+    NightsFarmtrackerAccountDB.forceVendor[itemID] = nil
 end
 
 ------------------------------------------------------------------------

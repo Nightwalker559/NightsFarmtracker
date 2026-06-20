@@ -50,7 +50,7 @@ function ns.SaveCurrentSession()
     for name, data in pairs(db.count) do
         local vendor = ns.VendorTotal(data)
         local ah     = ns.AHTotal(data)
-        local val    = (ah and vendor) and math.max(ah,vendor) or ah or vendor or 0
+        local val    = ns.ItemValue(data, vendor, ah) or 0
         newEntry.totalGold   = newEntry.totalGold   + val
         newEntry.totalVendor = newEntry.totalVendor + (vendor or 0)
         newEntry.totalAH     = newEntry.totalAH     + (ah or 0)
@@ -59,6 +59,7 @@ function ns.SaveCurrentSession()
             itemSubType=data.itemSubType, sellPrice=data.sellPrice,
             vendorTotal=vendor, ahTotal=ah,
             isVendorTrash=data.isVendorTrash, isBoE=data.isBoE, isBoP=data.isBoP,
+            canAH=data.canAH,
             classID=data.classID, itemID=data.itemID, q=data.q, qIDs=data.qIDs,
         }
     end
@@ -82,7 +83,7 @@ function ns.SaveCurrentSession()
             if not ex.items[name] then
                 ex.items[name]={amount=0,icon=d.icon,quality=d.quality,itemSubType=d.itemSubType,
                     sellPrice=d.sellPrice,vendorTotal=0,ahTotal=0,
-                    isVendorTrash=d.isVendorTrash,isBoE=d.isBoE,isBoP=d.isBoP,
+                    isVendorTrash=d.isVendorTrash,isBoE=d.isBoE,isBoP=d.isBoP,canAH=d.canAH,
                     classID=d.classID,itemID=d.itemID,q=d.q,qIDs=d.qIDs}
             end
             local ei=ex.items[name]
@@ -322,11 +323,18 @@ local function RebuildDetailContent(session)
             cats[cat]={gold=0,items={},classID=d.classID}
             catOrder[#catOrder+1]=cat
         end
-        local isJunk = d.isVendorTrash or (d.quality == 0)
+        local isVendorOnly = d.isVendorTrash or (d.quality == 0) or ns.IsForceVendor(d.itemID)
+                          or d.isBoP or d.canAH == false
         local qAtlas = session.qAtlas or NightsFarmtrackerDB.qAtlas or {}
 
-        if not isJunk and d.q and d.qIDs then
-            -- Split crafting reagents into per-tier rows
+        -- Category total: max(AH,Vendor) per item — vendor-only items (junk, BoP, forceVendor, canAH=false) always vendor only
+        local itemAH     = (not isVendorOnly) and hasAH and (d.ahTotal or 0) > 0 and d.ahTotal or nil
+        local itemVendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
+        local itemGold   = (itemAH and itemVendor) and math.max(itemAH, itemVendor) or itemAH or itemVendor or 0
+        cats[cat].gold = cats[cat].gold + itemGold
+
+        if not isVendorOnly and d.q and d.qIDs then
+            -- Split crafting reagents into per-tier rows (display only)
             for tier = 1, 3 do
                 local tc  = d.q[tier] or 0
                 local tid = d.qIDs[tier]
@@ -340,7 +348,6 @@ local function RebuildDetailContent(session)
                     local tGold = (tAH and tAH > 0) and tAH or tV or 0
                     if tGold > 0 then
                         local rankIcon = qAtlas[tier] and CreateAtlasMarkup(qAtlas[tier],12,11) or ("|cffaaaaaa R"..tier.."|r")
-                        cats[cat].gold = cats[cat].gold + tGold
                         cats[cat].items[#cats[cat].items+1] = {
                             name=name, d=d, gold=tGold, isRank=true,
                             tier=tier, tc=tc, tid=tid, tAH=tAH, tV=tV, rankIcon=rankIcon,
@@ -349,10 +356,8 @@ local function RebuildDetailContent(session)
                 end
             end
         else
-            local gold = (not isJunk and hasAH and (d.ahTotal or 0) > 0) and d.ahTotal or d.vendorTotal or 0
-            if gold > 0 then
-                cats[cat].gold = cats[cat].gold + gold
-                cats[cat].items[#cats[cat].items+1] = {name=name, d=d, gold=gold, isRank=false}
+            if itemGold > 0 then
+                cats[cat].items[#cats[cat].items+1] = {name=name, d=d, gold=itemGold, isRank=false}
             end
         end
     end
@@ -417,8 +422,9 @@ local function RebuildDetailContent(session)
                 ir.itemID = entry.d.itemID
                 ir.nameText:SetText(ns.TruncateName(entry.name))
                 ir.countText:SetText(tostring(entry.d.amount))
-                local isJunk = entry.d.isVendorTrash or (entry.d.quality == 0)
-                if not isJunk and hasAH and (entry.d.ahTotal or 0) > 0 then
+                local isVendorOnly = entry.d.isVendorTrash or (entry.d.quality == 0) or ns.IsForceVendor(entry.d.itemID)
+                                  or entry.d.isBoP or entry.d.canAH == false
+                if not isVendorOnly and hasAH and (entry.d.ahTotal or 0) > 0 then
                     ir.goldText:SetText(ns.FormatGold(entry.d.ahTotal))
                 elseif (entry.d.vendorTotal or 0) > 0 then
                     ir.goldText:SetText(ns.FormatGold(entry.d.vendorTotal))
@@ -492,8 +498,9 @@ function ns.RebuildHistory()
             local hasAH = ns.HasAnyAH() and NightsFarmtrackerDB.ahSource ~= "none"
             local n=0
             for _,d in pairs(session.items) do
-                local isJunk = d.isVendorTrash or (d.quality == 0)
-                if not isJunk and d.q and d.qIDs then
+                local isVendorOnly = d.isVendorTrash or (d.quality == 0) or ns.IsForceVendor(d.itemID)
+                                  or d.isBoP or d.canAH == false
+                if not isVendorOnly and d.q and d.qIDs then
                     for tier=1,3 do
                         local tc=d.q[tier] or 0; local tid=d.qIDs[tier]
                         if tc>0 then
@@ -504,7 +511,7 @@ function ns.RebuildHistory()
                         end
                     end
                 else
-                    local gold=(not isJunk and hasAH and (d.ahTotal or 0)>0) and d.ahTotal or d.vendorTotal or 0
+                    local gold=(not isVendorOnly and hasAH and (d.ahTotal or 0)>0) and d.ahTotal or d.vendorTotal or 0
                     if gold>0 then n=n+1 end
                 end
             end

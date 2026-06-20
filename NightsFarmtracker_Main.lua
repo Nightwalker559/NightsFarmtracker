@@ -86,9 +86,12 @@ local function ProcessLoot(items)
             elseif db.trackedNames and db.trackedNames[name] then
                 shouldTrack = true
             elseif quality == 0 then
-                -- grey: nur wenn vendorbar + Junk-Kategorie nicht excluded
-                shouldTrack = (sellPrice and sellPrice > 0)
-                           and not db.excludedNames[ns.CAT_VENDOR]
+                -- grey: vendorbar (bekannt oder unbekannt=Cache-Miss, später auflösen) + Junk-Kategorie nicht excluded
+                if sellPrice ~= nil then
+                    shouldTrack = (sellPrice > 0) and not db.excludedNames[ns.CAT_VENDOR]
+                else
+                    shouldTrack = not db.excludedNames[ns.CAT_VENDOR]
+                end
             else
                 -- quality > 0: tracken sofern nicht definitiv unverkäuflich.
                 -- sellPrice == nil = Cache-Miss = unbekannt → tracken und Preis später auflösen.
@@ -304,6 +307,8 @@ SlashCmdList["FARMTRACK"] = function(msg)
     elseif cmd == "debug" then
         ns.debugMode = not ns.debugMode
         print("|cff30b0c0Night's Farmtracker:|r Debug " .. (ns.debugMode and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
+    elseif cmd == "filter" then
+        ns.ToggleFilterWindow()
     elseif cmd == "test" then
         local db = NightsFarmtrackerDB
         local n = 0; for _ in pairs(db.count) do n = n + 1 end
@@ -312,7 +317,7 @@ SlashCmdList["FARMTRACK"] = function(msg)
             print("  " .. name .. " x" .. data.amount .. " classID=" .. tostring(data.classID) .. " sell=" .. tostring(data.sellPrice))
         end
     else
-        print("|cff30b0c0Night's Farmtracker:|r /nft · /nft debug · /nft test")
+        print("|cff30b0c0Night's Farmtracker:|r /nft · /nft debug · /nft filter · /nft test")
     end
 end
 
@@ -332,7 +337,8 @@ local CROSS_DEDUP_TTL     = 2   -- seconds
 
 EventFrame:RegisterEvent("ADDON_LOADED")
 EventFrame:RegisterEvent("PLAYER_LOGIN")
-EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")EventFrame:RegisterEvent("CHAT_MSG_LOOT")
+EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+EventFrame:RegisterEvent("CHAT_MSG_LOOT")
 EventFrame:RegisterEvent("CHAT_MSG_MONEY")
 EventFrame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
 

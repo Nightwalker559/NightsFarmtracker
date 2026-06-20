@@ -1,5 +1,43 @@
 # Changelog
 
+## [1.0.8] - 2026-06-19
+
+### New
+
+- Vendor-Only Filter: new window (button in BtnBar / `/nft filter`) — drag items from your bags into it to force vendor-only pricing for that item everywhere (HUD, category totals, session history), regardless of AH price
+- Filter is account-wide and persistent until removed (Shift+Right-click on entry)
+- Settings: Vendor-Only Filter can be disabled (Tracking section); when off, items in the list are priced normally again (list itself is kept)
+
+### Fixed
+
+- Filter button now shifts left to fill the gap when the History button is hidden (session history disabled), instead of leaving a blank space
+- Session history (list, detail view, save) now correctly excludes BoP items and items flagged `canAH == false` from AH pricing, matching the live HUD — previously these could be overstated using the AH price in saved sessions
+- Grey/junk items whose vendor price wasn't yet cached at loot time (cache miss) were silently dropped instead of being tracked and resolved via bag scan
+- Settings: custom TSM price source field referenced an undeclared variable due to declaration order, so the dropdown's greyed-out state never updated live while typing (only after reopening Settings)
+- Removed a stale hardcoded item-class priority entry that could block the correct (runtime-detected) Housing category sort order
+- Removed dead minimap-icon stub code left over from the pre-LibDBIcon implementation
+- HUD refresh (`RefreshHUD`) no longer recalculates each item's AH/vendor price up to three times per loot event; gold totals are now computed once and reused
+
+---
+
+## [1.0.7] - 2026-06-18
+
+### Fixed
+
+- Junk/Müll items were including AH prices (from Auctionator or TSM) in the category total, overall gold, and session history; vendor price is now always used for items with quality 0 or flagged as vendor trash
+
+---
+
+## [1.0.6] - 2026-06-18
+
+### Fixed
+
+- HUD category totals could show far less gold than the actual session total when a category mixed AH-priced and vendor-only items (e.g. "Metalle & Steine" 2997g vs. items only counted via AH falling out entirely); category gold now sums max(AH, Vendor) per item, matching the overall total
+- Same fix applied to the Session History detail view, where category totals previously favored AH-only sums and could undercount vendor-only items
+- Removed now-unused per-category `totalVendor`/`totalAH` accumulation in the HUD (dead code)
+
+---
+
 ## [1.0.5] - 2026-06-17
 
 ### Changed

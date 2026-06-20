@@ -76,8 +76,15 @@ L["tracking"]                 = "Tracking"
 L["session_history_enabled"]  = "Save session history"
 L["split_trade_goods"]        = "Split trade goods by subtype"
 L["merge_daily_sessions"]     = "Merge same-day sessions automatically"
+L["vendor_filter_enabled"]    = "Enable Vendor-Only Filter"
 L["ah_auto_info"]             = "Prefers Auctionator, falls back to TSM"
 L["tsm_custom"]               = "Custom TSM expression (overrides above)"
+-- Vendor-only filter
+L["filter_title"]             = "Vendor-Only Filter"
+L["filter_button"]            = "Vendor-Only Filter"
+L["filter_drop_hint"]         = "Drop item here"
+L["filter_list_empty"]        = "No items in filter yet"
+L["filter_tip_shift_rclick"]  = "  Shift+Right-click to remove"
 
 ------------------------------------------------------------------------
 -- German (deDE)
@@ -145,6 +152,13 @@ if GetLocale() == "deDE" then
     L["session_history_enabled"] = "Session-Verlauf speichern"
     L["split_trade_goods"]       = "Handwerksmaterialien nach Typ aufteilen"
     L["merge_daily_sessions"]    = "Sessions desselben Tages automatisch zusammenführen"
+    L["vendor_filter_enabled"]   = "Vendor-Only-Filter aktivieren"
     L["ah_auto_info"]            = "Bevorzugt Auctionator, fällt auf TSM zurück"
     L["tsm_custom"]              = "Eigener TSM-Ausdruck (überschreibt oben)"
+    -- Vendor-only filter
+    L["filter_title"]            = "Vendor-Only-Filter"
+    L["filter_button"]           = "Vendor-Only-Filter"
+    L["filter_drop_hint"]        = "Item hier rein ziehen"
+    L["filter_list_empty"]       = "Noch keine Items im Filter"
+    L["filter_tip_shift_rclick"] = "  Shift-Rechtsklick: Entfernen"
 end

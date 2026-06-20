@@ -98,6 +98,9 @@ end
 ------------------------------------------------------------------------
 -- Helper: dropdown for TSM price source
 ------------------------------------------------------------------------
+local tsmDropdown
+local tsmCustomEB
+
 local function MakeDropdown(parent, yOff)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     frame:SetSize(S_W - S_PAD*2 - 40, 24)
@@ -217,8 +220,6 @@ end
 -- All widgets are parented to SListFrame (the scroll child).
 ------------------------------------------------------------------------
 local settingsContent = {}
-local tsmDropdown
-local tsmCustomEB
 
 function ns.RebuildSettingsContent()
     if not SListFrame then return end
@@ -388,6 +389,16 @@ function ns.RebuildSettingsContent()
             db.mergeDaily = v
         end)
     settingsContent[#settingsContent+1] = mergeRow
+    y = y - 38
+
+    local filterRow = MakeCheckbox(SListFrame, ns.L["vendor_filter_enabled"], y,
+        function() return db.vendorFilterEnabled ~= false end,
+        function(v)
+            db.vendorFilterEnabled = v
+            ns.UpdateFilterBtn()
+            ns.RefreshHUD()
+        end)
+    settingsContent[#settingsContent+1] = filterRow
     y = y - 38
 
     -- ----------------------------------------------------------------

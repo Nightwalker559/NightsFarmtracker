@@ -93,6 +93,9 @@ btnReset:SetPoint("LEFT", btnPause, "RIGHT", 6, 0)
 local btnHistory  = MakeBtn(BtnBar, 18, "btn_history.png")
 btnHistory:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
 
+local btnFilter   = MakeBtn(BtnBar, 18, "btn_filter.png")
+btnFilter:SetPoint("LEFT", btnHistory, "RIGHT", 6, 0)
+
 -- Right side (anchored from right): close → collapse → help → settings
 local btnClose = MakeBtn(BtnBar, 18, "btn_close.png")
 btnClose:SetPoint("RIGHT", BtnBar, "RIGHT", 0, 0)
@@ -304,19 +307,8 @@ local function UpdateFrameHeight()
     end
 end
 
-local function UpdateSummary()
-    cachedGold = 0
-    local filter = NightsFarmtrackerDB.filterMode or "all"
-    for _, data in pairs(NightsFarmtrackerDB.count) do
-        local vis = filter=="all"
-               or (filter=="mats"  and ns.IsMat(data))
-               or (filter=="other" and not ns.IsMat(data))
-        if vis then
-            local val = ns.ItemValue(data)
-            if val then cachedGold = cachedGold + val end
-        end
-    end
-    cachedGold = cachedGold + (NightsFarmtrackerDB.lootedGold or 0)
+local function UpdateSummary(itemGoldTotal)
+    cachedGold = (itemGoldTotal or 0) + (NightsFarmtrackerDB.lootedGold or 0)
     MainFrame.totalGoldText:SetText(cachedGold > 0 and ns.FormatGold(cachedGold) or "")
     ns.UpdateGoldRate()
     ns.UpdateGoldFrame()
@@ -481,6 +473,7 @@ ns.RefreshHUD = function()
     local db     = NightsFarmtrackerDB
     local filter = db.filterMode or "all"
     local cats   = {}
+    local grandTotal = 0
 
     for name, data in pairs(db.count) do
         local vis = filter=="all"
@@ -488,15 +481,16 @@ ns.RefreshHUD = function()
                or (filter=="other" and not ns.IsMat(data))
         if vis then
             local cat = ns.CategoryName(data) or ns.CAT_MATS
-            if not cats[cat] then cats[cat]={items={},totalGold=0,totalVendor=0,totalAH=0,classID=data.classID} end
-            local c      = cats[cat]
-            local vendor = ns.VendorTotal(data) or 0
-            local ah     = ns.AHTotal(data)     or 0
-            local gold   = ns.ItemValue(data)   or 0
+            if not cats[cat] then cats[cat]={items={},totalGold=0,classID=data.classID} end
+            local c         = cats[cat]
+            local vendorRaw = ns.VendorTotal(data)
+            local ahRaw     = ns.AHTotal(data)
+            local vendor    = vendorRaw or 0
+            local ah        = ahRaw     or 0
+            local gold      = ns.ItemValue(data, vendorRaw, ahRaw) or 0
             c.items[#c.items+1] = {name=name,data=data,gold=gold,vendor=vendor,ah=ah}
             c.totalGold   = c.totalGold   + gold
-            c.totalVendor = c.totalVendor + vendor
-            c.totalAH     = c.totalAH     + ah
+            grandTotal    = grandTotal    + gold
         end
     end
 
@@ -511,22 +505,13 @@ ns.RefreshHUD = function()
     local sorted = {}
     for catName, cat in pairs(cats) do sorted[#sorted+1]={name=catName,cat=cat} end
 
-    -- hasAH muss vor dem Sort bekannt sein
+    -- hasAH wird unten fuer fv gebraucht
     local hasAH = ns.HasAnyAH() and db.ahSource ~= "none"
 
-    -- displayGold pro Kategorie: gleiche Logik wie der Header-Text
-    local junkLabel = ns.L["cat_junk"] or "Junk"
+    -- displayGold pro Kategorie: cat.totalGold ist die Summe von ns.ItemValue
+    -- (max(AH,Vendor) pro Item) und damit identisch zur Logik des Gesamtgolds.
     for _, entry in ipairs(sorted) do
-        local catName   = entry.name
-        local cat       = entry.cat
-        local isJunkCat = (catName == junkLabel)
-        if not hasAH or isJunkCat then
-            cat.displayGold = cat.totalVendor
-        elseif cat.totalAH > 0 then
-            cat.displayGold = cat.totalAH
-        else
-            cat.displayGold = cat.totalGold
-        end
+        entry.cat.displayGold = entry.cat.totalGold
     end
 
     table.sort(sorted, function(a,b)
@@ -558,14 +543,7 @@ ns.RefreshHUD = function()
         hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", -4, 0)
         hdr.goldText:SetFontHeight(11)
 
-        local isJunkCat = (catName == (ns.L["cat_junk"] or "Junk"))
-        if not hasAH or isJunkCat then
-            hdr.goldText:SetText(cat.totalVendor > 0 and ns.FormatGold(cat.totalVendor) or "")
-        elseif cat.totalAH > 0 then
-            hdr.goldText:SetText(ns.FormatGold(cat.totalAH))
-        else
-            hdr.goldText:SetText(cat.totalGold > 0 and ns.FormatGold(cat.totalGold) or "")
-        end
+        hdr.goldText:SetText(cat.totalGold > 0 and ns.FormatGold(cat.totalGold) or "")
         yOffset = yOffset + CAT_ROW_H
 
         if not isCollapsed then
@@ -575,7 +553,7 @@ ns.RefreshHUD = function()
             local flat = {}
             for _, item in ipairs(cat.items) do
                 local d = item.data
-                local fv = not hasAH or (d.quality==0) or d.isVendorTrash or d.isBoP
+                local fv = not hasAH or (d.quality==0) or d.isVendorTrash or d.isBoP or ns.IsForceVendor(d.itemID)
                 if d.q and d.qIDs then
                     for tier = 1, 3 do
                         local tc = d.q[tier] or 0
@@ -679,7 +657,7 @@ ns.RefreshHUD = function()
     local maxScroll = math.max(0, totalH - ScrollFrame:GetHeight())
     ScrollFrame:SetVerticalScroll(math.min(savedScroll, maxScroll))
     UpdateFrameHeight()
-    UpdateSummary()
+    UpdateSummary(grandTotal)
 end
 
 ------------------------------------------------------------------------
@@ -711,7 +689,6 @@ function ns.ApplyPauseVisuals()
         btnPause.tex:SetTexture(ART.."btn_pause.png")
         MainFrame.TimerText:SetTextColor(0.2, 0.85, 0.2)
     end
-    ns.UpdateMinimapIcon()
 end
 
 function ns.ExcludeItem(name)
@@ -782,6 +759,15 @@ btnHistory:SetScript("OnEnter", function(self)
     GameTooltip:Show()
 end)
 btnHistory:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+
+btnFilter:SetScript("OnClick", function() ns.ToggleFilterWindow() end)
+btnFilter:SetScript("OnEnter", function(self)
+    self.tex:SetAlpha(1)
+    GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
+    GameTooltip:SetText(ns.L["filter_button"])
+    GameTooltip:Show()
+end)
+btnFilter:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
 
 btnSettings:SetScript("OnClick", function() ns.ToggleSettings() end)
 btnSettings:SetScript("OnEnter", function(self)
@@ -861,15 +847,30 @@ function ns.SetMinimapVisible(show)
     else         DBIcon:Hide("NightsFarmtracker") end
 end
 
--- Stubs – nicht mehr benötigt, aber Aufrufer bleiben kompatibel
-function ns.UpdateMinimapIcon()     end
-function ns.UpdateMinimapPosition() end
+local function UpdateLeftButtons()
+    local db           = NightsFarmtrackerDB
+    local historyShown = db.sessionHistoryEnabled ~= false
+    local filterShown  = db.vendorFilterEnabled   ~= false
+
+    if historyShown then btnHistory:Show(); btnHistory:EnableMouse(true)
+    else                  btnHistory:Hide(); btnHistory:EnableMouse(false) end
+
+    if filterShown then btnFilter:Show(); btnFilter:EnableMouse(true)
+    else                  btnFilter:Hide(); btnFilter:EnableMouse(false) end
+
+    -- Filter rutscht an den Reset-Button, wenn History ausgeblendet ist (keine Lücke)
+    btnFilter:ClearAllPoints()
+    if historyShown then
+        btnFilter:SetPoint("LEFT", btnHistory, "RIGHT", 6, 0)
+    else
+        btnFilter:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
+    end
+end
 
 function ns.UpdateHistoryBtn()
-    local enabled = NightsFarmtrackerDB.sessionHistoryEnabled ~= false
-    if enabled then
-        btnHistory:Show(); btnHistory:EnableMouse(true)
-    else
-        btnHistory:Hide(); btnHistory:EnableMouse(false)
-    end
+    UpdateLeftButtons()
+end
+
+function ns.UpdateFilterBtn()
+    UpdateLeftButtons()
 end
