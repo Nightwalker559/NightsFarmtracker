@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.9] - 2026-06-22
+
+### New
+
+- Pets and Mounts now get their own categories ("Pets"/"Haustiere", "Mounts"/"Reittiere") instead of being grouped under Miscellaneous
+- Shift+Click on Reset button resets the session without saving it to history
+- Help tooltip now also explains the Gold Overview (click footer total) and the Shift+Click reset behavior
+- Settings: Gold display can be switched between Classic (coin icons) and Modern (colored text, e.g. `31g 60s`) — applies everywhere gold is shown (HUD, category totals, footer, history)
+- Modern display matches Classic's existing behavior of hiding the copper value from 1g onward
+- Modern display suffixes (g/s/c) are now localized — German uses "k" for Kupfer instead of "c"
+- Modern display uses Blizzard's native `GOLD_COLOR_CODE`/`SILVER_COLOR_CODE`/`COPPER_COLOR_CODE` globals when available, with a hardcoded hex fallback for clients where they're not defined
+
+### Fixed
+
+- `CHAT_MSG_LOOT` self-loot filter wrongly tracked Need/Greed roll-choice messages ("Ihr habt für [Item] Bedarf/Gier ausgewählt") in Group Loot raids, since they share the same leading word ("Ihr "/"You ") as the real receipt message ("Ihr erhaltet Beute: ..."). The filter now matches the full literal prefix anchored at the start of the message instead of just the first word, so only actual loot receipts are tracked
+- `GetItemInfoInstant` return values were off-by-one in two places (loot-time cache-miss recovery, bag-scan price resolution), causing wrong icon/classID and bogus bind-type checks for items not yet cached at loot time; bag-scan now reuses the existing full `GetItemInfo` call instead, which also correctly resolves bind flags afterwards
+
 ## [1.0.8] - 2026-06-19
 
 ### New

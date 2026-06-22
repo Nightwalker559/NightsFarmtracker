@@ -19,11 +19,12 @@ local priceRetryCount   = 0
 
 -- Localized self-loot prefix derived from WoW's own global string.
 -- EN: "You receive loot: "  /  DE: "Ihr erhaltet Beute: "
--- Only messages starting with this prefix belong to the player.
--- "Ihr " (DE) / "You " (EN) — erstes Wort aus LOOT_ITEM_SELF.
--- Deckt alle eigenen Loot-Varianten ab: Beute, Gegenstände, einen Gegenstand, etc.
--- Andere Spieler beginnen mit ihrem Charakternamen → werden gefiltert.
-local SELF_LOOT_PREFIX    = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(%S+%s)") or nil
+-- Only messages starting with this exact (anchored) prefix belong to the player.
+-- IMPORTANT: we take the full literal text before the first %s/%d placeholder,
+-- not just the first word — "Ihr " alone would also match roll-choice messages
+-- like "Ihr habt für [Item] Bedarf ausgewählt", which is NOT a loot receipt.
+-- Andere Spieler/Nachrichtentypen beginnen anders → werden gefiltert.
+local SELF_LOOT_PREFIX    = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^([^%%]+)%%") or nil
 
 -- Cache reagent quality API at load time; nil if unavailable
 local GetReagentQualityInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityInfo or nil
@@ -51,20 +52,21 @@ local function ProcessLoot(items)
         local qty    = pending.qty
         local link   = pending.link
 
-        local name, _, quality, _, _, _, itemSubType, _, _, icon, sellPrice, classID, _, bindType =
+        local name, _, quality, _, _, _, itemSubType, _, _, icon, sellPrice, classID, subClassID, bindType =
             C_Item.GetItemInfo(link)
 
         -- Cache miss: recover from link color (quality) + GetItemInfoInstant (classID/icon)
-        -- C_Item.GetItemInfoInstant returns: itemType,itemSubType,itemEquipLoc,icon,classID,subClassID,bindType
+        -- C_Item.GetItemInfoInstant returns: itemID, itemType, itemSubType, itemEquipLoc, icon, classID, subClassID
+        -- (no bindType — that gets resolved later via bag scan in ns.UpdatePricesFromBags)
         if not name then
-            local _t, _s, _e, icon2, classID2, _sc, bindType2 = C_Item.GetItemInfoInstant(itemID)
+            local _, _, _, _, icon2, classID2, subClassID2 = C_Item.GetItemInfoInstant(itemID)
             ns.Log("CacheMiss", itemID, "classID2=", classID2, "itemName=", pending.itemName)
             if classID2 and pending.itemName then
-                name      = pending.itemName
-                quality   = pending.linkQuality
-                icon      = icon2
-                classID   = classID2
-                bindType  = bindType2
+                name        = pending.itemName
+                quality     = pending.linkQuality
+                icon        = icon2
+                classID     = classID2
+                subClassID  = subClassID2
             else
                 pendingLoot[#pendingLoot+1] = pending
                 if not ns.pendingPriceUpdate then
@@ -124,6 +126,7 @@ local function ProcessLoot(items)
                 entry.quality     = quality     or entry.quality
                 entry.itemSubType = itemSubType or entry.itemSubType
                 entry.classID     = entry.classID or classID
+                entry.subClassID  = entry.subClassID or subClassID
                 entry.itemID      = entry.itemID or itemID
                 entry.itemLink    = link
 
@@ -213,26 +216,24 @@ function ns.UpdatePricesFromBags()
                     if data then
                         local bagLink = C_Container.GetContainerItemLink(bag, slot)
                         if bagLink then
-                            local sp = select(11, C_Item.GetItemInfo(bagLink))
+                            local sp, cID, subID, bType = select(11, C_Item.GetItemInfo(bagLink))
                             if sp and sp > 0 then
                                 data.sellPrice = sp
                                 data.itemLink  = bagLink
                             else
                                 data.noSell = true
                             end
-                            -- classID / Bind-Flags nachladen wenn beim Looten nicht aufgelöst
-                            if not data.classID then
-                                local _, _, _, _, cID, _, bType = C_Item.GetItemInfoInstant(bagLink)
-                                if cID then data.classID = cID end
-                                if bType then
-                                    if bType == BIND_ON_EQUIP  then data.isBoE = true end
-                                    if bType == BIND_ON_PICKUP then data.isBoP = true end
-                                    if data.canAH == nil then
-                                        data.canAH = (bType == BIND_ON_EQUIP)
-                                                  or (bType == 0)
-                                                  or (data.classID == TRADE_GOODS)
-                                    end
-                                end
+                            -- classID / subclass / bind flags: authoritative now that the
+                            -- item is cached via the bag link — overwrites any approximate
+                            -- values set during a loot-time cache miss (no bindType there)
+                            if cID then
+                                data.classID    = cID
+                                data.subClassID = subID
+                                if bType == BIND_ON_EQUIP  then data.isBoE = true end
+                                if bType == BIND_ON_PICKUP then data.isBoP = true end
+                                data.canAH = (bType == BIND_ON_EQUIP)
+                                          or (bType == 0 or bType == nil)
+                                          or (cID == TRADE_GOODS)
                             end
                             updated            = true
                             byID[ci.itemID]    = nil
@@ -395,11 +396,18 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "CHAT_MSG_LOOT" and not NightsFarmtrackerDB.paused then
         local msg, _, _, _, sender = ...
 
-        -- isMe: Prefix-Check ("Ihr "/"You ") ODER Sender = eigener Spielername
-        local prefixMatch = SELF_LOOT_PREFIX and msg:find(SELF_LOOT_PREFIX, 1, true)
-        local senderShort = sender and sender:match("^([^%-]+)") or ""
-        local senderMatch = senderShort ~= "" and senderShort == UnitName("player")
-        if not prefixMatch and not senderMatch then return end
+        -- isMe: Prefix-Check ist maßgeblich (anchored, "Ihr erhaltet Beute: "/"You receive loot: ").
+        -- Sender-Vergleich nur als Fallback falls LOOT_ITEM_SELF mal nicht verfügbar ist —
+        -- sonst könnte z.B. "Ihr habt für [Item] Bedarf ausgewählt" (keine Beute, nur Würfelwahl)
+        -- über den Sendernamen wieder durchrutschen.
+        local isMe
+        if SELF_LOOT_PREFIX then
+            isMe = msg:sub(1, #SELF_LOOT_PREFIX) == SELF_LOOT_PREFIX
+        else
+            local senderShort = sender and sender:match("^([^%-]+)") or ""
+            isMe = senderShort ~= "" and senderShort == UnitName("player")
+        end
+        if not isMe then return end
 
         local color, linkData, itemName =
             msg:match("|cff(%x%x%x%x%x%x)|H(item:[^|]+)|h%[([^%]]+)%]|h")

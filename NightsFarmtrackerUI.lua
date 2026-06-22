@@ -663,8 +663,10 @@ end
 ------------------------------------------------------------------------
 -- Session controls
 ------------------------------------------------------------------------
-function ns.Reset()
-    ns.SaveCurrentSession()
+function ns.Reset(skipSave)
+    if not skipSave then
+        ns.SaveCurrentSession()
+    end
     local db = NightsFarmtrackerDB
     db.count={}; db.collapsed={}; db.excludedNames={}
     db.totalTime=0; db.qAtlas={}; db.paused=true; db.lootedGold=0
@@ -741,12 +743,13 @@ btnPause:SetScript("OnEnter", function(self)
 end)
 btnPause:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
 
-btnReset:SetScript("OnClick", ns.Reset)
+btnReset:SetScript("OnClick", function() ns.Reset(IsShiftKeyDown()) end)
 btnReset:SetScript("OnEnter", function(self)
     self.tex:SetAlpha(1)
     GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
     GameTooltip:SetText(ns.L["reset_session"])
     GameTooltip:AddLine(ns.L["reset_desc"],0.7,0.7,0.7,true)
+    GameTooltip:AddLine(ns.L["reset_shift_hint"],0.5,0.5,0.5,true)
     GameTooltip:Show()
 end)
 btnReset:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
@@ -789,6 +792,10 @@ btnHelp:SetScript("OnEnter", function(self)
     GameTooltip:AddLine(ns.L["help_items"], 1,1,1)
     GameTooltip:AddLine(ns.L["help_item_hover"],                0.7,0.7,0.7)
     GameTooltip:AddLine(ns.L["help_item_rclick"],   0.7,0.7,0.7)
+    GameTooltip:AddLine(ns.L["help_gold"], 1,1,1)
+    GameTooltip:AddLine(ns.L["help_gold_click"],     0.7,0.7,0.7)
+    GameTooltip:AddLine(ns.L["help_reset"], 1,1,1)
+    GameTooltip:AddLine(ns.L["help_reset_shift"],    0.7,0.7,0.7)
     GameTooltip:Show()
 end)
 btnHelp:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)

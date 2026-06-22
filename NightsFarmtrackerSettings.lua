@@ -340,6 +340,19 @@ function ns.RebuildSettingsContent()
     settingsContent[#settingsContent+1] = rateRow2
     y = y - 24
 
+    local function getGoldDisplay() return db.goldDisplayMode=="modern" and "modern" or "classic" end
+    local function setGoldDisplay(v) db.goldDisplayMode=v; ns.RefreshHUD() end
+
+    local gdRow1 = MakeRadio(SListFrame, ns.L["gold_display_classic"], y, "classic", getGoldDisplay, setGoldDisplay)
+    gdRow1:SetSelected(getGoldDisplay()=="classic"); gdRow1:SetEnabled(true)
+    settingsContent[#settingsContent+1] = gdRow1
+    y = y - 24
+
+    local gdRow2 = MakeRadio(SListFrame, ns.L["gold_display_modern"], y, "modern", getGoldDisplay, setGoldDisplay)
+    gdRow2:SetSelected(getGoldDisplay()=="modern"); gdRow2:SetEnabled(true)
+    settingsContent[#settingsContent+1] = gdRow2
+    y = y - 24
+
     local mmRow = MakeCheckbox(SListFrame, ns.L["minimap_button"], y,
         function() return not db.minimapHidden end,
         function(v)

@@ -71,14 +71,50 @@ function ns.FormatTime(s)
         math.floor(s/3600), math.floor((s%3600)/60), s%60)
 end
 
-function ns.FormatGold(copper)
-    if not copper or copper <= 0 then return "" end
+local function FormatGoldClassic(copper)
     if copper >= 10000 then
         -- Gold + Silber (auf nächste Silbermünze runden)
         return GetCoinTextureString(math.floor(copper / 100) * 100)
     end
     -- Unter 1g: Silber + Kupfer
     return GetCoinTextureString(copper)
+end
+
+-- GOLD_COLOR_CODE / SILVER_COLOR_CODE / COPPER_COLOR_CODE are not always
+-- defined as globals depending on client version — fall back to the same
+-- hex values Blizzard uses if they're missing.
+local MONEY_GOLD_CC   = GOLD_COLOR_CODE   or "|cffffd700"
+local MONEY_SILVER_CC = SILVER_COLOR_CODE or "|cffc7c7cf"
+local MONEY_COPPER_CC = COPPER_COLOR_CODE or "|cffeda55f"
+local MONEY_CC_CLOSE  = FONT_COLOR_CODE_CLOSE or "|r"
+
+local function FormatGoldModern(copper)
+    -- same threshold as classic: from 1g (10000 copper) onward, copper is not shown
+    local showCopper = copper < 10000
+    if not showCopper then
+        copper = math.floor(copper / 100) * 100
+    end
+    local gold   = math.floor(copper / 10000)
+    local silver = math.floor((copper % 10000) / 100)
+    local cop    = copper % 100
+
+    local parts = {}
+    if gold > 0 then
+        parts[#parts+1] = MONEY_GOLD_CC .. gold .. ns.L["coin_gold"] .. MONEY_CC_CLOSE
+    end
+    parts[#parts+1] = MONEY_SILVER_CC .. string.format("%02d", silver) .. ns.L["coin_silver"] .. MONEY_CC_CLOSE
+    if showCopper then
+        parts[#parts+1] = MONEY_COPPER_CC .. string.format("%02d", cop) .. ns.L["coin_copper"] .. MONEY_CC_CLOSE
+    end
+    return table.concat(parts, " ")
+end
+
+function ns.FormatGold(copper)
+    if not copper or copper <= 0 then return "" end
+    if NightsFarmtrackerDB and NightsFarmtrackerDB.goldDisplayMode == "modern" then
+        return FormatGoldModern(copper)
+    end
+    return FormatGoldClassic(copper)
 end
 
 local Q_FALLBACK = {"Q1:","Q2:","Q3:"}
@@ -152,6 +188,15 @@ function ns.CategoryName(data)
     if data.classID then
         if data.classID == 2 or data.classID == 4 then
             return ns.L and ns.L["cat_gear"] or "Equipment"
+        end
+        -- Mounts / Companion Pets always get their own category (classID 15, Miscellaneous)
+        if data.classID == Enum.ItemClass.Miscellaneous and data.subClassID then
+            if data.subClassID == Enum.ItemMiscellaneousSubclass.Mount then
+                return ns.L and ns.L["cat_mounts"] or "Mounts"
+            end
+            if data.subClassID == Enum.ItemMiscellaneousSubclass.CompanionPet then
+                return ns.L and ns.L["cat_pets"] or "Pets"
+            end
         end
         -- Split trade goods (7) and reagents (5) by WoW subtype when enabled
         if (data.classID == 7 or data.classID == 5)
@@ -242,6 +287,7 @@ function ns.InitDB()
     if db.mergeDaily            == nil then db.mergeDaily            = true  end
     if db.splitTradeGoods       == nil then db.splitTradeGoods       = false end
     if db.ahSource        == nil then db.ahSource        = "auto"     end
+    if db.goldDisplayMode == nil then db.goldDisplayMode = "classic"  end
     if db.tsmPriceSource  == nil then db.tsmPriceSource  = "DBMarket" end
     if db.tsmCustomSource == nil then db.tsmCustomSource = ""         end
 end
