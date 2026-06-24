@@ -414,6 +414,16 @@ function ns.RebuildSettingsContent()
     settingsContent[#settingsContent+1] = filterRow
     y = y - 38
 
+    local logRow = MakeCheckbox(SListFrame, ns.L["log_window_enabled"], y,
+        function() return db.logWindowEnabled == true end,
+        function(v)
+            db.logWindowEnabled = v
+            if not v then ns.OnLogWindowDisabled() end
+            ns.UpdateLogBtn()
+        end)
+    settingsContent[#settingsContent+1] = logRow
+    y = y - 38
+
     -- ----------------------------------------------------------------
     -- Resize scroll area and outer frame
     -- ----------------------------------------------------------------

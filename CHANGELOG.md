@@ -1,5 +1,51 @@
 # Changelog
 
+## [1.1.1] - 2026-06-23
+
+### New
+
+- Session History: days with more than one session now show a "Merge" button next to the date header - merges all sessions of that day into one (duration, gold, items combined). Useful for sessions saved before "Merge same-day sessions automatically" was enabled
+- Loot Log window now anchors below the main frame when it's collapsed, and back to its right side (or right of the Vendor-Only Filter window) when expanded again
+
+### Fixed
+
+- Quest items were tracked despite never having a vendor or AH value. Quest-class items are now correctly detected and always treated as unsellable, regardless of bind type. Already-tracked quest items in the current session are cleaned up automatically on the next refresh - no reset required
+
+### Cleanup
+
+- Removed unused `CAT_BOE`/`CAT_BOP` legacy category aliases in Core.lua (never referenced)
+- The vendor-only check (junk/quality0/BoP/canAH=false/forced-vendor) was duplicated three times in History.lua — consolidated into one shared `ns.IsVendorOnly()` helper in Core.lua; no visual or behavioral change
+- The AH-eligibility (`canAH`) calculation was duplicated identically at loot-time and during the deferred bag-price scan in Main.lua — consolidated into one local `CanAH()` helper; no behavioral change
+- Removed unused `ADDON_NAME` local in UI.lua
+
+## [1.1.0] - 2026-06-23
+
+### New
+
+- Optional Loot Log window (button in BtnBar) - shows a feed of looted items (icon, name, amount, item quality), one line per loot event, most recent first
+- Settings: Loot log window is disabled by default; enable it in the Tracking section
+- Loot log entries are saved per-character (SavedVariablesPerCharacter) and survive `/reload` and relogs - only a session reset clears them
+- Loot Log anchors right of the main frame and docks next to the Vendor-Only Filter when both are open (whichever opens second chains outward); does not close on Escape, only on session reset
+- Loot Log window's open/closed state is also saved per-character and restored after `/reload` and relogs
+- Loot Log rows show a timestamp (HH:MM) before the item icon
+
+### Changed
+
+- Crafting-reagent rank indicator (R1/R2/R3) moved from inline text next to the count to a small badge between the item icon and item name — consistent across the main HUD, history detail view, and the new loot log
+
+### Fixed
+
+- Main frame was anchored via "CENTER", so collapsing/expanding (and any height change) grew/shrank the frame symmetrically around its middle - the header visually drifted instead of staying put. Now anchored via "TOP": the header stays fixed in place and the frame only grows downward. Saved positions are normalized automatically on login (same screen spot, no jump)
+- Root cause of the above persisting even after the anchor fix: WoW's drag mechanism does not preserve the original anchor point type after moving the frame - it can hand back e.g. "RIGHT" (vertically centered) instead of "TOP", silently reintroducing the symmetric-growth bug on every drag. The drag handler now always normalizes the anchor back to "TOP" after a move
+- Some ElvUI/WindTools setups re-anchor unrelated addon frames after entering the world, silently swapping our "TOP" anchor for something else even with the above fixes in place and the saved position correct. The main frame's anchor is now defensively re-applied after `PLAYER_ENTERING_WORLD`, mirroring the existing minimap-button fix for the same kind of interference
+
+### Cleanup
+
+- Removed unused `Q_FALLBACK` local in Core.lua and an unused `gathering_start` locale string (EN+DE)
+- Removed an orphaned empty comment header in History.lua
+- Item-row quality coloring (icon border + name color) was duplicated identically in five places across UI.lua, History.lua, Filter.lua, and Log.lua — consolidated into one shared `ns.ApplyQualityColor()` helper in Core.lua; no visual or behavioral change
+- Rank-icon size (`CreateAtlasMarkup` width/height) was hardcoded identically in three places — consolidated into `ns.RANK_ICON_W`/`ns.RANK_ICON_H` in Core.lua
+
 ## [1.0.9] - 2026-06-22
 
 ### New
@@ -14,7 +60,6 @@
 
 ### Fixed
 
-- `CHAT_MSG_LOOT` self-loot filter wrongly tracked Need/Greed roll-choice messages ("Ihr habt für [Item] Bedarf/Gier ausgewählt") in Group Loot raids, since they share the same leading word ("Ihr "/"You ") as the real receipt message ("Ihr erhaltet Beute: ..."). The filter now matches the full literal prefix anchored at the start of the message instead of just the first word, so only actual loot receipts are tracked
 - `GetItemInfoInstant` return values were off-by-one in two places (loot-time cache-miss recovery, bag-scan price resolution), causing wrong icon/classID and bogus bind-type checks for items not yet cached at loot time; bag-scan now reuses the existing full `GetItemInfo` call instead, which also correctly resolves bind flags afterwards
 
 ## [1.0.8] - 2026-06-19

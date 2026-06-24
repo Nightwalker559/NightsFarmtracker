@@ -6,6 +6,7 @@ local _, ns = ...
 
 local ADDON_NAME     = ns.ADDON_NAME
 local TRADE_GOODS    = ns.TRADE_GOODS
+local QUEST_CLASS    = ns.QUEST_CLASS
 local BIND_ON_EQUIP  = ns.BIND_ON_EQUIP
 local BIND_ON_PICKUP = ns.BIND_ON_PICKUP
 local MainFrame      = ns.MainFrame
@@ -19,12 +20,11 @@ local priceRetryCount   = 0
 
 -- Localized self-loot prefix derived from WoW's own global string.
 -- EN: "You receive loot: "  /  DE: "Ihr erhaltet Beute: "
--- Only messages starting with this exact (anchored) prefix belong to the player.
--- IMPORTANT: we take the full literal text before the first %s/%d placeholder,
--- not just the first word — "Ihr " alone would also match roll-choice messages
--- like "Ihr habt für [Item] Bedarf ausgewählt", which is NOT a loot receipt.
--- Andere Spieler/Nachrichtentypen beginnen anders → werden gefiltert.
-local SELF_LOOT_PREFIX    = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^([^%%]+)%%") or nil
+-- Only messages starting with this prefix belong to the player.
+-- "Ihr " (DE) / "You " (EN) — erstes Wort aus LOOT_ITEM_SELF.
+-- Deckt alle eigenen Loot-Varianten ab: Beute, Gegenstände, einen Gegenstand, etc.
+-- Andere Spieler beginnen mit ihrem Charakternamen → werden gefiltert.
+local SELF_LOOT_PREFIX    = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(%S+%s)") or nil
 
 -- Cache reagent quality API at load time; nil if unavailable
 local GetReagentQualityInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityInfo or nil
@@ -42,6 +42,14 @@ local LINK_QUALITY = {
 }
 
 local pendingLoot = {}
+
+-- canAH: only BoE and unbound items (0/nil), plus Trade Goods, may go on the AH.
+-- BoP (1), Warbound/account-bound and everything else → vendor only.
+local function CanAH(bindType, classID)
+    return (bindType == BIND_ON_EQUIP)
+        or (bindType == 0 or bindType == nil)
+        or (classID == TRADE_GOODS)
+end
 
 local function ProcessLoot(items)
     local changed          = false
@@ -97,10 +105,17 @@ local function ProcessLoot(items)
             else
                 -- quality > 0: tracken sofern nicht definitiv unverkäuflich.
                 -- sellPrice == nil = Cache-Miss = unbekannt → tracken und Preis später auflösen.
-                -- Nur überspringen wenn sellPrice explizit 0 UND BoP UND kein Trade Good.
-                local definitelyUnsellable = (sellPrice == 0)
-                                          and (bindType == BIND_ON_PICKUP)
-                                          and (classID ~= TRADE_GOODS)
+                -- Quest-Items (classID 12) sind laut Blizzard-API grundsätzlich unverkäuflich
+                -- (sellPrice immer 0), aber nicht zwingend BIND_ON_PICKUP - daher eigener Check.
+                -- Sonst: nur überspringen wenn sellPrice explizit 0 UND BoP UND kein Trade Good.
+                local definitelyUnsellable
+                if classID == QUEST_CLASS then
+                    definitelyUnsellable = true
+                else
+                    definitelyUnsellable = (sellPrice == 0)
+                                        and (bindType == BIND_ON_PICKUP)
+                                        and (classID ~= TRADE_GOODS)
+                end
                 shouldTrack = not definitelyUnsellable
             end
 
@@ -133,12 +148,8 @@ local function ProcessLoot(items)
                 if quality == 0               then entry.isVendorTrash = true end
                 if bindType == BIND_ON_EQUIP  then entry.isBoE         = true end
                 if bindType == BIND_ON_PICKUP then entry.isBoP         = true end
-                -- canAH: nur BoE und ungebundene Items (0/nil) sowie Trade Goods dürfen auf dem AH.
-                -- BoP (1), Kriegsmeute-/Account-gebunden und alles andere → nur Vendor.
                 if entry.canAH == nil then
-                    entry.canAH = (bindType == BIND_ON_EQUIP)
-                               or (bindType == 0 or bindType == nil)
-                               or (classID == TRADE_GOODS)
+                    entry.canAH = CanAH(bindType, classID)
                 end
 
                 -- Sell price: trust directly for trade goods and junk (no scaling)
@@ -149,6 +160,7 @@ local function ProcessLoot(items)
                 end
 
                 -- Quality tier tracking (crafting reagents Q1/Q2/Q3)
+                local rankIcon
                 if GetReagentQualityInfo then
                     local ok, qi = pcall(GetReagentQualityInfo, link)
                     if ok and qi then
@@ -159,10 +171,13 @@ local function ProcessLoot(items)
                         entry.qIDs[tier] = itemID
                         db.qAtlas        = db.qAtlas or {}
                         db.qAtlas[tier]  = qi.iconChat
+                        rankIcon = qi.iconChat and CreateAtlasMarkup(qi.iconChat, ns.RANK_ICON_W, ns.RANK_ICON_H)
+                                or ("|cffaaaaaa R" .. tier .. "|r")
                     end
                 end
 
                 changed = true
+                ns.AddLogEntry(icon, name, qty, link, quality, rankIcon)
             end
         end
     end
@@ -231,9 +246,7 @@ function ns.UpdatePricesFromBags()
                                 data.subClassID = subID
                                 if bType == BIND_ON_EQUIP  then data.isBoE = true end
                                 if bType == BIND_ON_PICKUP then data.isBoP = true end
-                                data.canAH = (bType == BIND_ON_EQUIP)
-                                          or (bType == 0 or bType == nil)
-                                          or (cID == TRADE_GOODS)
+                                data.canAH = CanAH(bType, cID)
                             end
                             updated            = true
                             byID[ci.itemID]    = nil
@@ -354,6 +367,24 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         MainFrame:ClearAllPoints()
         MainFrame:SetPoint(p[1], UIParent, p[2], p[3], p[4])
 
+        -- Normalize to a "TOP" anchor if it's anything else. Needed not just
+        -- for old saved data, but also because WoW's drag mechanism itself
+        -- can hand back a different anchor type after StopMovingOrSizing()
+        -- (e.g. "RIGHT", which is vertically centered) - a non-"TOP" anchor
+        -- makes height changes (collapse/expand) grow symmetrically up/down
+        -- instead of just downward. Runs every login as a safety net; same
+        -- screen spot, no visual jump.
+        if p[1] ~= "TOP" then
+            local top, left, right = MainFrame:GetTop(), MainFrame:GetLeft(), MainFrame:GetRight()
+            if top and left and right then
+                local offsetY = top - UIParent:GetTop()
+                local offsetX = (left + right) / 2 - UIParent:GetWidth() / 2
+                NightsFarmtrackerDB.pos = {"TOP", "TOP", offsetX, offsetY}
+                MainFrame:ClearAllPoints()
+                MainFrame:SetPoint("TOP", UIParent, "TOP", offsetX, offsetY)
+            end
+        end
+
         ns.UpdateTimerDisplay(ns.FormatTime(NightsFarmtrackerDB.totalTime))
         ns.ApplyPauseVisuals()
         ns.InitMinimapButton()
@@ -365,6 +396,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         ns.SetMinimapVisible(not (NightsFarmtrackerDB.minimap and NightsFarmtrackerDB.minimap.hide))
         ns.SetExpanded(NightsFarmtrackerDB.expanded)
         ns.UpdateHistoryBtn()
+        ns.RestoreLogWindow()
         ns.RefreshHUD()
 
     elseif event == "PLAYER_ENTERING_WORLD" then
@@ -373,6 +405,17 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         if DBIcon then
             C_Timer.After(0, function() DBIcon:Refresh("NightsFarmtracker") end)
         end
+        -- Some ElvUI/WindTools setups also re-anchor unrelated addon frames
+        -- after entering the world (observed: our "TOP" anchor silently
+        -- becomes "RIGHT", reintroducing the symmetric collapse/expand bug).
+        -- Re-apply our saved TOP anchor here, after other addons had their turn.
+        C_Timer.After(0, function()
+            local pos = NightsFarmtrackerDB.pos
+            if pos and pos[1] == "TOP" then
+                MainFrame:ClearAllPoints()
+                MainFrame:SetPoint("TOP", UIParent, "TOP", pos[3], pos[4])
+            end
+        end)
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 
     elseif event == "BAG_UPDATE_DELAYED" and ns.pendingPriceUpdate then
@@ -396,18 +439,11 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "CHAT_MSG_LOOT" and not NightsFarmtrackerDB.paused then
         local msg, _, _, _, sender = ...
 
-        -- isMe: Prefix-Check ist maßgeblich (anchored, "Ihr erhaltet Beute: "/"You receive loot: ").
-        -- Sender-Vergleich nur als Fallback falls LOOT_ITEM_SELF mal nicht verfügbar ist —
-        -- sonst könnte z.B. "Ihr habt für [Item] Bedarf ausgewählt" (keine Beute, nur Würfelwahl)
-        -- über den Sendernamen wieder durchrutschen.
-        local isMe
-        if SELF_LOOT_PREFIX then
-            isMe = msg:sub(1, #SELF_LOOT_PREFIX) == SELF_LOOT_PREFIX
-        else
-            local senderShort = sender and sender:match("^([^%-]+)") or ""
-            isMe = senderShort ~= "" and senderShort == UnitName("player")
-        end
-        if not isMe then return end
+        -- isMe: Prefix-Check ("Ihr "/"You ") ODER Sender = eigener Spielername
+        local prefixMatch = SELF_LOOT_PREFIX and msg:find(SELF_LOOT_PREFIX, 1, true)
+        local senderShort = sender and sender:match("^([^%-]+)") or ""
+        local senderMatch = senderShort ~= "" and senderShort == UnitName("player")
+        if not prefixMatch and not senderMatch then return end
 
         local color, linkData, itemName =
             msg:match("|cff(%x%x%x%x%x%x)|H(item:[^|]+)|h%[([^%]]+)%]|h")

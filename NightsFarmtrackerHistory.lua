@@ -105,6 +105,82 @@ function ns.SaveCurrentSession()
 end
 
 ------------------------------------------------------------------------
+-- Manual merge of all sessions belonging to one calendar day
+-- Used when "merge_daily_sessions" was off and the user wants to combine
+-- already-saved separate entries afterwards.
+------------------------------------------------------------------------
+function ns.MergeDaySessions(dateStr)
+    local sessions = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions
+    if not sessions then return end
+
+    local matched = {}
+    for i = #sessions, 1, -1 do
+        if date("%d.%m.%Y", sessions[i].timestamp) == dateStr then
+            table.insert(matched, table.remove(sessions, i))
+        end
+    end
+    if #matched < 2 then
+        for _, s in ipairs(matched) do table.insert(sessions, s) end
+        return
+    end
+    table.sort(matched, function(a,b) return a.timestamp < b.timestamp end)
+
+    local merged = matched[1]
+    for i = 2, #matched do
+        local s = matched[i]
+        merged.timestamp   = s.timestamp -- keep most recent
+        merged.duration    = (merged.duration or 0)    + (s.duration or 0)
+        merged.totalGold   = (merged.totalGold or 0)   + (s.totalGold or 0)
+        merged.totalVendor = (merged.totalVendor or 0) + (s.totalVendor or 0)
+        merged.totalAH     = (merged.totalAH or 0)     + (s.totalAH or 0)
+        merged.lootedGold  = (merged.lootedGold or 0)  + (s.lootedGold or 0)
+        if s.qAtlas then
+            merged.qAtlas = merged.qAtlas or {}
+            for tier, atlas in pairs(s.qAtlas) do
+                merged.qAtlas[tier] = merged.qAtlas[tier] or atlas
+            end
+        end
+        merged.items = merged.items or {}
+        for name, d in pairs(s.items or {}) do
+            local ei = merged.items[name]
+            if not ei then
+                merged.items[name] = {
+                    amount=d.amount, icon=d.icon, quality=d.quality, itemSubType=d.itemSubType,
+                    sellPrice=d.sellPrice, vendorTotal=d.vendorTotal or 0, ahTotal=d.ahTotal or 0,
+                    isVendorTrash=d.isVendorTrash, isBoE=d.isBoE, isBoP=d.isBoP, canAH=d.canAH,
+                    classID=d.classID, itemID=d.itemID, q=d.q, qIDs=d.qIDs,
+                }
+            else
+                ei.amount      = (ei.amount or 0)      + (d.amount or 0)
+                ei.vendorTotal = (ei.vendorTotal or 0) + (d.vendorTotal or 0)
+                ei.ahTotal     = (ei.ahTotal or 0)      + (d.ahTotal or 0)
+                if d.q then
+                    if not ei.q then ei.q={}; ei.qIDs={} end
+                    for tier=1,3 do
+                        if d.q[tier] then ei.q[tier]=(ei.q[tier] or 0)+d.q[tier] end
+                        if d.qIDs and d.qIDs[tier] and not ei.qIDs[tier] then ei.qIDs[tier]=d.qIDs[tier] end
+                    end
+                end
+            end
+        end
+    end
+
+    table.insert(sessions, merged)
+    table.sort(sessions, function(a,b) return a.timestamp > b.timestamp end)
+    ns.RebuildHistory()
+end
+
+StaticPopupDialogs["NFT_CONFIRM_MERGE_DAY"] = {
+    text         = "%s",
+    button1      = OKAY,
+    button2      = CANCEL,
+    OnAccept     = function(self, data) ns.MergeDaySessions(data) end,
+    timeout      = 0,
+    whileDead    = true,
+    hideOnEscape = true,
+}
+
+------------------------------------------------------------------------
 -- Frame references
 ------------------------------------------------------------------------
 local HistFrame, HScrollFrame, HListFrame
@@ -158,12 +234,29 @@ local function AcquireDayRow()
     r.goldText=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     r.goldText:SetPoint("RIGHT",0,0); r.goldText:SetJustifyH("RIGHT"); r.goldText:SetFontHeight(11)
     r.goldText:SetTextColor(unpack(ns.COL_GOLD))
+
+    r.mergeBtn = CreateFrame("Button", nil, r)
+    r.mergeBtn:SetSize(40, DAY_H - 4)
+    r.mergeBtn:SetPoint("RIGHT", r.goldText, "LEFT", -8, 0)
+    r.mergeBtn.text = r.mergeBtn:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    r.mergeBtn.text:SetAllPoints(); r.mergeBtn.text:SetJustifyH("RIGHT")
+    r.mergeBtn.text:SetFontHeight(10); r.mergeBtn.text:SetTextColor(unpack(ns.COL_ACCENT))
+    r.mergeBtn.text:SetText(ns.L["merge_day_btn"])
+    r.mergeBtn:SetScript("OnEnter", function()
+        r.mergeBtn.text:SetTextColor(1,1,1)
+        GameTooltip:SetOwner(r.mergeBtn,"ANCHOR_TOP"); GameTooltip:SetText(ns.L["merge_day_tooltip"]); GameTooltip:Show()
+    end)
+    r.mergeBtn:SetScript("OnLeave", function()
+        r.mergeBtn.text:SetTextColor(unpack(ns.COL_ACCENT)); GameTooltip:Hide()
+    end)
+    r.mergeBtn:Hide()
     return r
 end
 local function ReleaseDayRow(r)
     r:Hide(); r:ClearAllPoints()
     r:SetScript("OnMouseUp",nil); r:SetScript("OnEnter",nil); r:SetScript("OnLeave",nil)
     r.dateText:SetTextColor(unpack(ns.COL_ACCENT))
+    r.mergeBtn:Hide(); r.mergeBtn:SetScript("OnClick", nil)
     dayPool[#dayPool+1]=r
 end
 
@@ -198,10 +291,12 @@ local function AcquireDetRow()
     r.iconBorder:SetPoint("BOTTOMRIGHT", r.icon,"BOTTOMRIGHT",  1, -1)
     r.iconBorder:Hide()
 
+    r.rankBadge = ns.CreateIconBadge(r, r.icon)
+
     -- Single-line: icon | name | count | gold (y=0 = centered with icon)
     r.nameText = r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 8,    0)
-    r.nameText:SetPoint("RIGHT", r,      "RIGHT", -128, 0)
+    r.nameText:SetPoint("LEFT",  r.rankBadge, "RIGHT", 4,    0)
+    r.nameText:SetPoint("RIGHT", r,           "RIGHT", -128, 0)
     r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(11); r.nameText:SetWordWrap(false)
 
     r.countText = r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
@@ -225,6 +320,7 @@ local function ReleaseDetRow(r)
     r:Hide(); r:ClearAllPoints(); r.itemID=nil; r.iconBorder:Hide()
     r.icon:ClearAllPoints(); r.icon:SetPoint("LEFT", 4, 0)
     r.goldText:SetTextColor(unpack(ns.COL_GOLD))
+    r.rankBadge:SetText("")
     detRowPool[#detRowPool+1]=r
 end
 
@@ -323,8 +419,7 @@ local function RebuildDetailContent(session)
             cats[cat]={gold=0,items={},classID=d.classID}
             catOrder[#catOrder+1]=cat
         end
-        local isVendorOnly = d.isVendorTrash or (d.quality == 0) or ns.IsForceVendor(d.itemID)
-                          or d.isBoP or d.canAH == false
+        local isVendorOnly = ns.IsVendorOnly(d)
         local qAtlas = session.qAtlas or NightsFarmtrackerDB.qAtlas or {}
 
         -- Category total: max(AH,Vendor) per item — vendor-only items (junk, BoP, forceVendor, canAH=false) always vendor only
@@ -347,7 +442,7 @@ local function RebuildDetailContent(session)
                     if d.sellPrice and d.sellPrice > 0 then tV = d.sellPrice * tc end
                     local tGold = (tAH and tAH > 0) and tAH or tV or 0
                     if tGold > 0 then
-                        local rankIcon = qAtlas[tier] and CreateAtlasMarkup(qAtlas[tier],12,11) or ("|cffaaaaaa R"..tier.."|r")
+                        local rankIcon = qAtlas[tier] and CreateAtlasMarkup(qAtlas[tier],ns.RANK_ICON_W,ns.RANK_ICON_H) or ("|cffaaaaaa R"..tier.."|r")
                         cats[cat].items[#cats[cat].items+1] = {
                             name=name, d=d, gold=tGold, isRank=true,
                             tier=tier, tc=tc, tid=tid, tAH=tAH, tV=tV, rankIcon=rankIcon,
@@ -395,22 +490,17 @@ local function RebuildDetailContent(session)
             -- Icon einrücken wie im Hauptframe
             ir.icon:ClearAllPoints(); ir.icon:SetPoint("LEFT", 4 + ns.CAT_INDENT, 0)
             ir.nameText:ClearAllPoints()
-            ir.nameText:SetPoint("LEFT",  ir.icon, "RIGHT", 8,    0)
-            ir.nameText:SetPoint("RIGHT", ir,      "RIGHT", -128, 0)
+            ir.nameText:SetPoint("LEFT",  ir.rankBadge, "RIGHT", 4,    0)
+            ir.nameText:SetPoint("RIGHT", ir,           "RIGHT", -128, 0)
             ir.icon:SetTexture(entry.d.icon or ns.FALLBACK_ICON)
             local q = entry.d.quality
-            if q then
-                local r_,g_,b_ = GetItemQualityColor(q)
-                ir.nameText:SetTextColor(r_,g_,b_)
-                ir.iconBorder:SetColorTexture(r_,g_,b_,0.9); ir.iconBorder:Show()
-            else
-                ir.nameText:SetTextColor(1,1,1); ir.iconBorder:Hide()
-            end
+            ns.ApplyQualityColor(ir.nameText, ir.iconBorder, q, {1,1,1})
             ir.goldText:SetTextColor(unpack(ns.COL_GOLD))  -- immer gold, wie Hauptframe
             if entry.isRank then
                 ir.itemID = entry.tid
                 ir.nameText:SetText(ns.TruncateName(entry.name))
-                ir.countText:SetText(entry.rankIcon.." "..tostring(entry.tc))
+                ir.rankBadge:SetText(entry.rankIcon or "")
+                ir.countText:SetText(tostring(entry.tc))
                 if entry.tAH and entry.tAH > 0 then
                     ir.goldText:SetText(ns.FormatGold(entry.tAH))
                 elseif entry.tV and entry.tV > 0 then
@@ -421,9 +511,9 @@ local function RebuildDetailContent(session)
             else
                 ir.itemID = entry.d.itemID
                 ir.nameText:SetText(ns.TruncateName(entry.name))
+                ir.rankBadge:SetText("")
                 ir.countText:SetText(tostring(entry.d.amount))
-                local isVendorOnly = entry.d.isVendorTrash or (entry.d.quality == 0) or ns.IsForceVendor(entry.d.itemID)
-                                  or entry.d.isBoP or entry.d.canAH == false
+                local isVendorOnly = ns.IsVendorOnly(entry.d)
                 if not isVendorOnly and hasAH and (entry.d.ahTotal or 0) > 0 then
                     ir.goldText:SetText(ns.FormatGold(entry.d.ahTotal))
                 elseif (entry.d.vendorTotal or 0) > 0 then
@@ -465,9 +555,6 @@ local function ShowDetail(session)
 end
 
 ------------------------------------------------------------------------
--- Merge sessions
-------------------------------------------------------------------------
-------------------------------------------------------------------------
 -- RebuildHistory
 ------------------------------------------------------------------------
 function ns.RebuildHistory()
@@ -490,6 +577,15 @@ function ns.RebuildHistory()
         drow.dateText:SetText(dStr)
         drow.infoText:SetText("")
         drow.goldText:SetText("")
+        if #day.sessions > 1 then
+            drow.mergeBtn:Show()
+            drow.mergeBtn:SetScript("OnClick", function()
+                StaticPopup_Show("NFT_CONFIRM_MERGE_DAY",
+                    string.format(ns.L["merge_day_confirm"], #day.sessions, dStr), nil, dStr)
+            end)
+        else
+            drow.mergeBtn:Hide()
+        end
         activeDayRows[#activeDayRows+1]=drow; yOffset=yOffset+DAY_H
         for _,entry in ipairs(day.sessions) do
             local session=entry.session; local idx=entry.idx
@@ -498,8 +594,7 @@ function ns.RebuildHistory()
             local hasAH = ns.HasAnyAH() and NightsFarmtrackerDB.ahSource ~= "none"
             local n=0
             for _,d in pairs(session.items) do
-                local isVendorOnly = d.isVendorTrash or (d.quality == 0) or ns.IsForceVendor(d.itemID)
-                                  or d.isBoP or d.canAH == false
+                local isVendorOnly = ns.IsVendorOnly(d)
                 if not isVendorOnly and d.q and d.qIDs then
                     for tier=1,3 do
                         local tc=d.q[tier] or 0; local tid=d.qIDs[tier]

@@ -3,7 +3,7 @@
 -- BtnBar always visible: [▶][↺][⏱] left · [⚙][?][▼/▲][✕] right
 -- Footer always visible: total gold | timer | gold/rate
 ------------------------------------------------------------------------
-local ADDON_NAME, ns = ...
+local _, ns = ...
 
 local PAD         = ns.PAD
 local FRAME_W     = ns.FRAME_W
@@ -62,7 +62,7 @@ end
 ------------------------------------------------------------------------
 local MainFrame = CreateFrame("Frame","NightsFarmtrackerMain",UIParent,"BackdropTemplate")
 MainFrame:SetSize(FRAME_W, COLLAPSED_H)
-MainFrame:SetPoint("CENTER")
+MainFrame:SetPoint("TOP", UIParent, "TOP", 0, -150)
 MainFrame:Hide()
 MainFrame:SetMovable(true); MainFrame:EnableMouse(true); MainFrame:SetClampedToScreen(true)
 ns.ApplyFrameStyle(MainFrame)
@@ -70,8 +70,21 @@ MainFrame:RegisterForDrag("LeftButton")
 MainFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
 MainFrame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
-    local point,_,rel,x,y = self:GetPoint()
-    NightsFarmtrackerDB.pos = {point,rel,x,y}
+    -- WoW's drag mechanism does not preserve the original anchor point type -
+    -- StopMovingOrSizing()/GetPoint() can return a different point (e.g.
+    -- "RIGHT", which is vertically centered) depending on where the frame
+    -- ends up. A "RIGHT" anchor would make height changes grow symmetrically
+    -- up/down again, so always normalize back to a "TOP" anchor here.
+    local top      = self:GetTop()
+    local left     = self:GetLeft()
+    local right    = self:GetRight()
+    local uiTop    = UIParent:GetTop()
+    local uiWidth  = UIParent:GetWidth()
+    local offsetY  = top - uiTop
+    local offsetX  = (left + right) / 2 - uiWidth / 2
+    NightsFarmtrackerDB.pos = {"TOP", "TOP", offsetX, offsetY}
+    self:ClearAllPoints()
+    self:SetPoint("TOP", UIParent, "TOP", offsetX, offsetY)
 end)
 ns.MainFrame = MainFrame
 
@@ -95,6 +108,9 @@ btnHistory:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
 
 local btnFilter   = MakeBtn(BtnBar, 18, "btn_filter.png")
 btnFilter:SetPoint("LEFT", btnHistory, "RIGHT", 6, 0)
+
+local btnLog      = MakeBtn(BtnBar, 18, "btn_log.png")
+btnLog:SetPoint("LEFT", btnFilter, "RIGHT", 6, 0)
 
 -- Right side (anchored from right): close → collapse → help → settings
 local btnClose = MakeBtn(BtnBar, 18, "btn_close.png")
@@ -293,6 +309,9 @@ function ns.SetExpanded(expand)
         btnToggle.tex:SetTexture(ART.."btn_expand.png")
         MainFrame:SetHeight(COLLAPSED_H)
     end
+    if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
+        ns.ReanchorLogFrame()
+    end
 end
 
 local function UpdateFrameHeight()
@@ -388,10 +407,12 @@ local function AcquireRow()
     row.iconBorder:SetPoint("BOTTOMRIGHT", row.icon,"BOTTOMRIGHT",  1, -1)
     row.iconBorder:Hide()
 
+    row.rankBadge = ns.CreateIconBadge(row, row.icon)
+
     -- Single-line layout: all y=0 → vertically centered with icon
     row.nameText = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 8,    0)
-    row.nameText:SetPoint("RIGHT", row,      "RIGHT", -128, 0)
+    row.nameText:SetPoint("LEFT",  row.rankBadge, "RIGHT", 4,    0)
+    row.nameText:SetPoint("RIGHT", row,           "RIGHT", -128, 0)
     row.nameText:SetJustifyH("LEFT")
     row.nameText:SetFontHeight(11)
     row.nameText:SetWordWrap(false)
@@ -421,14 +442,15 @@ local function ReleaseRow(row)
     row.icon:SetPoint("LEFT", 4, 0)
     row.icon:Show()
     row.nameText:ClearAllPoints()
-    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 8,    0)
-    row.nameText:SetPoint("RIGHT", row,      "RIGHT", -128, 0)
+    row.nameText:SetPoint("LEFT",  row.rankBadge, "RIGHT", 4,    0)
+    row.nameText:SetPoint("RIGHT", row,           "RIGHT", -128, 0)
     row.nameText:SetFontHeight(11)
     row.countText:ClearAllPoints()
     row.countText:SetPoint("RIGHT", row, "RIGHT", -90, 0)
     row.goldText:ClearAllPoints()
     row.goldText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.goldText:SetFontHeight(11)
+    row.rankBadge:SetText("")
     rowPool[#rowPool+1] = row
 end
 
@@ -441,12 +463,8 @@ local function PlaceRow(row, yOff, name, icon, nameColor, quality)
     row.sep:SetShown(yOff > 0)
     if nameColor then
         row.nameText:SetTextColor(unpack(nameColor)); row.iconBorder:Hide()
-    elseif quality then
-        local r,g,b = GetItemQualityColor(quality)
-        row.nameText:SetTextColor(r,g,b)
-        row.iconBorder:SetColorTexture(r,g,b,0.9); row.iconBorder:Show()
     else
-        row.nameText:SetTextColor(1,1,1); row.iconBorder:Hide()
+        ns.ApplyQualityColor(row.nameText, row.iconBorder, quality, {1,1,1})
     end
     itemOrder[#itemOrder+1] = name
     itemRows[name] = row
@@ -476,21 +494,26 @@ ns.RefreshHUD = function()
     local grandTotal = 0
 
     for name, data in pairs(db.count) do
-        local vis = filter=="all"
-               or (filter=="mats"  and ns.IsMat(data))
-               or (filter=="other" and not ns.IsMat(data))
-        if vis then
-            local cat = ns.CategoryName(data) or ns.CAT_MATS
-            if not cats[cat] then cats[cat]={items={},totalGold=0,classID=data.classID} end
-            local c         = cats[cat]
-            local vendorRaw = ns.VendorTotal(data)
-            local ahRaw     = ns.AHTotal(data)
-            local vendor    = vendorRaw or 0
-            local ah        = ahRaw     or 0
-            local gold      = ns.ItemValue(data, vendorRaw, ahRaw) or 0
-            c.items[#c.items+1] = {name=name,data=data,gold=gold,vendor=vendor,ah=ah}
-            c.totalGold   = c.totalGold   + gold
-            grandTotal    = grandTotal    + gold
+        if data.classID == ns.QUEST_CLASS then
+            -- Quest items are never sellable - drop any entry tracked before this fix existed
+            db.count[name] = nil
+        else
+            local vis = filter=="all"
+                   or (filter=="mats"  and ns.IsMat(data))
+                   or (filter=="other" and not ns.IsMat(data))
+            if vis then
+                local cat = ns.CategoryName(data) or ns.CAT_MATS
+                if not cats[cat] then cats[cat]={items={},totalGold=0,classID=data.classID} end
+                local c         = cats[cat]
+                local vendorRaw = ns.VendorTotal(data)
+                local ahRaw     = ns.AHTotal(data)
+                local vendor    = vendorRaw or 0
+                local ah        = ahRaw     or 0
+                local gold      = ns.ItemValue(data, vendorRaw, ahRaw) or 0
+                c.items[#c.items+1] = {name=name,data=data,gold=gold,vendor=vendor,ah=ah}
+                c.totalGold   = c.totalGold   + gold
+                grandTotal    = grandTotal    + gold
+            end
         end
     end
 
@@ -568,7 +591,7 @@ ns.RefreshHUD = function()
                             local tGold = fv and (tV or 0) or (tAH or tV or 0)
                             if tGold > 0 then
                                 local rankIcon = qAtlas[tier]
-                                              and CreateAtlasMarkup(qAtlas[tier],12,11)
+                                              and CreateAtlasMarkup(qAtlas[tier],ns.RANK_ICON_W,ns.RANK_ICON_H)
                                               or ("|cffaaaaaa R"..tier.."|r")
                                 flat[#flat+1] = {
                                     isRank=true, name=item.name, d=d,
@@ -612,22 +635,17 @@ ns.RefreshHUD = function()
                 row.icon:SetTexCoord(0.08,0.92,0.08,0.92); row.icon:Show()
                 row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", 4+CAT_INDENT, 0)
                 row:SetPoint("TOPLEFT", 0, -yOffset)
-                if d.quality then
-                    local r,g,b = GetItemQualityColor(d.quality)
-                    row.nameText:SetTextColor(r,g,b)
-                    row.iconBorder:SetColorTexture(r,g,b,0.9); row.iconBorder:Show()
-                else
-                    row.nameText:SetTextColor(1,1,1); row.iconBorder:Hide()
-                end
+                ns.ApplyQualityColor(row.nameText, row.iconBorder, d.quality, {1,1,1})
                 row.nameText:ClearAllPoints()
-                row.nameText:SetPoint("LEFT",  row.icon,"RIGHT", 8,    0)
-                row.nameText:SetPoint("RIGHT", row,     "RIGHT", -108, 0)
+                row.nameText:SetPoint("LEFT",  row.rankBadge,"RIGHT", 4,    0)
+                row.nameText:SetPoint("RIGHT", row,          "RIGHT", -108, 0)
 
                 if fi.isRank then
                     local key = fi.name.."_q"..fi.tier
                     row.itemName = fi.name; row.itemID = fi.tid; row.itemLink = nil
                     row.nameText:SetText(ns.TruncateName(fi.name))
-                    row.countText:SetText(fi.rankIcon.." "..tostring(fi.tc))
+                    row.rankBadge:SetText(fi.rankIcon or "")
+                    row.countText:SetText(tostring(fi.tc))
                     if fi.fv then
                         row.goldText:SetText(fi.tV and ns.FormatGold(fi.tV) or "")
                     elseif fi.tAH and fi.tAH > 0 then
@@ -642,6 +660,7 @@ ns.RefreshHUD = function()
                     local it = fi.item
                     row.itemName = fi.name; row.itemID = d.itemID; row.itemLink = d.itemLink
                     row.nameText:SetText(ns.TruncateName(fi.name))
+                    row.rankBadge:SetText("")
                     row.countText:SetText(tostring(d.amount))
                     if fi.fv then ShowGold(row,nil,it.vendor,true)
                     else ShowGold(row,it.ah,it.vendor,false) end
@@ -670,6 +689,9 @@ function ns.Reset(skipSave)
     local db = NightsFarmtrackerDB
     db.count={}; db.collapsed={}; db.excludedNames={}
     db.totalTime=0; db.qAtlas={}; db.paused=true; db.lootedGold=0
+    ns.ClearLog()
+    if ns.LogFrame then ns.LogFrame:Hide() end
+    NightsFarmtrackerDB.logWindowShown = false
     ns.StopTimer(); ns.CleanupPriceUpdate()
     GoldFrame:Hide()
     for _, row in pairs(itemRows) do ReleaseRow(row) end
@@ -772,6 +794,15 @@ btnFilter:SetScript("OnEnter", function(self)
 end)
 btnFilter:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
 
+btnLog:SetScript("OnClick", function() ns.ToggleLogWindow() end)
+btnLog:SetScript("OnEnter", function(self)
+    self.tex:SetAlpha(1)
+    GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
+    GameTooltip:SetText(ns.L["log_title"])
+    GameTooltip:Show()
+end)
+btnLog:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+
 btnSettings:SetScript("OnClick", function() ns.ToggleSettings() end)
 btnSettings:SetScript("OnEnter", function(self)
     self.tex:SetAlpha(1)
@@ -858,12 +889,16 @@ local function UpdateLeftButtons()
     local db           = NightsFarmtrackerDB
     local historyShown = db.sessionHistoryEnabled ~= false
     local filterShown  = db.vendorFilterEnabled   ~= false
+    local logShown     = db.logWindowEnabled      == true
 
     if historyShown then btnHistory:Show(); btnHistory:EnableMouse(true)
     else                  btnHistory:Hide(); btnHistory:EnableMouse(false) end
 
     if filterShown then btnFilter:Show(); btnFilter:EnableMouse(true)
     else                  btnFilter:Hide(); btnFilter:EnableMouse(false) end
+
+    if logShown then btnLog:Show(); btnLog:EnableMouse(true)
+    else               btnLog:Hide(); btnLog:EnableMouse(false) end
 
     -- Filter rutscht an den Reset-Button, wenn History ausgeblendet ist (keine Lücke)
     btnFilter:ClearAllPoints()
@@ -872,6 +907,16 @@ local function UpdateLeftButtons()
     else
         btnFilter:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
     end
+
+    -- Log rutscht an den jeweils letzten sichtbaren linken Button heran
+    btnLog:ClearAllPoints()
+    if filterShown then
+        btnLog:SetPoint("LEFT", btnFilter, "RIGHT", 6, 0)
+    elseif historyShown then
+        btnLog:SetPoint("LEFT", btnHistory, "RIGHT", 6, 0)
+    else
+        btnLog:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
+    end
 end
 
 function ns.UpdateHistoryBtn()
@@ -879,5 +924,9 @@ function ns.UpdateHistoryBtn()
 end
 
 function ns.UpdateFilterBtn()
+    UpdateLeftButtons()
+end
+
+function ns.UpdateLogBtn()
     UpdateLeftButtons()
 end

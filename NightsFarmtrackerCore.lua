@@ -8,6 +8,7 @@ local ADDON_NAME, ns = ...
 ------------------------------------------------------------------------
 ns.ADDON_NAME     = ADDON_NAME
 ns.TRADE_GOODS    = Enum.ItemClass.Tradegoods
+ns.QUEST_CLASS    = Enum.ItemClass.Questitem
 ns.BIND_ON_EQUIP  = 2
 ns.BIND_ON_PICKUP = 1
 ns.FALLBACK_ICON  = 134400
@@ -33,8 +34,6 @@ ns.CLASS_PRIORITY = {
 -- priority instead of silently falling through to the default (50).
 -- Legacy aliases (used in History fallback)
 ns.CAT_VENDOR = "Vendor Trash"
-ns.CAT_BOE    = "Equipment"
-ns.CAT_BOP    = "Equipment"
 ns.CAT_MATS   = "Tradeskill"
 
 -- UI layout
@@ -45,6 +44,8 @@ ns.CAT_ROW_H   = 22
 ns.CAT_INDENT  = 8
 ns.FOOTER_H    = 32
 ns.ICON_SIZE   = 22
+ns.RANK_ICON_W = 14   -- width of the R1/R2/R3 atlas markup (CreateAtlasMarkup)
+ns.RANK_ICON_H = 16   -- height of the R1/R2/R3 atlas markup
 ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
 ns.MAX_ROWS    = 8
 ns.SCROLL_STEP = ns.ROW_H
@@ -116,8 +117,6 @@ function ns.FormatGold(copper)
     end
     return FormatGoldClassic(copper)
 end
-
-local Q_FALLBACK = {"Q1:","Q2:","Q3:"}
 
 -- Truncate item names to a fixed max length so columns stay aligned.
 -- "Quasischweinefleisch" (20 chars) is the reference maximum.
@@ -244,6 +243,13 @@ end
 
 -- vendor/ah are optional precomputed values (avoids recalculating
 -- VendorTotal/AHTotal when the caller already has them, e.g. RefreshHUD).
+-- True if an item must always be valued at vendor price, never AH
+-- (junk, BoP, force-vendor filtered, or explicitly AH-ineligible).
+function ns.IsVendorOnly(data)
+    return data.isVendorTrash or (data.quality == 0) or data.isBoP
+        or data.canAH == false or ns.IsForceVendor(data.itemID)
+end
+
 function ns.ItemValue(data, vendor, ah)
     if data.isVendorTrash or (data.quality == 0) then return vendor or ns.VendorTotal(data) end
     if data.itemID and ns.IsForceVendor(data.itemID) then return vendor or ns.VendorTotal(data) end
@@ -269,7 +275,7 @@ function ns.InitDB()
     if db.visible       == nil then db.visible       = true                    end
     if db.expanded      == nil then db.expanded      = false                   end
     if db.totalTime     == nil then db.totalTime     = 0                       end
-    if db.pos           == nil then db.pos           = {"CENTER","CENTER",0,0} end
+    if db.pos           == nil then db.pos           = {"TOP","TOP",0,-150} end
     if db.qAtlas        == nil then db.qAtlas        = {}                      end
     if db.trackedNames  == nil then db.trackedNames  = {}                      end
     if db.collapsed     == nil then db.collapsed     = {}                      end
@@ -283,6 +289,9 @@ function ns.InitDB()
     end
     if db.lootedGold    == nil then db.lootedGold    = 0                      end
     if db.sessionHistoryEnabled == nil then db.sessionHistoryEnabled = true  end
+    if db.logWindowEnabled      == nil then db.logWindowEnabled      = false end
+    if db.logWindowShown        == nil then db.logWindowShown        = false end
+    if db.logEntries            == nil then db.logEntries            = {}    end
     if db.vendorFilterEnabled   == nil then db.vendorFilterEnabled   = true  end
     if db.mergeDaily            == nil then db.mergeDaily            = true  end
     if db.splitTradeGoods       == nil then db.splitTradeGoods       = false end
@@ -322,6 +331,42 @@ end
 function ns.RemoveForceVendor(itemID)
     if not itemID then return end
     NightsFarmtrackerAccountDB.forceVendor[itemID] = nil
+end
+
+------------------------------------------------------------------------
+-- Icon badge helper — small slot between the item icon and item name
+-- (used for crafting-reagent rank icons R1/R2/R3). Shared by every frame
+-- that shows item icons, so the badge position/size stays identical.
+-- Anchor item names to this badge's RIGHT (not the icon's), so the column
+-- stays consistent whether or not a given row actually has a rank icon.
+------------------------------------------------------------------------
+local ICON_BADGE_W = 16  -- reserved width of the badge column
+
+function ns.CreateIconBadge(parent, icon)
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    fs:SetPoint("LEFT", icon, "RIGHT", 2, 0)
+    fs:SetWidth(ICON_BADGE_W)
+    fs:SetFontHeight(10)
+    fs:SetJustifyH("CENTER")
+    return fs
+end
+
+------------------------------------------------------------------------
+-- Row appearance helper — icon border + name color by item quality.
+-- Shared by all item rows (main HUD, history detail, filter list, log)
+-- so the "look" lives in one place instead of being duplicated per file.
+------------------------------------------------------------------------
+function ns.ApplyQualityColor(nameText, iconBorder, quality, fallbackColor)
+    if quality then
+        local r, g, b = GetItemQualityColor(quality)
+        nameText:SetTextColor(r, g, b)
+        iconBorder:SetColorTexture(r, g, b, 0.9)
+        iconBorder:Show()
+    else
+        local fr, fg, fb = unpack(fallbackColor or {1, 1, 1})
+        nameText:SetTextColor(fr, fg, fb)
+        iconBorder:Hide()
+    end
 end
 
 ------------------------------------------------------------------------

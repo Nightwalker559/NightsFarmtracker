@@ -101,13 +101,7 @@ function ns.RebuildFilterList()
         r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
         r.nameText:SetText(ns.TruncateName(e.name or ("Item " .. e.itemID)))
         r.itemID = e.itemID
-        if e.quality then
-            local rq, gq, bq = GetItemQualityColor(e.quality)
-            r.nameText:SetTextColor(rq, gq, bq)
-            r.iconBorder:SetColorTexture(rq, gq, bq, 0.9); r.iconBorder:Show()
-        else
-            r.nameText:SetTextColor(0.85, 0.85, 0.85); r.iconBorder:Hide()
-        end
+        ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
         activeRows[#activeRows+1] = r
         yOff = yOff + ROW_H
     end
@@ -154,6 +148,7 @@ local function EnsureFilterFrame()
     ns.ApplyFrameStyle(FilterFrame)
     FilterFrame:Hide()
     table.insert(UISpecialFrames, "NightsFarmtrackerFilterWnd")
+    ns.FilterFrame = FilterFrame  -- exposed so other windows (e.g. Log) can anchor next to it
 
     -- accept item drops anywhere on the frame (fallback)
     FilterFrame:SetScript("OnReceiveDrag", HandleDrop)
@@ -243,6 +238,12 @@ function ns.ToggleFilterWindow()
     if FilterFrame:IsShown() then
         FilterFrame:Hide()
     else
+        FilterFrame:ClearAllPoints()
+        if ns.LogFrame and ns.LogFrame:IsShown() then
+            FilterFrame:SetPoint("TOPLEFT", ns.LogFrame, "TOPRIGHT", 4, 0)
+        else
+            FilterFrame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", 4, 0)
+        end
         ns.RebuildFilterList()
         FilterFrame:Show()
     end

@@ -20,7 +20,6 @@ L["settings"]          = "Settings"
 L["collapse"]          = "Collapse"
 L["expand"]            = "Expand"
 L["close"]             = "Close"
-L["gathering_start"]   = "Hit start and begin gathering"
 L["gathering_active"]  = "Gathering... loot will appear here"
 -- Help tooltip
 L["help_categories"]   = "Categories:"
@@ -43,6 +42,9 @@ L["item_plural"]       = "%d items"
 L["sessions_summary"]  = "%d session across %d day (max %d)"
 L["sessions_summary_pl"] = "%d sessions across %d days (max %d)"
 L["looted_gold"]       = "Direct"
+L["merge_day_btn"]     = "Merge"
+L["merge_day_tooltip"] = "Merge all sessions of this day into one"
+L["merge_day_confirm"] = "Merge all %d sessions of %s into one? This cannot be undone."
 -- Settings
 L["settings_title"]    = "Night's Farmtracker — Settings"
 L["ah_source"]         = "AH Price Source"
@@ -90,6 +92,7 @@ L["session_history_enabled"]  = "Save session history"
 L["split_trade_goods"]        = "Split trade goods by subtype"
 L["merge_daily_sessions"]     = "Merge same-day sessions automatically"
 L["vendor_filter_enabled"]    = "Enable Vendor-Only Filter"
+L["log_window_enabled"]       = "Enable loot log window"
 L["ah_auto_info"]             = "Prefers Auctionator, falls back to TSM"
 L["tsm_custom"]               = "Custom TSM expression (overrides above)"
 -- Vendor-only filter
@@ -98,6 +101,9 @@ L["filter_button"]            = "Vendor-Only Filter"
 L["filter_drop_hint"]         = "Drop item here"
 L["filter_list_empty"]        = "No items in filter yet"
 L["filter_tip_shift_rclick"]  = "  Shift+Right-click to remove"
+-- Loot log
+L["log_title"]                = "Loot Log"
+L["log_empty"]                = "No items yet"
 
 ------------------------------------------------------------------------
 -- German (deDE)
@@ -113,7 +119,6 @@ if GetLocale() == "deDE" then
     L["collapse"]          = "Einklappen"
     L["expand"]            = "Ausklappen"
     L["close"]             = "Schließen"
-    L["gathering_start"]   = "Start drücken und farmen"
     L["gathering_active"]  = "Sammle... Beute erscheint hier"
     L["help_categories"]   = "Kategorien:"
     L["help_cat_click"]    = "  Klick: ein-/ausklappen"
@@ -134,6 +139,9 @@ if GetLocale() == "deDE" then
     L["sessions_summary"]    = "%d Session über %d Tag (max %d)"
     L["sessions_summary_pl"] = "%d Sessions über %d Tage (max %d)"
     L["looted_gold"]       = "Direkt"
+    L["merge_day_btn"]     = "Merge"
+    L["merge_day_tooltip"] = "Alle Sessions dieses Tages zusammenführen"
+    L["merge_day_confirm"] = "Alle %d Sessions von %s zusammenführen? Kann nicht rückgängig gemacht werden."
     L["settings_title"]    = "Night's Farmtracker — Einstellungen"
     L["ah_source"]         = "AH-Preisquelle"
     L["ah_auto"]           = "Automatisch (beste verfügbare)"
@@ -179,6 +187,7 @@ if GetLocale() == "deDE" then
     L["split_trade_goods"]       = "Handwerksmaterialien nach Typ aufteilen"
     L["merge_daily_sessions"]    = "Sessions desselben Tages automatisch zusammenführen"
     L["vendor_filter_enabled"]   = "Vendor-Only-Filter aktivieren"
+    L["log_window_enabled"]      = "Verlaufsfenster aktivieren"
     L["ah_auto_info"]            = "Bevorzugt Auctionator, fällt auf TSM zurück"
     L["tsm_custom"]              = "Eigener TSM-Ausdruck (überschreibt oben)"
     -- Vendor-only filter
@@ -187,4 +196,7 @@ if GetLocale() == "deDE" then
     L["filter_drop_hint"]        = "Item hier rein ziehen"
     L["filter_list_empty"]       = "Noch keine Items im Filter"
     L["filter_tip_shift_rclick"] = "  Shift-Rechtsklick: Entfernen"
+    -- Verlaufsfenster
+    L["log_title"]               = "Verlaufsfenster"
+    L["log_empty"]                = "Noch keine Items"
 end
