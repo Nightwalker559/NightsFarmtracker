@@ -363,6 +363,13 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         ns.InitAccountDB()
         ns.InitSettings()
 
+        -- MainFrame and GoldFrame were built while UI.lua loaded, before
+        -- SavedVariables/the saved color theme were available, so their
+        -- border/background still have the default theme's colors baked
+        -- in - refresh them now.
+        ns.RefreshFrameStyle(MainFrame)
+        ns.RefreshFrameStyle(ns.GoldFrame)
+
         local p = NightsFarmtrackerDB.pos
         MainFrame:ClearAllPoints()
         MainFrame:SetPoint(p[1], UIParent, p[2], p[3], p[4])

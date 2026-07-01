@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.1.2] - 2026-07-01
+
+### New
+
+- Session History: sessions are now grouped by month. Past months are collapsed by default (click the month header to expand/collapse); the current month starts expanded but can be collapsed too
+- Month headers show a delete button to remove all sessions of that month at once (with confirmation), instead of deleting sessions one by one or clearing the whole history
+- Session History and Loot Log now share a single button: left-click opens Session History, right-click opens Loot Log. Tooltip and the "?" help window reflect both actions
+- New Settings section "Color Theme" to switch the addon's border/background/accent colors, picked from an expandable dropdown menu: Default, Void, Silvermoon, Fel, Frost, Bloodmoon. Gold text color stays the same across all themes. Requires a UI reload to fully apply
+
+### Changed
+
+- Session History rows no longer show the item count ("N items") - duration and gold are enough at a glance, the full item breakdown is still available in the session detail view
+- The "?" help window now sorts its sections alphabetically by their (localized) title instead of a fixed order
+
+### Fixed
+
+- German localization: the help window's "Items" section title and hover hint were left untranslated (still showed the English words) - now properly localized
+- Color Theme: the main frame's and Gold Overview's border/background/accent colors kept the default theme's colors even after switching to another theme and reloading. Both are built before SavedVariables are available, so they now get explicitly re-skinned once the saved theme is loaded
+- Color Theme: the "Gathering... loot will appear here" empty-state hint was still hardcoded to the default teal instead of following the selected theme's accent color
+- Gold Overview and Loot Log windows overlapped when both were open and the main frame was collapsed, since both anchored to the same spot directly below the main frame. Loot Log now chains below Gold Overview in that case, matching the existing chaining behavior between Vendor-Only Filter and Loot Log
+- Settings window jumped back to the top every time a radio option (AH source, gold display, gold rate, color theme) was changed, since the content rebuild always reset the scroll position to 0. It now keeps the current scroll position (clamped to the new content height)
+
 ## [1.1.1] - 2026-06-23
 
 ### New

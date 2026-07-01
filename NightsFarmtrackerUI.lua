@@ -109,9 +109,6 @@ btnHistory:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
 local btnFilter   = MakeBtn(BtnBar, 18, "btn_filter.png")
 btnFilter:SetPoint("LEFT", btnHistory, "RIGHT", 6, 0)
 
-local btnLog      = MakeBtn(BtnBar, 18, "btn_log.png")
-btnLog:SetPoint("LEFT", btnFilter, "RIGHT", 6, 0)
-
 -- Right side (anchored from right): close → collapse → help → settings
 local btnClose = MakeBtn(BtnBar, 18, "btn_close.png")
 btnClose:SetPoint("RIGHT", BtnBar, "RIGHT", 0, 0)
@@ -131,16 +128,19 @@ hdrSep:SetHeight(1)
 hdrSep:SetColorTexture(unpack(ns.COL_BORDER))
 hdrSep:SetPoint("TOPLEFT",  PAD,  -HDR_TOTAL)
 hdrSep:SetPoint("TOPRIGHT", -PAD, -HDR_TOTAL)
+table.insert(MainFrame.nftEdges, hdrSep)
 
 ------------------------------------------------------------------------
 -- Empty hint (expanded, no items yet)
 ------------------------------------------------------------------------
 local emptyHint = MainFrame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
 emptyHint:SetPoint("TOP", MainFrame, "TOP", 0, -(SCROLL_TOP + 28))
-emptyHint:SetTextColor(0.30, 0.55, 0.60)
+emptyHint:SetTextColor(unpack(ns.COL_ACCENT))
 emptyHint:SetFontHeight(11)
 emptyHint:SetText(ns.L["gathering_active"])
 emptyHint:Hide()
+MainFrame.nftAccentTexts = MainFrame.nftAccentTexts or {}
+table.insert(MainFrame.nftAccentTexts, emptyHint)
 
 ------------------------------------------------------------------------
 -- Footer — always visible: [total gold] [timer] [gold/rate]
@@ -150,6 +150,7 @@ footerSep:SetHeight(1)
 footerSep:SetColorTexture(unpack(ns.COL_BORDER))
 footerSep:SetPoint("BOTTOMLEFT",  PAD,  FOOTER_H - 2)
 footerSep:SetPoint("BOTTOMRIGHT", -PAD, FOOTER_H - 2)
+table.insert(MainFrame.nftEdges, footerSep)
 
 local goldBtn = CreateFrame("Button", nil, MainFrame)
 goldBtn:SetPoint("BOTTOMLEFT", MainFrame, "BOTTOMLEFT", PAD, 4)
@@ -209,6 +210,7 @@ GoldFrame:SetFrameStrata("HIGH")
 GoldFrame:SetClampedToScreen(true)
 ns.ApplyFrameStyle(GoldFrame)
 GoldFrame:Hide()
+ns.GoldFrame = GoldFrame
 
 do
     local gp = PAD
@@ -216,10 +218,12 @@ do
     titleFS:SetPoint("TOPLEFT", gp, -10)
     titleFS:SetTextColor(unpack(ns.COL_ACCENT))
     titleFS:SetText(ns.L["gold_overview"])
+    GoldFrame.nftAccentTexts = { titleFS }
 
     local sep1 = GoldFrame:CreateTexture(nil,"ARTWORK"); sep1:SetHeight(1)
     sep1:SetColorTexture(unpack(ns.COL_BORDER))
     sep1:SetPoint("TOPLEFT", gp, -26); sep1:SetPoint("TOPRIGHT", -gp, -26)
+    table.insert(GoldFrame.nftEdges, sep1)
 
     local function MakeRow(yOff, labelKey, bold)
         local font = bold and "GameFontNormal" or "GameFontNormalSmall"
@@ -240,6 +244,7 @@ do
     local sep2 = GoldFrame:CreateTexture(nil,"ARTWORK"); sep2:SetHeight(1)
     sep2:SetColorTexture(unpack(ns.COL_BORDER))
     sep2:SetPoint("TOPLEFT", gp, -63); sep2:SetPoint("TOPRIGHT", -gp, -63)
+    table.insert(GoldFrame.nftEdges, sep2)
 
     local totalVal = MakeRow(-72, "gold_total", true)
 
@@ -262,6 +267,12 @@ end
 function ns.ToggleGoldFrame()
     if GoldFrame:IsShown() then GoldFrame:Hide()
     else GoldFrame:Show(); ns.UpdateGoldFrame() end
+    -- GoldFrame always sits directly below MainFrame; when MainFrame is
+    -- collapsed, LogFrame also wants that spot, so it needs to know
+    -- whether to chain below GoldFrame instead (avoids overlap).
+    if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
+        ns.ReanchorLogFrame()
+    end
 end
 
 MainFrame:HookScript("OnHide", function() GoldFrame:Hide() end)
@@ -776,11 +787,31 @@ btnReset:SetScript("OnEnter", function(self)
 end)
 btnReset:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
 
-btnHistory:SetScript("OnClick", function() ns.ToggleHistory() end)
+-- Left-click: Session History · Right-click: Loot Log
+btnHistory:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+btnHistory:SetScript("OnClick", function(self, button)
+    local db = NightsFarmtrackerDB
+    if button == "RightButton" then
+        if db.logWindowEnabled == true then ns.ToggleLogWindow() end
+    else
+        if db.sessionHistoryEnabled ~= false then ns.ToggleHistory() end
+    end
+end)
 btnHistory:SetScript("OnEnter", function(self)
     self.tex:SetAlpha(1)
+    local db          = NightsFarmtrackerDB
+    local historyShown = db.sessionHistoryEnabled ~= false
+    local logShown      = db.logWindowEnabled      == true
     GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
-    GameTooltip:SetText(ns.L["session_history"])
+    if historyShown and logShown then
+        GameTooltip:SetText(ns.L["session_history"].." / "..ns.L["log_title"])
+        GameTooltip:AddLine(ns.L["hist_log_left_hint"], 0.7,0.7,0.7)
+        GameTooltip:AddLine(ns.L["hist_log_right_hint"], 0.7,0.7,0.7)
+    elseif logShown then
+        GameTooltip:SetText(ns.L["log_title"])
+    else
+        GameTooltip:SetText(ns.L["session_history"])
+    end
     GameTooltip:Show()
 end)
 btnHistory:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
@@ -793,15 +824,6 @@ btnFilter:SetScript("OnEnter", function(self)
     GameTooltip:Show()
 end)
 btnFilter:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
-
-btnLog:SetScript("OnClick", function() ns.ToggleLogWindow() end)
-btnLog:SetScript("OnEnter", function(self)
-    self.tex:SetAlpha(1)
-    GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
-    GameTooltip:SetText(ns.L["log_title"])
-    GameTooltip:Show()
-end)
-btnLog:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
 
 btnSettings:SetScript("OnClick", function() ns.ToggleSettings() end)
 btnSettings:SetScript("OnEnter", function(self)
@@ -817,16 +839,20 @@ btnHelp:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self,"ANCHOR_BOTTOMRIGHT")
     GameTooltip:AddLine("Night's Farmtracker",unpack(ns.COL_ACCENT))
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(ns.L["help_categories"], 1,1,1)
-    GameTooltip:AddLine(ns.L["help_cat_click"],             0.7,0.7,0.7)
-    GameTooltip:AddLine(ns.L["help_cat_rclick"],    0.7,0.7,0.7)
-    GameTooltip:AddLine(ns.L["help_items"], 1,1,1)
-    GameTooltip:AddLine(ns.L["help_item_hover"],                0.7,0.7,0.7)
-    GameTooltip:AddLine(ns.L["help_item_rclick"],   0.7,0.7,0.7)
-    GameTooltip:AddLine(ns.L["help_gold"], 1,1,1)
-    GameTooltip:AddLine(ns.L["help_gold_click"],     0.7,0.7,0.7)
-    GameTooltip:AddLine(ns.L["help_reset"], 1,1,1)
-    GameTooltip:AddLine(ns.L["help_reset_shift"],    0.7,0.7,0.7)
+    local helpSections = {
+        { title = ns.L["help_categories"], lines = { ns.L["help_cat_click"], ns.L["help_cat_rclick"] } },
+        { title = ns.L["help_items"],      lines = { ns.L["help_item_hover"], ns.L["help_item_rclick"] } },
+        { title = ns.L["help_gold"],       lines = { ns.L["help_gold_click"] } },
+        { title = ns.L["help_reset"],      lines = { ns.L["help_reset_shift"] } },
+        { title = ns.L["help_histlog"],    lines = { ns.L["help_histlog_left"], ns.L["help_histlog_right"] } },
+    }
+    table.sort(helpSections, function(a,b) return a.title < b.title end)
+    for _,section in ipairs(helpSections) do
+        GameTooltip:AddLine(section.title, 1,1,1)
+        for _,line in ipairs(section.lines) do
+            GameTooltip:AddLine(line, 0.7,0.7,0.7)
+        end
+    end
     GameTooltip:Show()
 end)
 btnHelp:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
@@ -888,34 +914,22 @@ end
 local function UpdateLeftButtons()
     local db           = NightsFarmtrackerDB
     local historyShown = db.sessionHistoryEnabled ~= false
-    local filterShown  = db.vendorFilterEnabled   ~= false
     local logShown     = db.logWindowEnabled      == true
+    local filterShown  = db.vendorFilterEnabled   ~= false
+    local histLogShown = historyShown or logShown
 
-    if historyShown then btnHistory:Show(); btnHistory:EnableMouse(true)
+    if histLogShown then btnHistory:Show(); btnHistory:EnableMouse(true)
     else                  btnHistory:Hide(); btnHistory:EnableMouse(false) end
 
     if filterShown then btnFilter:Show(); btnFilter:EnableMouse(true)
     else                  btnFilter:Hide(); btnFilter:EnableMouse(false) end
 
-    if logShown then btnLog:Show(); btnLog:EnableMouse(true)
-    else               btnLog:Hide(); btnLog:EnableMouse(false) end
-
-    -- Filter rutscht an den Reset-Button, wenn History ausgeblendet ist (keine Lücke)
+    -- Filter rutscht an den Reset-Button, wenn History/Log ausgeblendet ist (keine Lücke)
     btnFilter:ClearAllPoints()
-    if historyShown then
+    if histLogShown then
         btnFilter:SetPoint("LEFT", btnHistory, "RIGHT", 6, 0)
     else
         btnFilter:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
-    end
-
-    -- Log rutscht an den jeweils letzten sichtbaren linken Button heran
-    btnLog:ClearAllPoints()
-    if filterShown then
-        btnLog:SetPoint("LEFT", btnFilter, "RIGHT", 6, 0)
-    elseif historyShown then
-        btnLog:SetPoint("LEFT", btnHistory, "RIGHT", 6, 0)
-    else
-        btnLog:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
     end
 end
 

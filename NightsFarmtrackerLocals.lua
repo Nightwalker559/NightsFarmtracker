@@ -9,6 +9,11 @@ ns.L = L
 ------------------------------------------------------------------------
 -- English (default)
 ------------------------------------------------------------------------
+-- Month names (index 1-12), used for month grouping in Session History
+L.MONTH_NAMES = {
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December",
+}
 -- Main frame
 L["start_tracking"]    = "Start tracking"
 L["pause_tracking"]    = "Pause tracking"
@@ -32,6 +37,11 @@ L["help_gold"]         = "Gold overview:"
 L["help_gold_click"]   = "  Click total gold (footer) to toggle breakdown"
 L["help_reset"]        = "Reset:"
 L["help_reset_shift"]  = "  Shift+Click to reset without saving to history"
+L["help_histlog"]       = "Session History / Loot Log:"
+L["help_histlog_left"]  = "  Left-click: Session History"
+L["help_histlog_right"] = "  Right-click: Loot Log"
+L["hist_log_left_hint"]  = "Left-click: Session History"
+L["hist_log_right_hint"] = "Right-click: Loot Log"
 -- History
 L["delete_session"]    = "Delete this session"
 L["delete_all"]        = "Delete all saved sessions"
@@ -45,6 +55,8 @@ L["looted_gold"]       = "Direct"
 L["merge_day_btn"]     = "Merge"
 L["merge_day_tooltip"] = "Merge all sessions of this day into one"
 L["merge_day_confirm"] = "Merge all %d sessions of %s into one? This cannot be undone."
+L["delete_month"]        = "Delete this month"
+L["delete_month_confirm"] = "Delete all %d sessions of %s? This cannot be undone."
 -- Settings
 L["settings_title"]    = "Night's Farmtracker — Settings"
 L["ah_source"]         = "AH Price Source"
@@ -56,6 +68,19 @@ L["not_installed"]     = "(not installed)"
 L["tsm_source"]        = "TSM Price Source"
 L["tsm_hint"]          = "Click to cycle: DBMarket · DBRegionMarketAvg · DBMinBuyout"
 L["display"]           = "Display"
+L["color_theme"]       = "Color Theme"
+L["theme_default"]     = "Default"
+L["theme_void"]        = "Void"
+L["theme_silvermoon"]  = "Silvermoon"
+L["theme_fel"]         = "Fel"
+L["theme_frost"]       = "Frost"
+L["theme_bloodmoon"]   = "Bloodmoon"
+L["theme_default_desc"]    = "Teal"
+L["theme_void_desc"]       = "Purple"
+L["theme_silvermoon_desc"] = "Warm Gold"
+L["theme_fel_desc"]        = "Toxic Green"
+L["theme_frost_desc"]      = "Ice Blue"
+L["theme_bloodmoon_desc"]  = "Blood Red"
 L["gold_per_hour"]     = "Gold / hour"
 L["gold_per_min"]      = "Gold / min"
 L["gold_display_classic"] = "Classic gold display (icons)"
@@ -109,6 +134,10 @@ L["log_empty"]                = "No items yet"
 -- German (deDE)
 ------------------------------------------------------------------------
 if GetLocale() == "deDE" then
+    L.MONTH_NAMES = {
+        "Januar","Februar","März","April","Mai","Juni",
+        "Juli","August","September","Oktober","November","Dezember",
+    }
     L["start_tracking"]    = "Tracking starten"
     L["pause_tracking"]    = "Tracking pausieren"
     L["reset_session"]     = "Session zurücksetzen"
@@ -123,13 +152,18 @@ if GetLocale() == "deDE" then
     L["help_categories"]   = "Kategorien:"
     L["help_cat_click"]    = "  Klick: ein-/ausklappen"
     L["help_cat_rclick"]   = "  Shift-Rechtsklick: ausschliessen"
-    L["help_items"]        = "Items:"
-    L["help_item_hover"]   = "  Hover: Item-Tooltip"
+    L["help_items"]        = "Gegenstände:"
+    L["help_item_hover"]   = "  Hover: Tooltip anzeigen"
     L["help_item_rclick"]  = "  Shift-Rechtsklick: nicht tracken"
     L["help_gold"]         = "Gold-Übersicht:"
     L["help_gold_click"]   = "  Klick auf Gesamtgold (unten) zeigt Aufschlüsselung"
     L["help_reset"]        = "Zurücksetzen:"
     L["help_reset_shift"]  = "  Shift-Klick: Zurücksetzen ohne Speichern im Verlauf"
+    L["help_histlog"]       = "Session-Verlauf / Verlaufsfenster:"
+    L["help_histlog_left"]  = "  Linksklick: Session-Verlauf"
+    L["help_histlog_right"] = "  Rechtsklick: Verlaufsfenster"
+    L["hist_log_left_hint"]  = "Linksklick: Session-Verlauf"
+    L["hist_log_right_hint"] = "Rechtsklick: Verlaufsfenster"
     L["delete_session"]    = "Session löschen"
     L["delete_all"]        = "Alle Sessions löschen"
     L["clear_all"]         = "Alles löschen"
@@ -142,6 +176,8 @@ if GetLocale() == "deDE" then
     L["merge_day_btn"]     = "Merge"
     L["merge_day_tooltip"] = "Alle Sessions dieses Tages zusammenführen"
     L["merge_day_confirm"] = "Alle %d Sessions von %s zusammenführen? Kann nicht rückgängig gemacht werden."
+    L["delete_month"]         = "Monat löschen"
+    L["delete_month_confirm"] = "Alle %d Sessions von %s löschen? Kann nicht rückgängig gemacht werden."
     L["settings_title"]    = "Night's Farmtracker — Einstellungen"
     L["ah_source"]         = "AH-Preisquelle"
     L["ah_auto"]           = "Automatisch (beste verfügbare)"
@@ -152,6 +188,19 @@ if GetLocale() == "deDE" then
     L["tsm_source"]        = "TSM-Preisquelle"
     L["tsm_hint"]          = "Klicken zum Wechseln: DBMarket · DBRegionMarketAvg · DBMinBuyout"
     L["display"]           = "Anzeige"
+    L["color_theme"]       = "Farbschema"
+    L["theme_default"]     = "Standard"
+    L["theme_void"]        = "Void"
+    L["theme_silvermoon"]  = "Silvermoon"
+    L["theme_fel"]         = "Fel"
+    L["theme_frost"]       = "Frost"
+    L["theme_bloodmoon"]   = "Bloodmoon"
+    L["theme_default_desc"]    = "Türkis"
+    L["theme_void_desc"]       = "Lila"
+    L["theme_silvermoon_desc"] = "Warmes Gold"
+    L["theme_fel_desc"]        = "Giftgrün"
+    L["theme_frost_desc"]      = "Eisblau"
+    L["theme_bloodmoon_desc"]  = "Blutrot"
     L["gold_per_hour"]     = "Gold / Stunde"
     L["gold_per_min"]      = "Gold / Minute"
     L["gold_display_classic"] = "Klassische Gold-Anzeige (Icons)"

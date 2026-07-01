@@ -198,14 +198,19 @@ local function EnsureLogFrame()
 end
 
 ------------------------------------------------------------------------
--- Anchoring — below MainFrame when collapsed, otherwise right side of
--- MainFrame (or right of Vendor-Only Filter window if that's open, to
--- avoid overlapping it).
+-- Anchoring — below MainFrame when collapsed (or below the Gold Overview
+-- window if that's also open there, to avoid overlapping it), otherwise
+-- right side of MainFrame (or right of Vendor-Only Filter window if that's
+-- open, to avoid overlapping it).
 ------------------------------------------------------------------------
 local function ReanchorLogFrame()
     LogFrame:ClearAllPoints()
     if NightsFarmtrackerDB.expanded == false then
-        LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "BOTTOMLEFT", 0, -4)
+        if ns.GoldFrame and ns.GoldFrame:IsShown() then
+            LogFrame:SetPoint("TOPLEFT", ns.GoldFrame, "BOTTOMLEFT", 0, -4)
+        else
+            LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "BOTTOMLEFT", 0, -4)
+        end
     elseif ns.FilterFrame and ns.FilterFrame:IsShown() then
         LogFrame:SetPoint("TOPLEFT", ns.FilterFrame, "TOPRIGHT", 4, 0)
     else

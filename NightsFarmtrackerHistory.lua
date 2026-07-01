@@ -13,6 +13,7 @@ local H_PAD    = 10
 local H_HDR_H  = ns.HDR_TOTAL
 local H_FTR_H  = 28
 local DAY_H    = ns.CAT_ROW_H
+local MONTH_H  = ns.CAT_ROW_H
 local SESS_H   = 38
 local MAX_VIS_H = 10 * SESS_H
 
@@ -181,6 +182,33 @@ StaticPopupDialogs["NFT_CONFIRM_MERGE_DAY"] = {
 }
 
 ------------------------------------------------------------------------
+-- Delete all sessions belonging to one calendar month ("YYYY-MM")
+------------------------------------------------------------------------
+function ns.DeleteMonthSessions(monthKey)
+    local sessions = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions
+    if not sessions then return end
+    for i = #sessions, 1, -1 do
+        if date("%Y-%m", sessions[i].timestamp) == monthKey then
+            table.remove(sessions, i)
+        end
+    end
+    if NightsFarmtrackerAccountDB.collapsedMonths then
+        NightsFarmtrackerAccountDB.collapsedMonths[monthKey] = nil
+    end
+    ns.RebuildHistory()
+end
+
+StaticPopupDialogs["NFT_CONFIRM_DELETE_MONTH"] = {
+    text         = "%s",
+    button1      = OKAY,
+    button2      = CANCEL,
+    OnAccept     = function(self, data) ns.DeleteMonthSessions(data) end,
+    timeout      = 0,
+    whileDead    = true,
+    hideOnEscape = true,
+}
+
+------------------------------------------------------------------------
 -- Frame references
 ------------------------------------------------------------------------
 local HistFrame, HScrollFrame, HListFrame
@@ -198,11 +226,9 @@ local function AcquireSessRow()
     r.bg=r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); r.bg:SetColorTexture(1,1,1,0.05); r.bg:Hide()
     r.sep=r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1)
     r.sep:SetColorTexture(0.18,0.28,0.30,0.55); r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
-    -- Single-line: [Dauer] [Items] [Gold] [X]
+    -- Single-line: [Dauer] [Gold] [X]
     r.dateText=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     r.dateText:SetPoint("LEFT",6,0); r.dateText:SetTextColor(0.9,0.9,0.9); r.dateText:SetFontHeight(11)
-    r.infoText=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    r.infoText:SetPoint("CENTER",0,0); r.infoText:SetTextColor(0.55,0.55,0.55); r.infoText:SetFontHeight(11)
     r.goldText=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     r.goldText:SetPoint("RIGHT",-22,0); r.goldText:SetJustifyH("RIGHT"); r.goldText:SetFontHeight(11)
     r.goldText:SetTextColor(unpack(ns.COL_GOLD))
@@ -258,6 +284,44 @@ local function ReleaseDayRow(r)
     r.dateText:SetTextColor(unpack(ns.COL_ACCENT))
     r.mergeBtn:Hide(); r.mergeBtn:SetScript("OnClick", nil)
     dayPool[#dayPool+1]=r
+end
+
+------------------------------------------------------------------------
+-- Month header row pool (collapsible grouping for past months)
+------------------------------------------------------------------------
+local activeMonthRows={} local monthPool={}
+
+local function AcquireMonthRow()
+    local r=table.remove(monthPool)
+    if r then r:SetParent(HListFrame); r:Show(); return r end
+    r=CreateFrame("Frame",nil,HListFrame); r:SetHeight(MONTH_H); r:EnableMouse(true)
+    r.bg=r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); r.bg:SetColorTexture(unpack(ns.COL_CAT_BG))
+    r.sep=r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1); r.sep:SetColorTexture(unpack(ns.COL_BORDER))
+    r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
+    r.arrow=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    r.arrow:SetPoint("LEFT",4,0); r.arrow:SetFontHeight(11); r.arrow:SetTextColor(unpack(ns.COL_ACCENT))
+    r.nameText=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    r.nameText:SetPoint("LEFT",r.arrow,"RIGHT",4,0); r.nameText:SetFontHeight(11)
+    r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
+    r.delBtn=CreateFrame("Button",nil,r); r.delBtn:SetSize(18,18); r.delBtn:SetPoint("RIGHT",-2,0)
+    local mDelTex=r.delBtn:CreateTexture(nil,"ARTWORK"); mDelTex:SetAllPoints()
+    mDelTex:SetTexture(ART.."btn_close.png"); mDelTex:SetAlpha(0.5)
+    r.delBtn:SetScript("OnEnter",function() mDelTex:SetAlpha(1)
+        GameTooltip:SetOwner(r.delBtn,"ANCHOR_TOP"); GameTooltip:SetText(ns.L["delete_month"]); GameTooltip:Show() end)
+    r.delBtn:SetScript("OnLeave",function() mDelTex:SetAlpha(0.5); GameTooltip:Hide() end)
+    r.goldText=r:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    r.goldText:SetPoint("RIGHT",r.delBtn,"LEFT",-6,0); r.goldText:SetJustifyH("RIGHT"); r.goldText:SetFontHeight(11)
+    r.goldText:SetTextColor(unpack(ns.COL_GOLD))
+    r:SetScript("OnEnter",function(self) self.nameText:SetTextColor(1,1,1) end)
+    r:SetScript("OnLeave",function(self) self.nameText:SetTextColor(unpack(ns.COL_ACCENT)) end)
+    return r
+end
+local function ReleaseMonthRow(r)
+    r:Hide(); r:ClearAllPoints(); r:SetScript("OnMouseUp",nil)
+    r:SetScript("OnEnter",nil); r:SetScript("OnLeave",nil)
+    r.delBtn:SetScript("OnClick",nil)
+    r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
+    monthPool[#monthPool+1]=r
 end
 
 ------------------------------------------------------------------------
@@ -559,71 +623,103 @@ end
 ------------------------------------------------------------------------
 function ns.RebuildHistory()
     if not HListFrame then return end
-    for _,r in ipairs(activeSessRows) do ReleaseSessRow(r) end
-    for _,r in ipairs(activeDayRows)  do ReleaseDayRow(r)  end
-    activeSessRows={}; activeDayRows={}
+    for _,r in ipairs(activeSessRows)  do ReleaseSessRow(r)  end
+    for _,r in ipairs(activeDayRows)   do ReleaseDayRow(r)   end
+    for _,r in ipairs(activeMonthRows) do ReleaseMonthRow(r) end
+    activeSessRows={}; activeDayRows={}; activeMonthRows={}
     local sessions=(NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions) or {}
+
+    -- Group sessions by calendar day (order follows sessions array, newest first)
     local days,dayOrder={},{}
     for i,session in ipairs(sessions) do
         local dStr=date("%d.%m.%Y",session.timestamp)
-        if not days[dStr] then days[dStr]={totalGold=0,sessions={}}; dayOrder[#dayOrder+1]=dStr end
+        if not days[dStr] then
+            days[dStr]={
+                totalGold=0, sessions={},
+                monthKey=date("%Y-%m",session.timestamp),
+                monthLabel=(ns.L.MONTH_NAMES[tonumber(date("%m",session.timestamp))] or "")
+                    .." "..date("%Y",session.timestamp),
+            }
+            dayOrder[#dayOrder+1]=dStr
+        end
         days[dStr].totalGold=days[dStr].totalGold+session.totalGold
         days[dStr].sessions[#days[dStr].sessions+1]={session=session,idx=i}
     end
-    local yOffset=0
+
+    -- Group days into months, preserving day order
+    local months,monthOrder={},{}
+    local currentMonthKey=date("%Y-%m")
     for _,dStr in ipairs(dayOrder) do
-        local day=days[dStr]
-        local drow=AcquireDayRow(); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
-        drow.dateText:SetText(dStr)
-        drow.infoText:SetText("")
-        drow.goldText:SetText("")
-        if #day.sessions > 1 then
-            drow.mergeBtn:Show()
-            drow.mergeBtn:SetScript("OnClick", function()
-                StaticPopup_Show("NFT_CONFIRM_MERGE_DAY",
-                    string.format(ns.L["merge_day_confirm"], #day.sessions, dStr), nil, dStr)
-            end)
-        else
-            drow.mergeBtn:Hide()
+        local day=days[dStr]; local mKey=day.monthKey
+        if not months[mKey] then
+            months[mKey]={label=day.monthLabel,totalGold=0,sessionCount=0,dayList={},isCurrent=(mKey==currentMonthKey)}
+            monthOrder[#monthOrder+1]=mKey
         end
-        activeDayRows[#activeDayRows+1]=drow; yOffset=yOffset+DAY_H
-        for _,entry in ipairs(day.sessions) do
-            local session=entry.session; local idx=entry.idx
-            local row=AcquireSessRow(); row:SetWidth(ns.CONTENT_W); row:SetPoint("TOPLEFT",0,-yOffset)
-            row.sessionIdx=idx
-            local hasAH = ns.HasAnyAH() and NightsFarmtrackerDB.ahSource ~= "none"
-            local n=0
-            for _,d in pairs(session.items) do
-                local isVendorOnly = ns.IsVendorOnly(d)
-                if not isVendorOnly and d.q and d.qIDs then
-                    for tier=1,3 do
-                        local tc=d.q[tier] or 0; local tid=d.qIDs[tier]
-                        if tc>0 then
-                            local tAH,tV
-                            if tid and hasAH then local p=ns.GetAHPriceForID(tid); if p then tAH=p*tc end end
-                            if d.sellPrice and d.sellPrice>0 then tV=d.sellPrice*tc end
-                            if ((tAH and tAH>0) and tAH or tV or 0) > 0 then n=n+1 end
-                        end
-                    end
-                else
-                    local gold=(not isVendorOnly and hasAH and (d.ahTotal or 0)>0) and d.ahTotal or d.vendorTotal or 0
-                    if gold>0 then n=n+1 end
-                end
+        months[mKey].totalGold=months[mKey].totalGold+day.totalGold
+        months[mKey].sessionCount=months[mKey].sessionCount+#day.sessions
+        table.insert(months[mKey].dayList,dStr)
+    end
+
+    local accDB=NightsFarmtrackerAccountDB
+    accDB.collapsedMonths=accDB.collapsedMonths or {}
+
+    local yOffset=0
+    for _,mKey in ipairs(monthOrder) do
+        local month=months[mKey]
+        -- default: current month expanded, past months collapsed — user choice wins
+        local collapsed=accDB.collapsedMonths[mKey]
+        if collapsed==nil then collapsed=not month.isCurrent end
+        local mrow=AcquireMonthRow(); mrow:SetSize(ns.CONTENT_W, MONTH_H); mrow:SetPoint("TOPLEFT",0,-yOffset)
+        mrow.arrow:SetText(collapsed and "+" or "-")
+        mrow.nameText:SetText(month.label)
+        mrow.goldText:SetText(month.totalGold>0 and ns.FormatGold(month.totalGold) or "")
+        mrow:SetScript("OnMouseUp",function(self)
+            if not self.delBtn:IsMouseOver() then
+                accDB.collapsedMonths[mKey]=not collapsed
+                ns.RebuildHistory()
             end
-            local combinedGold = (session.totalGold or 0) + (session.lootedGold or 0)
-            row.dateText:SetText(ns.FormatTime(session.duration))
-            row.infoText:SetText(n==1 and string.format(ns.L["item_singular"],n) or string.format(ns.L["item_plural"],n))
-            row.goldText:SetText(combinedGold>0 and ns.FormatGold(combinedGold) or "")
-            local sess=session
-            row:SetScript("OnMouseUp",function(self,btn)
-                if btn=="LeftButton" and not self.delBtn:IsMouseOver() then ShowDetail(sess) end
-            end)
-            row.delBtn:SetScript("OnClick",function()
-                table.remove(NightsFarmtrackerAccountDB.sessions,idx); ns.RebuildHistory()
-            end)
-            activeSessRows[#activeSessRows+1]=row; yOffset=yOffset+SESS_H
+        end)
+        mrow.delBtn:SetScript("OnClick",function()
+            StaticPopup_Show("NFT_CONFIRM_DELETE_MONTH",
+                string.format(ns.L["delete_month_confirm"], month.sessionCount, month.label), nil, mKey)
+        end)
+        activeMonthRows[#activeMonthRows+1]=mrow; yOffset=yOffset+MONTH_H
+        if not collapsed then
+            yOffset=yOffset+4 -- gap between month header and first day row
+            for _,dStr in ipairs(month.dayList) do
+                local day=days[dStr]
+                local drow=AcquireDayRow(); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
+                drow.dateText:SetText(dStr)
+                drow.goldText:SetText("")
+                if #day.sessions > 1 then
+                    drow.mergeBtn:Show()
+                    drow.mergeBtn:SetScript("OnClick", function()
+                        StaticPopup_Show("NFT_CONFIRM_MERGE_DAY",
+                            string.format(ns.L["merge_day_confirm"], #day.sessions, dStr), nil, dStr)
+                    end)
+                else
+                    drow.mergeBtn:Hide()
+                end
+                activeDayRows[#activeDayRows+1]=drow; yOffset=yOffset+DAY_H
+                for _,entry in ipairs(day.sessions) do
+                    local session=entry.session; local idx=entry.idx
+                    local row=AcquireSessRow(); row:SetWidth(ns.CONTENT_W); row:SetPoint("TOPLEFT",0,-yOffset)
+                    row.sessionIdx=idx
+                    local combinedGold = (session.totalGold or 0) + (session.lootedGold or 0)
+                    row.dateText:SetText(ns.FormatTime(session.duration))
+                    row.goldText:SetText(combinedGold>0 and ns.FormatGold(combinedGold) or "")
+                    local sess=session
+                    row:SetScript("OnMouseUp",function(self,btn)
+                        if btn=="LeftButton" and not self.delBtn:IsMouseOver() then ShowDetail(sess) end
+                    end)
+                    row.delBtn:SetScript("OnClick",function()
+                        table.remove(NightsFarmtrackerAccountDB.sessions,idx); ns.RebuildHistory()
+                    end)
+                    activeSessRows[#activeSessRows+1]=row; yOffset=yOffset+SESS_H
+                end
+                yOffset=yOffset+3
+            end
         end
-        yOffset=yOffset+3
     end
     local contentH=math.max(1,yOffset)
     HListFrame:SetHeight(contentH)

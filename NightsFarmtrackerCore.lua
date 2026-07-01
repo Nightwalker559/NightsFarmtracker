@@ -50,12 +50,84 @@ ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
 ns.MAX_ROWS    = 8
 ns.SCROLL_STEP = ns.ROW_H
 
--- Colors
-ns.COL_BG     = {0.06, 0.09, 0.10, 0.92}
-ns.COL_BORDER = {0.20, 0.38, 0.42, 0.85}
-ns.COL_CAT_BG = {0.10, 0.16, 0.18, 0.80}
-ns.COL_ACCENT = {0.30, 0.75, 0.85}
-ns.COL_GOLD   = {1.00, 0.82, 0.00}
+-- Colors — theme-based. ns.COL_GOLD always stays the same regardless of
+-- theme (gold amounts should stay visually consistent/recognizable).
+ns.COLOR_THEMES = {
+    default = {
+        name     = "Default",
+        labelKey = "theme_default",
+        descKey  = "theme_default_desc",
+        bg     = {0.06, 0.09, 0.10, 0.92},
+        border = {0.20, 0.38, 0.42, 0.85},
+        catBg  = {0.10, 0.16, 0.18, 0.80},
+        accent = {0.30, 0.75, 0.85},
+    },
+    void = {
+        name     = "Void",
+        labelKey = "theme_void",
+        descKey  = "theme_void_desc",
+        bg     = {0.07, 0.05, 0.10, 0.92},
+        border = {0.32, 0.18, 0.42, 0.85},
+        catBg  = {0.12, 0.08, 0.16, 0.80},
+        accent = {0.62, 0.35, 0.90},
+    },
+    silvermoon = {
+        name     = "Silvermoon",
+        labelKey = "theme_silvermoon",
+        descKey  = "theme_silvermoon_desc",
+        bg     = {0.09, 0.06, 0.04, 0.92},
+        border = {0.45, 0.30, 0.10, 0.85},
+        catBg  = {0.16, 0.10, 0.06, 0.80},
+        accent = {1.00, 0.75, 0.25},
+    },
+    fel = {
+        name     = "Fel",
+        labelKey = "theme_fel",
+        descKey  = "theme_fel_desc",
+        bg     = {0.05, 0.08, 0.04, 0.92},
+        border = {0.18, 0.38, 0.14, 0.85},
+        catBg  = {0.08, 0.14, 0.06, 0.80},
+        accent = {0.55, 0.95, 0.20},
+    },
+    frost = {
+        name     = "Frost",
+        labelKey = "theme_frost",
+        descKey  = "theme_frost_desc",
+        bg     = {0.05, 0.07, 0.10, 0.92},
+        border = {0.20, 0.32, 0.48, 0.85},
+        catBg  = {0.08, 0.12, 0.18, 0.80},
+        accent = {0.55, 0.80, 1.00},
+    },
+    bloodmoon = {
+        name     = "Bloodmoon",
+        labelKey = "theme_bloodmoon",
+        descKey  = "theme_bloodmoon_desc",
+        bg     = {0.08, 0.04, 0.05, 0.92},
+        border = {0.42, 0.14, 0.16, 0.85},
+        catBg  = {0.14, 0.06, 0.07, 0.80},
+        accent = {0.95, 0.30, 0.30},
+    },
+}
+-- Display order for the Settings dropdown
+ns.COLOR_THEME_ORDER = {"default", "void", "silvermoon", "fel", "frost", "bloodmoon"}
+ns.COL_GOLD = {1.00, 0.82, 0.00}
+
+-- Applies a theme's colors to ns.COL_BG/BORDER/CAT_BG/ACCENT. Elements
+-- already drawn with the old colors are not retroactively recolored -
+-- a UI reload is required for a theme change to fully apply everywhere.
+function ns.ApplyColorTheme(themeKey)
+    local theme = ns.COLOR_THEMES[themeKey] or ns.COLOR_THEMES.default
+    ns.COL_BG     = theme.bg
+    ns.COL_BORDER = theme.border
+    ns.COL_CAT_BG = theme.catBg
+    ns.COL_ACCENT = theme.accent
+end
+-- Best-effort early apply in case SavedVariables already happen to be
+-- available (e.g. on repeated /reload during dev). On a normal login this
+-- runs before SavedVariables are loaded and falls back to "default"; the
+-- real apply happens in InitDB(), with MainFrame/GoldFrame explicitly
+-- re-skinned afterwards since they're built before that point.
+ns.ApplyColorTheme(NightsFarmtrackerDB and NightsFarmtrackerDB.colorTheme)
 
 ------------------------------------------------------------------------
 -- Debug
@@ -299,6 +371,8 @@ function ns.InitDB()
     if db.goldDisplayMode == nil then db.goldDisplayMode = "classic"  end
     if db.tsmPriceSource  == nil then db.tsmPriceSource  = "DBMarket" end
     if db.tsmCustomSource == nil then db.tsmCustomSource = ""         end
+    if db.colorTheme      == nil then db.colorTheme      = "default"  end
+    ns.ApplyColorTheme(db.colorTheme)
 end
 
 function ns.InitAccountDB()
@@ -380,16 +454,38 @@ function ns.ApplyFrameStyle(frame)
         insets   = {left=0, right=0, top=0, bottom=0},
     })
     frame:SetBackdropColor(unpack(ns.COL_BG))
-    -- Draw 1px square border as four colored textures
-    local r, g, b, a = unpack(ns.COL_BORDER)
+    -- Draw 1px square border as four colored textures. Tracked on the frame
+    -- so ns.RefreshFrameStyle() can recolor them later (needed for frames
+    -- built before SavedVariables/theme are loaded, e.g. MainFrame).
+    frame.nftEdges = frame.nftEdges or {}
     local function Edge(p1, p2, horiz)
         local t = frame:CreateTexture(nil, "BORDER")
-        t:SetColorTexture(r, g, b, a)
+        t:SetColorTexture(unpack(ns.COL_BORDER))
         if horiz then t:SetHeight(1) else t:SetWidth(1) end
         t:SetPoint(p1); t:SetPoint(p2)
+        frame.nftEdges[#frame.nftEdges+1] = t
     end
     Edge("TOPLEFT",    "TOPRIGHT",    true)
     Edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
     Edge("TOPLEFT",    "BOTTOMLEFT",  false)
     Edge("TOPRIGHT",   "BOTTOMRIGHT", false)
+end
+
+-- Re-applies the current theme colors to a frame already styled via
+-- ApplyFrameStyle. Needed for MainFrame specifically: it's built while
+-- UI.lua loads, which happens before SavedVariables/InitDB have set the
+-- saved theme, so its border/background start out on the default colors.
+-- Extra COL_BORDER-colored textures (e.g. header/footer separators) can be
+-- added to frame.nftEdges by the caller so they get refreshed too.
+function ns.RefreshFrameStyle(frame)
+    if not frame or not frame.nftEdges then return end
+    frame:SetBackdropColor(unpack(ns.COL_BG))
+    for _, t in ipairs(frame.nftEdges) do
+        t:SetColorTexture(unpack(ns.COL_BORDER))
+    end
+    if frame.nftAccentTexts then
+        for _, fs in ipairs(frame.nftAccentTexts) do
+            fs:SetTextColor(unpack(ns.COL_ACCENT))
+        end
+    end
 end

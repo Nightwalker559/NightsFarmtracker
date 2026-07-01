@@ -7,7 +7,7 @@ local _, ns = ...
 
 local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
 
-StaticPopupDialogs["NFT_MINIMAP_RELOAD"] = {
+StaticPopupDialogs["NFT_RELOAD"] = {
     text        = ns.L and ns.L["reload_required"] or "Reload required.",
     button1     = OKAY,
     button2     = CANCEL,
@@ -100,6 +100,7 @@ end
 ------------------------------------------------------------------------
 local tsmDropdown
 local tsmCustomEB
+local themeDropdown
 
 local function MakeDropdown(parent, yOff)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
@@ -179,6 +180,95 @@ local function MakeCustomSourceEB(parent, yOff)
 end
 
 ------------------------------------------------------------------------
+-- Helper: dropdown for Color Theme (expandable list, unlike the TSM
+-- cycle-button - there are enough themes that jumping straight to one
+-- beats clicking through them one by one)
+------------------------------------------------------------------------
+local themeMenuList
+local THEME_ROW_H = 20
+
+local function CloseThemeMenu()
+    if themeMenuList then themeMenuList:Hide() end
+end
+
+local function MakeThemeDropdown(parent, yOff)
+    local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    frame:SetSize(S_W - S_PAD*2 - 40, 24)
+    frame:SetPoint("TOPLEFT", S_PAD, yOff)
+    frame:SetBackdrop({bgFile="Interface/Tooltips/UI-Tooltip-Background",
+        edgeFile="Interface/Tooltips/UI-Tooltip-Border",
+        tile=true,tileSize=8,edgeSize=8,insets={left=2,right=2,top=2,bottom=2}})
+    frame:SetBackdropColor(0.05,0.08,0.09,1)
+    frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+
+    frame.lbl = frame:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    frame.lbl:SetPoint("LEFT",6,0)
+    frame.lbl:SetTextColor(0.85,0.85,0.85)
+
+    local arrow = frame:CreateTexture(nil,"ARTWORK")
+    arrow:SetSize(10, 8)
+    arrow:SetPoint("RIGHT", -6, 0)
+    arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+    arrow:SetVertexColor(unpack(ns.COL_ACCENT))
+
+    local list = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    list:SetFrameStrata("TOOLTIP")
+    list:SetBackdrop({bgFile="Interface/Tooltips/UI-Tooltip-Background",
+        edgeFile="Interface/Tooltips/UI-Tooltip-Border",
+        tile=true,tileSize=8,edgeSize=8,insets={left=2,right=2,top=2,bottom=2}})
+    list:SetBackdropColor(0.05,0.08,0.09,1)
+    list:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+    list:Hide()
+    themeMenuList = list
+
+    local function ThemeLabel(theme)
+        local name = ns.L[theme.labelKey] or theme.name
+        local desc = theme.descKey and ns.L[theme.descKey]
+        return desc and (name.." ("..desc..")") or name
+    end
+
+    list.rows = {}
+    for i, key in ipairs(ns.COLOR_THEME_ORDER) do
+        local theme = ns.COLOR_THEMES[key]
+        local row = CreateFrame("Button", nil, list)
+        row:SetHeight(THEME_ROW_H)
+        row:SetPoint("TOPLEFT", 2, -2 - (i-1)*THEME_ROW_H)
+        row:SetPoint("RIGHT", -2, 0)
+        row.txt = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+        row.txt:SetPoint("LEFT", 6, 0)
+        row.txt:SetText(ThemeLabel(theme))
+        row.txt:SetTextColor(0.85,0.85,0.85)
+        row:SetScript("OnEnter", function() row.txt:SetTextColor(1,1,1) end)
+        row:SetScript("OnLeave", function() row.txt:SetTextColor(0.85,0.85,0.85) end)
+        row:SetScript("OnClick", function()
+            NightsFarmtrackerDB.colorTheme = key
+            list:Hide()
+            frame:Refresh()
+            StaticPopup_Show("NFT_RELOAD")
+        end)
+        list.rows[i] = row
+    end
+    list:SetHeight(2 + THEME_ROW_H * #ns.COLOR_THEME_ORDER + 2)
+
+    frame:EnableMouse(true)
+    frame:SetScript("OnMouseUp", function()
+        if list:IsShown() then list:Hide(); return end
+        list:ClearAllPoints()
+        list:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -2)
+        list:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, -2)
+        list:Show()
+    end)
+
+    function frame:Refresh()
+        local key   = NightsFarmtrackerDB.colorTheme or "default"
+        local theme = ns.COLOR_THEMES[key] or ns.COLOR_THEMES.default
+        self.lbl:SetText(ThemeLabel(theme))
+    end
+
+    return frame
+end
+
+------------------------------------------------------------------------
 -- Helper: checkbox
 ------------------------------------------------------------------------
 local function MakeCheckbox(parent, label, yOff, getValue, setValue)
@@ -223,6 +313,8 @@ local settingsContent = {}
 
 function ns.RebuildSettingsContent()
     if not SListFrame then return end
+    CloseThemeMenu()
+    local prevScroll = SScrollFrame:GetVerticalScroll()
     for _, w in ipairs(settingsContent) do w:Hide() end
     settingsContent = {}
 
@@ -359,13 +451,34 @@ function ns.RebuildSettingsContent()
             db.minimapHidden = not v
             db.minimap.hide  = not v
             if v then
-                StaticPopup_Show("NFT_MINIMAP_RELOAD")
+                StaticPopup_Show("NFT_RELOAD")
             else
                 ns.SetMinimapVisible(false)
             end
         end)
     settingsContent[#settingsContent+1] = mmRow
     y = y - 38
+
+    -- ----------------------------------------------------------------
+    -- Section: Appearance
+    -- ----------------------------------------------------------------
+    y = y - 8
+    local themeLbl = SListFrame:CreateFontString(nil,"OVERLAY","GameFontNormal")
+    themeLbl:SetPoint("TOPLEFT", S_PAD, y)
+    themeLbl:SetTextColor(unpack(ns.COL_ACCENT))
+    themeLbl:SetText(ns.L["color_theme"])
+    settingsContent[#settingsContent+1] = themeLbl
+    y = y - 26
+
+    if not themeDropdown then
+        themeDropdown = MakeThemeDropdown(SListFrame, y)
+    else
+        themeDropdown:SetPoint("TOPLEFT", S_PAD, y)
+        themeDropdown:Show()
+    end
+    themeDropdown:Refresh()
+    settingsContent[#settingsContent+1] = themeDropdown
+    y = y - 32
 
     -- ----------------------------------------------------------------
     -- Section: Tracking
@@ -429,10 +542,11 @@ function ns.RebuildSettingsContent()
     -- ----------------------------------------------------------------
     local contentH = math.abs(y) + 8
     SListFrame:SetHeight(contentH)
-    SScrollFrame:SetVerticalScroll(0)
     local visH = math.min(contentH, S_MAX_VIS)
     SScrollFrame:SetHeight(visH)
     SF:SetHeight(S_HDR_H + visH + 10)
+    local maxS = math.max(0, contentH - visH)
+    SScrollFrame:SetVerticalScroll(math.min(prevScroll, maxS))
 
     for _, w in ipairs(settingsContent) do w:Show() end
 end
@@ -472,7 +586,7 @@ local function EnsureSettingsFrame()
     local xTex = xBtn:CreateTexture(nil,"ARTWORK")
     xTex:SetAllPoints(); xTex:SetTexture(ART.."btn_close.png")
     xTex:SetAlpha(0.7)
-    xBtn:SetScript("OnClick", function() SF:Hide() end)
+    xBtn:SetScript("OnClick", function() SF:Hide(); CloseThemeMenu() end)
     xBtn:SetScript("OnEnter",function()xTex:SetAlpha(1)end)
     xBtn:SetScript("OnLeave",function()xTex:SetAlpha(0.7)end)
 
@@ -504,6 +618,7 @@ function ns.ToggleSettings()
     EnsureSettingsFrame()
     if SF:IsShown() then
         SF:Hide()
+        CloseThemeMenu()
     else
         ns.RebuildSettingsContent()
         SF:Show()

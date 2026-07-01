@@ -15,9 +15,10 @@ Night's Farmtracker sits in your HUD while you grind and counts everything you l
 - Session timer with pause/resume
 - Gold per hour / gold per minute rate display
 - Direct gold from mob drops tracked separately
-- Account-wide session history with up to 50 sessions and day-level merging
+- Account-wide session history with up to 50 sessions, day-level merging, and past months collapsed into a monthly group (current month stays expanded)
 - Shift+Right-click to exclude items or categories from tracking
 - Minimap button, draggable and repositionable
+- Selectable color themes (Default, Void, Silvermoon, Fel, Frost, Bloodmoon)
 - English and German localization
 
 ---
