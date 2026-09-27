@@ -2,10 +2,10 @@
 ## Title: Night's Farmtracker
 ## Notes: Tracks items gathered while farming
 ## Author: Nightwalker559
-## Version: 1.6.7
+## Version: 1.6.8
 ## SavedVariables: NightsFarmtrackerAccountDB
 ## SavedVariablesPerCharacter: NightsFarmtrackerDB
-## IconTexture: Interface\AddOns\NightsFarmtracker\Media\Icon.png
+## IconTexture: Interface\AddOns\NightsFarmtracker\Media\Icon
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua

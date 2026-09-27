@@ -475,6 +475,13 @@ end
 
 function ns.StartTimer()
     if timerTicker then return end
+    -- Stamp the real-world start of this session the first time it actually
+    -- starts running, so SaveCurrentSession can file it under the calendar
+    -- day it was farmed on instead of the day it happens to be reset on
+    -- (e.g. farming past midnight, then resetting after sleeping).
+    if not NightsFarmtrackerDB.sessionStartTime then
+        NightsFarmtrackerDB.sessionStartTime = time()
+    end
     lastTick    = GetTime()
     timerTicker = C_Timer.NewTicker(1, OnTick)
 end

@@ -274,9 +274,13 @@ function ns.SaveCurrentSession()
     -- Sessions are stored one array per calendar day
     -- (sessions["YYYY-MM-DD"] = { session1, session2, ... }, newest first
     -- within the day) so the raw SavedVariables file reads day-by-day
-    -- instead of one long undated array. mergeDaily folds into today's
-    -- existing entry if there is one; otherwise a new one is added.
-    local todayKey = date("%Y-%m-%d")
+    -- instead of one long undated array. Keyed by when the session actually
+    -- started (db.sessionStartTime, stamped in ns.StartTimer), not by
+    -- "today" - otherwise a session farmed before midnight lands under the
+    -- day it happens to be reset on instead of the day it ran. mergeDaily
+    -- folds into that day's existing entry if there is one; otherwise a new
+    -- one is added.
+    local todayKey = date("%Y-%m-%d", db.sessionStartTime or newEntry.timestamp)
     local todayList = sessions[todayKey]
     if db.mergeDaily ~= false and todayList and todayList[1] then
         MergeSessionInto(todayList[1], newEntry, true)
