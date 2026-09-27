@@ -1,17 +1,15 @@
 # Changelog
 
-## [1.6.8] - 2026-09-27
-
-### Fixed
-
-- Session History: a session farmed before midnight and reset after was filed under the reset day instead of the day it was actually farmed - sessions are now dated by when tracking started, not when Reset was clicked
-- `.toc` IconTexture pointed at a non-existent `Icon.png` (only `Icon.tga` is shipped) - addon list icon now loads correctly
-
 ## [1.6.7] - 2026-09-25
 
 ### New
 
 - Oribos Exchange support as a third AH price source (Settings -> AH Price Source), alongside Auctionator and TSM - no desktop app required; Auto mode now tries Auctionator, then Oribos Exchange, then TSM; falls back to the region price when the realm has no recent data
+
+### Fixed
+
+- Session History: a session farmed before midnight and reset after was filed under the reset day instead of the day it was actually farmed - sessions are now dated by when tracking started, not when Reset was clicked
+- `.toc` IconTexture pointed at a non-existent `Icon.png` (only `Icon.tga` is shipped) - addon list icon now loads correctly
 
 ## [1.6.6] - 2026-09-24
 
