@@ -198,7 +198,8 @@ end
 
 ------------------------------------------------------------------------
 -- Anchoring — below MainFrame when collapsed (or below the Gold Overview
--- window if that's also open there, to avoid overlapping it), otherwise
+-- window / Instance Lockout frame if those are also open there, to avoid
+-- overlapping them), otherwise
 -- part of the Log/Filter/Blacklist right-side chain (see
 -- ns.RefreshWindowChain in Core.lua), which also re-flows Filter/
 -- Blacklist if they're open.
@@ -206,7 +207,9 @@ end
 local function ReanchorLogFrame()
     if NightsFarmtrackerDB.expanded == false then
         LogFrame:ClearAllPoints()
-        if ns.GoldFrame and ns.GoldFrame:IsShown() then
+        if ns.LockoutFrame and ns.LockoutFrame:IsShown() then
+            LogFrame:SetPoint("TOPLEFT", ns.LockoutFrame, "BOTTOMLEFT", 0, -4)
+        elseif ns.GoldFrame and ns.GoldFrame:IsShown() then
             LogFrame:SetPoint("TOPLEFT", ns.GoldFrame, "BOTTOMLEFT", 0, -4)
         else
             LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "BOTTOMLEFT", 0, -4)

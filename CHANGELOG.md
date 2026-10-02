@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.8] - 2026-10-02
+
+### New
+
+- Instance lockout counter (Settings -> Display, off by default): small frame below the main window showing resets in the last hour as x/9, the time until the oldest one expires, and a button that resets instances. Tooltip lists each reset with its expiry time. Resets are tracked account-wide
+- Gear AH Threshold: config icon next to the threshold field (Settings -> AH Price Source) lets you choose which Equipment categories (Equipment, BoE, BoA, Cosmetic) the threshold applies to. Unchecked categories use the higher of AH and vendor price. All categories stay enabled by default, so existing behavior is unchanged
+
+### Changed
+
+- Items of obsolete classes (WoW Token, obsolete Money/Permanent) are no longer tracked
+- Loot parsing is safe against Midnight "secret values": CHAT_MSG_LOOT, CHAT_MSG_MONEY and ENCOUNTER_LOOT_RECEIVED skip secret payloads instead of erroring
+- Looted gold is parsed with the client's own coin strings (works in every language, not just EN/DE); own loot is additionally recognized by sender GUID
+
 ## [1.6.7] - 2026-09-25
 
 ### New

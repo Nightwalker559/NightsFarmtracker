@@ -21,7 +21,6 @@ local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
 local HDR_PAD    = 6
 local BTN_BAR_H  = 26
 local HDR_TOTAL  = ns.WINDOW_HDR_H  -- same header height as every other window
-ns.HDR_TOTAL = HDR_TOTAL
 local SCROLL_TOP = HDR_TOTAL + 1
 local COLLAPSED_H = HDR_TOTAL + 1 + FOOTER_H
 
@@ -708,7 +707,7 @@ ns.RefreshHUD = function()
         local threshold = db.gearAHThreshold or 0
         if threshold > 0 then
             for _, data in pairs(db.count) do
-                if data.variants and ns.IsGear(data) and not ns.IsVendorOnly(data) then
+                if data.variants and ns.IsGearThresholdApplicable(data) and not ns.IsVendorOnly(data) then
                     data.thresholdNotifiedCounts = data.thresholdNotifiedCounts or {}
                     for gKey, gv in pairs(ns.GroupGearVariantsForDisplay(data.variants)) do
                         local prevCount = data.thresholdNotifiedCounts[gKey] or 0

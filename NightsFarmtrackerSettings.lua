@@ -319,6 +319,75 @@ local function MakeCustomSourceEB(parent, yOff)
 end
 
 ------------------------------------------------------------------------
+-- Gear AH threshold config popup: one checkbox per Equipment group
+-- (ns.GEAR_THRESHOLD_GROUPS); checked = the threshold applies to it.
+-- Lazily built, anchored under the config icon, child of the settings
+-- window so it closes with it.
+------------------------------------------------------------------------
+local TC_ROW_H = 20
+
+function ns.ToggleGearThresholdConfig(anchor)
+    local pop = ns.GearThresholdConfigFrame
+    if pop and pop:IsShown() then pop:Hide(); return end
+
+    if not pop then
+        pop = CreateFrame("Frame", nil, ns.SettingsFrame, "BackdropTemplate")
+        pop:SetFrameStrata("TOOLTIP")
+        pop:EnableMouse(true)
+        ns.ApplyFrameStyle(pop)
+        ns.GearThresholdConfigFrame = pop
+
+        local title = pop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        title:SetPoint("TOPLEFT", 10, -8)
+        title:SetTextColor(unpack(ns.COL_ACCENT))
+        title:SetText(ns.L["gear_ah_threshold_config_title"])
+
+        pop.rows = {}
+        local width = title:GetStringWidth() + 20
+        for i, g in ipairs(ns.GEAR_THRESHOLD_GROUPS) do
+            local row = CreateFrame("Frame", nil, pop)
+            row:SetHeight(TC_ROW_H)
+            row:SetPoint("TOPLEFT", 10, -(26 + (i - 1) * TC_ROW_H))
+            row:SetPoint("TOPRIGHT", -10, -(26 + (i - 1) * TC_ROW_H))
+
+            local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
+            box:SetSize(14, 14); box:SetPoint("LEFT", 0, 0)
+            ns.StyleBackdropBox(box)
+            local check = box:CreateTexture(nil, "ARTWORK")
+            check:SetSize(7, 7); check:SetPoint("CENTER")
+            check:SetColorTexture(unpack(ns.COL_ACCENT))
+
+            local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            lbl:SetPoint("LEFT", box, "RIGHT", 8, 0)
+            lbl:SetText(ns.L[g.locKey])
+            width = math.max(width, lbl:GetStringWidth() + 14 + 8 + 20)
+
+            local function Refresh()
+                if ns.IsGearThresholdGroupEnabled(g.key) then
+                    check:Show(); lbl:SetTextColor(1, 0.82, 0)
+                else
+                    check:Hide(); lbl:SetTextColor(0.85, 0.85, 0.85)
+                end
+            end
+            row.Refresh = Refresh
+            row:EnableMouse(true)
+            row:SetScript("OnMouseUp", function()
+                ns.SetGearThresholdGroupEnabled(g.key, not ns.IsGearThresholdGroupEnabled(g.key))
+                Refresh()
+                ns.RefreshHUD()
+            end)
+            pop.rows[i] = row
+        end
+        pop:SetSize(width, 26 + #ns.GEAR_THRESHOLD_GROUPS * TC_ROW_H + 8)
+    end
+
+    for _, row in ipairs(pop.rows) do row.Refresh() end
+    pop:ClearAllPoints()
+    pop:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
+    pop:Show()
+end
+
+------------------------------------------------------------------------
 -- Helper: EditBox for gear AH threshold (gold, numeric only)
 ------------------------------------------------------------------------
 local function MakeGearThresholdEB(parent, yOff)
@@ -356,12 +425,36 @@ local function MakeGearThresholdEB(parent, yOff)
     goldLbl:SetTextColor(0.6,0.6,0.6)
     frame.goldLbl = goldLbl
 
-    -- goldLbl isn't a child of frame (it needs to sit outside frame's
-    -- bordered box), so it won't auto-hide/show with frame - keep it in
-    -- sync explicitly since this widget is reused across settings rebuilds.
+    -- Config icon: opens a small popup to pick which Equipment categories
+    -- the threshold applies to (see ns.GEAR_THRESHOLD_GROUPS).
+    local cfgBtn = CreateFrame("Button", nil, parent)
+    cfgBtn:SetSize(16, 16)
+    cfgBtn:SetPoint("LEFT", goldLbl, "RIGHT", 8, 0)
+    local cfgTex = cfgBtn:CreateTexture(nil, "ARTWORK")
+    cfgTex:SetAllPoints()
+    cfgTex:SetTexture(ns.ART.."btn_settings.png")
+    cfgTex:SetAlpha(0.75)
+    cfgBtn:SetScript("OnEnter", function(self)
+        cfgTex:SetAlpha(1)
+        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
+        GameTooltip:AddLine(ns.L["gear_ah_threshold_config_title"], 1, 1, 1)
+        GameTooltip:AddLine(ns.L["gear_ah_threshold_config_tip"], 0.5, 0.5, 0.5, true)
+        GameTooltip:Show()
+    end)
+    cfgBtn:SetScript("OnLeave", function() cfgTex:SetAlpha(0.75); GameTooltip:Hide() end)
+    cfgBtn:SetScript("OnClick", function(self) ns.ToggleGearThresholdConfig(self) end)
+    frame.cfgBtn = cfgBtn
+
+    -- goldLbl/cfgBtn aren't children of frame (they need to sit outside
+    -- frame's bordered box), so they won't auto-hide/show with frame - keep
+    -- them in sync explicitly since this widget is reused across settings
+    -- rebuilds.
     local baseShow, baseHide = frame.Show, frame.Hide
-    frame.Show = function(self) baseShow(self); goldLbl:Show() end
-    frame.Hide = function(self) baseHide(self); goldLbl:Hide() end
+    frame.Show = function(self) baseShow(self); goldLbl:Show(); cfgBtn:Show() end
+    frame.Hide = function(self)
+        baseHide(self); goldLbl:Hide(); cfgBtn:Hide()
+        if ns.GearThresholdConfigFrame then ns.GearThresholdConfigFrame:Hide() end
+    end
 
     frame.eb = eb
     return frame
@@ -1032,7 +1125,7 @@ function ns.RebuildSettingsContent()
         threshHint:SetPoint("TOPLEFT", S_PAD, y)
         threshHint:SetTextColor(0.5,0.5,0.5)
         threshHint:SetText(ns.L["gear_ah_threshold_hint"])
-        y = y - 28
+        y = y - math.max(28, math.ceil(threshHint:GetStringHeight()) + 6)
 
         if not gearThresholdEB then
             gearThresholdEB = MakeGearThresholdEB(SListFrame, y)
@@ -1319,6 +1412,12 @@ function ns.RebuildSettingsContent()
                 db.mergeJunkEntries = v
                 StaticPopup_Show("NFT_RELOAD")
             end)
+        y = y - 38
+
+        local lockoutRow = track(AcquireCheckbox(SListFrame), "checkbox")
+        ConfigureCheckbox(lockoutRow, ns.L["lockout_enabled"], y,
+            function() return db.instanceLockoutEnabled == true end,
+            function(v) ns.SetInstanceLockoutEnabled(v) end)
         y = y - 38
 
         return y

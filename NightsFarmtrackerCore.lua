@@ -519,7 +519,6 @@ local function MigrateItemKeys(items)
     for k in pairs(items) do items[k] = nil end
     for k, v in pairs(migrated) do items[k] = v end
 end
-ns.MigrateItemKeys = MigrateItemKeys
 
 ------------------------------------------------------------------------
 -- One-time, per-character migration: gear looted THIS session before the
@@ -619,9 +618,9 @@ ns.PROFILE_KEYS = {
     goldRateMode=true, sessionLength=true, sessionHistoryEnabled=true, logWindowEnabled=true,
     vendorFilterEnabled=true, blacklistEnabled=true, mergeDaily=true,
     splitTradeGoods=true, splitGearByBinding=true, ahSource=true,
-    gearAHThreshold=true, goldDisplayMode=true, tsmPriceSource=true,
+    gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
     tsmCustomSource=true, colorTheme=true, venomTrackerEnabled=true,
-    baitFrameEnabled=true, mergeJunkEntries=true,
+    baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
 }
 
 ns.DEFAULT_PROFILE = "Default"
@@ -639,6 +638,7 @@ local function NewProfileDefaults()
         splitGearByBinding    = false,
         ahSource              = "auto",
         gearAHThreshold       = 0,
+        gearThresholdOff      = {},
         goldDisplayMode       = "classic",
         tsmPriceSource        = "DBMarket",
         tsmCustomSource       = "",
@@ -646,6 +646,7 @@ local function NewProfileDefaults()
         venomTrackerEnabled   = false,
         baitFrameEnabled      = false,
         mergeJunkEntries      = false,
+        instanceLockoutEnabled = false,
     }
 end
 
@@ -696,6 +697,11 @@ function ns.CopyProfile(name, sourceName)
     local src = profiles[sourceName] or ActiveProfileTable()
     local copy = {}
     for k, v in pairs(src) do copy[k] = v end
+    -- gearThresholdOff is a table - copy it so the two profiles don't share it
+    if type(src.gearThresholdOff) == "table" then
+        copy.gearThresholdOff = {}
+        for k, v in pairs(src.gearThresholdOff) do copy.gearThresholdOff[k] = v end
+    end
     profiles[name] = copy
     return true
 end

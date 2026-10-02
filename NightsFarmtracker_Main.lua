@@ -33,6 +33,23 @@ local priceRetryCount   = 0
 -- start with their character name and are filtered out this way.
 local SELF_LOOT_PREFIX    = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(%S+%s)") or nil
 
+-- Midnight (12.x) can hand addons "secret values" (e.g. chat/event payloads
+-- while restricted): any string operation on one throws. Event handlers
+-- below bail out on them instead of erroring. No-op on clients without it.
+local issecretvalue = issecretvalue or function() return false end
+
+-- Coin patterns from WoW's own global strings ("%d Gold" etc.), so the
+-- CHAT_MSG_MONEY parse works in every client language instead of only
+-- matching hardcoded EN/DE words.
+local function AmountPattern(fmt)
+    if not fmt then return nil end
+    local pattern = fmt:gsub("([%^%$%(%)%.%[%]%*%+%-%?])", "%%%1"):gsub("%%d", "(%%d+)")
+    return pattern
+end
+local GOLD_PATTERN   = AmountPattern(GOLD_AMOUNT)
+local SILVER_PATTERN = AmountPattern(SILVER_AMOUNT)
+local COPPER_PATTERN = AmountPattern(COPPER_AMOUNT)
+
 -- Cache reagent quality API at load time; nil if unavailable
 local GetReagentQualityInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityInfo or nil
 
@@ -118,7 +135,9 @@ local function ProcessLoot(items)
 
             ns.RecordItemDBEntry(itemID, name, link, quality, classID, subClassID, catData)
 
-            if ns.IsBlacklisted(itemID) then
+            if ns.IsIgnoredItemClass(classID) then
+                -- obsolete/irrelevant item class (WoW Token, obsolete money/permanent) - never tracked
+            elseif ns.IsBlacklisted(itemID) then
                 -- itemID explicitly blacklisted — never tracked, wins over everything else
             elseif ns.IsBlacklistCategory({ classID = classID, subClassID = subClassID, quality = quality, itemSubType = itemSubType }) then
                 -- category blacklisted
@@ -640,10 +659,11 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "CHAT_MSG_MONEY" and not NightsFarmtrackerDB.paused then
         local msg = ...
+        if not msg or issecretvalue(msg) then return end
         local copper = 0
-        local g = msg:match("(%d+)%s*[Gg]old")
-        local s = msg:match("(%d+)%s*[Ss]il")                                    -- Silber / Silver
-        local c = msg:match("(%d+)%s*[Kk]upfer") or msg:match("(%d+)%s*[Cc]opper") -- Kupfer / Copper
+        local g = GOLD_PATTERN   and msg:match(GOLD_PATTERN)
+        local s = SILVER_PATTERN and msg:match(SILVER_PATTERN)
+        local c = COPPER_PATTERN and msg:match(COPPER_PATTERN)
         if g then copper = copper + tonumber(g) * 10000 end
         if s then copper = copper + tonumber(s) * 100   end
         if c then copper = copper + tonumber(c)         end
@@ -653,13 +673,16 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "CHAT_MSG_LOOT" and not NightsFarmtrackerDB.paused then
-        local msg, _, _, _, sender = ...
+        local msg, _, _, _, sender, _, _, _, _, _, _, guid = ...
+        if not msg or issecretvalue(msg) then return end
 
-        -- isMe: prefix check ("Ihr "/"You ") OR sender = own player name
+        -- isMe: sender GUID = own GUID (language-independent) OR prefix check
+        -- ("Ihr "/"You ") OR sender = own player name
+        local guidMatch   = guid and not issecretvalue(guid) and guid == UnitGUID("player")
         local prefixMatch = SELF_LOOT_PREFIX and msg:find(SELF_LOOT_PREFIX, 1, true)
-        local senderShort = sender and sender:match("^([^%-]+)") or ""
+        local senderShort = (sender and not issecretvalue(sender)) and sender:match("^([^%-]+)") or ""
         local senderMatch = senderShort ~= "" and senderShort == UnitName("player")
-        if not prefixMatch and not senderMatch then return end
+        if not guidMatch and not prefixMatch and not senderMatch then return end
 
         local color, linkData, itemName =
             msg:match("|cff(%x%x%x%x%x%x)|H(item:[^|]+)|h%[([^%]]+)%]|h")
@@ -708,6 +731,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         -- Fires for encounter loot (boss drops etc.), locale-independent
         -- Args: encounterID, encounterName, difficultyID, groupSize, itemLink, quantity, playerName
         local _, _, _, _, link, qty, playerName = ...
+        if issecretvalue(link) or issecretvalue(qty) or issecretvalue(playerName) then return end
         if not link or link == "" then return end
         if playerName ~= UnitName("player") then return end
 

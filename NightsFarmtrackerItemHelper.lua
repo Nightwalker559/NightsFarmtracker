@@ -7,6 +7,23 @@
 local _, ns = ...
 
 ------------------------------------------------------------------------
+-- Ignored item classes - never tracked: obsolete leftovers from old
+-- expansions (Money / Permanent) and the WoW Token. Enum names with
+-- numeric fallbacks (10 / 14 / 18) in case an Enum entry is ever removed.
+------------------------------------------------------------------------
+local IGNORED_ITEM_CLASSES = {}
+do
+    local E = Enum and Enum.ItemClass or {}
+    IGNORED_ITEM_CLASSES[E.CurrencyTokenObsolete or 10] = true
+    IGNORED_ITEM_CLASSES[E.PermanentObsolete     or 14] = true
+    IGNORED_ITEM_CLASSES[E.WoWToken              or 18] = true
+end
+
+function ns.IsIgnoredItemClass(classID)
+    return classID ~= nil and IGNORED_ITEM_CLASSES[classID] == true
+end
+
+------------------------------------------------------------------------
 -- Category names
 ------------------------------------------------------------------------
 function ns.CategoryName(data)
@@ -91,20 +108,60 @@ function ns.IsGear(data)
         or data.classID == 2 or data.classID == 4
 end
 
+-- Equipment groups the Gear AH Threshold can be switched on/off for
+-- individually (config icon next to the threshold field in Settings).
+-- Keyed by stable ids - independent of the localized category names and of
+-- the "splitGearByBinding" setting. Soulbound gear isn't listed: it is
+-- always vendor-only anyway (see IsVendorOnly). Stored inverted
+-- (db.gearThresholdOff[key] = true) so every group applies by default,
+-- which keeps the pre-existing behavior for old saves/profiles.
+ns.GEAR_THRESHOLD_GROUPS = {
+    { key = "gear",     locKey = "cat_gear"          },
+    { key = "boe",      locKey = "cat_gear_boe"      },
+    { key = "boa",      locKey = "cat_gear_boa"      },
+    { key = "cosmetic", locKey = "cat_gear_cosmetic" },
+}
+
+function ns.GearThresholdGroup(data)
+    if data.isCosmetic then return "cosmetic" end
+    if data.isBoA or data.isWarbound then return "boa" end
+    if data.isBoE then return "boe" end
+    return "gear"
+end
+
+function ns.IsGearThresholdGroupEnabled(key)
+    local off = NightsFarmtrackerDB.gearThresholdOff
+    return not (off and off[key])
+end
+
+function ns.SetGearThresholdGroupEnabled(key, enabled)
+    local off = NightsFarmtrackerDB.gearThresholdOff
+    if not off then
+        off = {}
+        NightsFarmtrackerDB.gearThresholdOff = off
+    end
+    off[key] = (not enabled) or nil
+end
+
+-- True if this item is Equipment AND its group is switched on for the
+-- Gear AH Threshold.
+function ns.IsGearThresholdApplicable(data)
+    return ns.IsGear(data) and ns.IsGearThresholdGroupEnabled(ns.GearThresholdGroup(data))
+end
+
 -- True if the Gear AH Threshold setting forces vendor-only pricing for
 -- this item: Equipment whose AH price is below the configured gold
 -- threshold (or has no AH price at all) always displays vendor price.
+-- Groups switched off in the threshold config are skipped entirely.
 -- Shared by ItemValue() and the HUD row display so both stay in sync -
 -- a display-side re-derivation of this rule previously caused item rows
 -- to disagree with the category header (which goes through ItemValue).
 function ns.IsGearThresholdVendorOnly(data, ahTotal)
     local threshold = NightsFarmtrackerDB.gearAHThreshold or 0
-    if threshold <= 0 or not ns.IsGear(data) then return false end
+    if threshold <= 0 or not ns.IsGearThresholdApplicable(data) then return false end
     return not (ahTotal and ahTotal >= threshold)
 end
 
--- vendor/ah are optional precomputed values (avoids recalculating
--- VendorTotal/AHTotal when the caller already has them, e.g. RefreshHUD).
 -- True if an item must always be valued at vendor price, never AH
 -- (BoP, force-vendor filtered item/category - which includes Junk by
 -- default - or explicitly AH-ineligible).
@@ -141,6 +198,8 @@ function ns.GearVariantItemValue(data)
     return any and total or nil
 end
 
+-- vendor/ah are optional precomputed values (avoids recalculating
+-- VendorTotal/AHTotal when the caller already has them, e.g. RefreshHUD).
 function ns.ItemValue(data, vendor, ah)
     if data.itemID and ns.IsForceVendor(data.itemID) then return vendor or ns.VendorTotal(data) end
     if ns.IsForceVendorCategory(data) then return vendor or ns.VendorTotal(data) end
