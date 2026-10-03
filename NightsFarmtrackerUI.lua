@@ -605,14 +605,12 @@ local function PlaceRow(row, yOff, name, icon, nameColor, quality)
     itemRows[name] = row
 end
 
+-- Same rule as ns.ItemValue: vendor price when forced (filters, BoP, no AH
+-- source, Gear AH Threshold), otherwise the higher of AH and vendor price -
+-- so a row always shows the value that goes into its category total.
 local function ShowGold(row, ah, vendor, forceVendor)
-    if not forceVendor and ah and ah > 0 then
-        row.goldText:SetText(ns.FormatGold(ah))
-    elseif vendor and vendor > 0 then
-        row.goldText:SetText(ns.FormatGold(vendor))
-    else
-        row.goldText:SetText("")
-    end
+    local shown = forceVendor and (vendor or 0) or math.max(ah or 0, vendor or 0)
+    row.goldText:SetText(shown > 0 and ns.FormatGold(shown) or "")
 end
 
 ------------------------------------------------------------------------
@@ -784,7 +782,7 @@ ns.RefreshHUD = function()
                                 if ap then tAH = ap * tc end
                             end
                             if gv.sellPrice and gv.sellPrice > 0 then tV = gv.sellPrice * tc end
-                            local tGold = fv and (tV or 0) or (tAH or tV or 0)
+                            local tGold = fv and (tV or 0) or math.max(tAH or 0, tV or 0)
                             if tGold > 0 then
                                 local rankIcon = qAtlas[tier]
                                               and CreateAtlasMarkup(qAtlas[tier],ns.RANK_ICON_W,ns.RANK_ICON_H)
@@ -817,7 +815,7 @@ ns.RefreshHUD = function()
                             -- Gear AH Threshold must not force AH pricing onto a
                             -- cheaper sibling variant that's still below it.
                             local vfv   = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, tAH)
-                            local tGold = vfv and (tV or 0) or (tAH or tV or 0)
+                            local tGold = vfv and (tV or 0) or math.max(tAH or 0, tV or 0)
 
                             if tGold > 0 then
                                 flat[#flat+1] = {
@@ -828,7 +826,7 @@ ns.RefreshHUD = function()
                         end
                     end
                 else
-                    local gold = fv and (item.vendor or 0) or (item.ah or item.vendor or 0)
+                    local gold = fv and (item.vendor or 0) or math.max(item.ah or 0, item.vendor or 0)
                     flat[#flat+1] = {
                         isRank=false, name=item.name, d=d,
                         item=item, gold=gold, fv=fv,
@@ -871,15 +869,7 @@ ns.RefreshHUD = function()
                     row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, fi.tid)))
                     row.rankBadge:SetText(fi.rankIcon or "")
                     row.countText:SetText(tostring(fi.tc))
-                    if fi.fv then
-                        row.goldText:SetText(fi.tV and ns.FormatGold(fi.tV) or "")
-                    elseif fi.tAH and fi.tAH > 0 then
-                        row.goldText:SetText(ns.FormatGold(fi.tAH))
-                    elseif fi.tV and fi.tV > 0 then
-                        row.goldText:SetText(ns.FormatGold(fi.tV))
-                    else
-                        row.goldText:SetText("")
-                    end
+                    ShowGold(row, fi.tAH, fi.tV, fi.fv)
                     itemOrder[#itemOrder+1] = key; itemRows[key] = row
                 elseif fi.isGearVariant then
                     local gv  = fi.gv
@@ -888,15 +878,7 @@ ns.RefreshHUD = function()
                     row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, gv.itemLink or d.itemID)))
                     row.rankBadge:SetText("")
                     row.countText:SetText(tostring(gv.amount))
-                    if fi.fv then
-                        row.goldText:SetText(fi.tV and ns.FormatGold(fi.tV) or "")
-                    elseif fi.tAH and fi.tAH > 0 then
-                        row.goldText:SetText(ns.FormatGold(fi.tAH))
-                    elseif fi.tV and fi.tV > 0 then
-                        row.goldText:SetText(ns.FormatGold(fi.tV))
-                    else
-                        row.goldText:SetText("")
-                    end
+                    ShowGold(row, fi.tAH, fi.tV, fi.fv)
                     itemOrder[#itemOrder+1] = key; itemRows[key] = row
                 else
                     local it = fi.item
@@ -910,8 +892,7 @@ ns.RefreshHUD = function()
                     row.nameText:SetText(d.isJunkMerged and ns.TruncateName(fi.name) or ns.TruncateName(ns.DisplayName(fi.name, d.itemID)))
                     row.rankBadge:SetText(ns.RankIconFromLink(d.itemLink) or "")
                     row.countText:SetText(tostring(d.amount))
-                    if fi.fv then ShowGold(row,nil,it.vendor,true)
-                    else ShowGold(row,it.ah,it.vendor,false) end
+                    ShowGold(row, it.ah, it.vendor, fi.fv)
                     itemOrder[#itemOrder+1] = fi.item.itemID; itemRows[fi.item.itemID] = row
                 end
                 yOffset = yOffset + ROW_H

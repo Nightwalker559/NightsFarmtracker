@@ -7,6 +7,7 @@
 - Session History: the Vendor-Only filters (item, category, AH Price by Expansion) are now frozen into a session when it is saved. Previously History re-applied the filters as they were at viewing time, so items that were forced to vendor price while farming showed their AH price after the session was reset (sessions saved before this fix still follow the live filters)
 - Blacklist: category blacklisting at loot time ignored the item's binding/cosmetic status, so with "Equipment" blacklisted cosmetic gear was never tracked, and "Equipment (BoE)" etc. were only caught later by the HUD refresh
 - Vendor-Only Filter: turning the filter off in Settings now also switches off the AH Price by Expansion filter (it kept forcing vendor prices while its window was hidden)
+- Main window: item rows now show the same value that goes into the category total (vendor price when forced by filters / Gear AH Threshold / no AH source, otherwise the higher of AH and vendor price) - rows used to show the AH price even when the vendor price was higher
 - Vendor-Only Filter / Blacklist: categories that are switched on stay listed even when nothing of them is tracked (e.g. after a Reset) - they used to disappear from the list while still active
 
 ### Changed
