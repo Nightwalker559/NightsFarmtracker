@@ -252,6 +252,29 @@ end
 -- Filter and Blacklist windows show it as an always-available toggle.
 -- Shared by both windows' category checkbox sections.
 ------------------------------------------------------------------------
+-- Every category name ns.CategoryName can produce in the CURRENT client
+-- language. Used to ignore stale saved filter keys from another language
+-- (e.g. "Junk" next to "Müll" after switching the client from EN to DE).
+local function BuildKnownCategoryNames()
+    local known = {}
+    local L = ns.L or {}
+    for _, key in ipairs({ "cat_junk", "cat_gear", "cat_gear_boa", "cat_gear_soul",
+                           "cat_gear_boe", "cat_gear_cosmetic", "cat_mounts", "cat_pets" }) do
+        if L[key] then known[L[key]] = true end
+    end
+    for classID = 0, 20 do
+        local n = C_Item.GetItemClassInfo(classID)
+        if n and n ~= "" then known[n] = true end
+    end
+    for _, classID in ipairs({ 5, 7 }) do   -- reagents / trade goods (splitTradeGoods)
+        for subID = 0, 30 do
+            local n = C_Item.GetItemSubClassInfo(classID, subID)
+            if n and n ~= "" then known[n] = true end
+        end
+    end
+    return known
+end
+
 function ns.GetTrackedCategoryNames(activeCategories)
     local junkName = ns.L and ns.L["cat_junk"] or "Junk"
     local seen, names = { [junkName] = true }, { junkName }
@@ -259,8 +282,9 @@ function ns.GetTrackedCategoryNames(activeCategories)
     -- when nothing of them is tracked right now (e.g. after a Reset) -
     -- otherwise an active filter would be invisible and impossible to undo.
     if activeCategories then
+        local known = BuildKnownCategoryNames()
         for name, enabled in pairs(activeCategories) do
-            if enabled == true and not seen[name] then
+            if enabled == true and not seen[name] and known[name] then
                 seen[name] = true
                 names[#names + 1] = name
             end
