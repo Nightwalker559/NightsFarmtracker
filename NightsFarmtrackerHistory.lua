@@ -137,12 +137,19 @@ local function MergeSessionInto(target, src, keepTimestamp)
                 isCosmetic=d.isCosmetic, name=d.name,
                 classID=d.classID, subClassID=d.subClassID, itemID=d.itemID, itemLink=d.itemLink,
                 variants=CopyVariants(d.variants, d.itemID, false),
-                filterFrozen=d.filterFrozen,
+                filterFrozen=d.filterFrozen, histValue=d.histValue,
             }
         else
             -- Only stays frozen if BOTH sides were frozen at save time; a
             -- legacy (unfrozen) side falls back to the live vendor filters.
             ei.filterFrozen = ei.filterFrozen and d.filterFrozen or nil
+            -- Frozen per-session values just add up, so a merge of one
+            -- AH-priced and one vendor-priced session stays exact.
+            if ei.histValue ~= nil and d.histValue ~= nil then
+                ei.histValue = ei.histValue + d.histValue
+            else
+                ei.histValue = nil
+            end
             local priorAmount      = ei.amount or 0
             local priorAhTotal     = ei.ahTotal or 0
 
@@ -272,6 +279,15 @@ function ns.SaveCurrentSession()
             ah = ns.AHTotal(data)
         end
         local val    = ns.ItemValue(data, vendor, ah) or 0
+        -- Item value as History shows it (same rule as BuildSessionCategories:
+        -- vendor-only items vendor, else max(AH, vendor); no Gear AH
+        -- Threshold) frozen per item, so merging sessions priced differently
+        -- (e.g. filters changed in between) adds up instead of re-pricing
+        -- the combined amount at one price.
+        local histAH = (not (forceVendor or data.isBoP or data.canAH == false))
+            and ns.HasAnyAH() and db.ahSource ~= "none" and (ah or 0) > 0 and ah or nil
+        local histVendor = (vendor or 0) > 0 and vendor or nil
+        local histValue  = (histAH and histVendor) and math.max(histAH, histVendor) or histAH or histVendor or 0
         newEntry.totalGold   = newEntry.totalGold   + val
         newEntry.totalVendor = newEntry.totalVendor + (vendor or 0)
         newEntry.totalAH     = newEntry.totalAH     + (ah or 0)
@@ -283,7 +299,7 @@ function ns.SaveCurrentSession()
             isVendorTrash=data.isVendorTrash, isBoE=data.isBoE, isBoP=data.isBoP,
             isBoA=data.isBoA, canAH=data.canAH, isCosmetic=data.isCosmetic, name=data.name,
             classID=data.classID, subClassID=data.subClassID, itemID=data.itemID, itemLink=data.itemLink,
-            variants=variantsCopy, filterFrozen=true,
+            variants=variantsCopy, filterFrozen=true, histValue=histValue,
         }
     end
     -- Sessions are stored one array per calendar day
@@ -853,6 +869,7 @@ local function BuildSessionCategories(session)
         local itemAH     = (not isVendorOnly) and hasAH and (ahTotal or 0) > 0 and ahTotal or nil
         local itemVendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
         local itemGold   = (itemAH and itemVendor) and math.max(itemAH, itemVendor) or itemAH or itemVendor or 0
+        if d.filterFrozen and d.histValue ~= nil then itemGold = d.histValue end
         cats[cat].gold = cats[cat].gold + itemGold
 
         if isTier and qConsistent then
