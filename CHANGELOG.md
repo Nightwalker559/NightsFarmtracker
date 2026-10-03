@@ -1,6 +1,12 @@
 # Changelog
 
-## [1.6.8] - 2026-10-02
+## 1.6.9
+
+### Changed
+
+- Item icons are larger (22 -> 30 px) with a 2 px gap between icons (row height 34 px); applies to the main window, Session History, Filter, Blacklist and Log lists
+
+## 1.6.8
 
 ### New
 
@@ -13,7 +19,7 @@
 - Loot parsing is safe against Midnight "secret values": CHAT_MSG_LOOT, CHAT_MSG_MONEY and ENCOUNTER_LOOT_RECEIVED skip secret payloads instead of erroring
 - Looted gold is parsed with the client's own coin strings (works in every language, not just EN/DE); own loot is additionally recognized by sender GUID
 
-## [1.6.7] - 2026-09-25
+## 1.6.7
 
 ### New
 
@@ -24,7 +30,7 @@
 - Session History: a session farmed before midnight and reset after was filed under the reset day instead of the day it was actually farmed - sessions are now dated by when tracking started, not when Reset was clicked
 - `.toc` IconTexture pointed at a non-existent `Icon.png` (only `Icon.tga` is shipped) - addon list icon now loads correctly
 
-## [1.6.6] - 2026-09-24
+## 1.6.6
 
 ### New
 
@@ -34,7 +40,7 @@
 
 - Gold/hour is back to the plain session average (totalGold/totalTime) - reverts the EMA smoothing from 1.6.5
 
-## [1.6.5] - 2026-09-23
+## 1.6.5
 
 ### Changed
 
@@ -45,14 +51,14 @@
 
 - Gear AH Threshold sound only ever fired once per item group per session - looting a 2nd/3rd copy of an already-notified valuable item stayed silent; now re-checks and alerts again on each new copy whose own AH price reaches the threshold
 
-## [1.6.4] - 2026-09-23
+## 1.6.4
 
 ### Fixed
 
 - Combat lockdown: opening/closing/toggling any window (Main, Gold, Log, Filter, Blacklist, Settings, History/Detail, Venom Tracker, Export) via its X button, minimap icon, or `/nft` could throw ADDON_ACTION_BLOCKED - all Show()/Hide() calls now deferred to right after combat via a shared `ns.DeferInCombat` helper
 - Venom Tracker overlay: scan now bails out cleanly in combat instead of risking a blocked Show/Hide, and re-syncs automatically once combat ends
 
-## [1.6.3] - 2026-09-22
+## 1.6.3
 
 ### Changed
 
@@ -64,7 +70,7 @@
 - Gear AH Threshold sound could stay silent for Adventurer's/scaling gear: it checked each raw bonus-ID roll on its own instead of the combined value shown in the item's row, so a second pickup that looked identical but landed in its own bucket never individually reached the threshold even though the displayed total did
 - Settings sidebar: alphabetical sort could place Profiles above other sections (e.g. Session History) depending on locale; Profiles now always sorts last
 
-## [1.6.2] - 2026-09-20
+## 1.6.2
 
 ### New
 
@@ -82,7 +88,7 @@
 
 - Gold Overview frame's title and row text now use the addon's standard font sizes instead of unscaled Blizzard defaults, matching the main window's text
 
-## [1.6.1] - 2026-09-19
+## 1.6.1
 
 ### Changed
 
@@ -99,14 +105,14 @@
 - Gear items no longer store a redundant, easily stale duplicate of their item link outside their variant data
 - One-time login repair applies all of the above fixes to saved session history and the live session
 
-## [1.6.0] - 2026-09-18
+## 1.6.0
 
 ### Fixed
 
 - Bind-on-Use items always showed vendor price, ignoring Filter/category settings - now priced via AH again like BoE
 - One-time repair on login fixes already-affected items in the live session and all saved session history
 
-## [1.5.9] - 2026-09-18
+## 1.5.9
 
 ### Fixed
 
@@ -115,7 +121,7 @@
 - Same-day session merging and the old item-key migration could sum an already-corrupted tier breakdown into the target instead of ignoring it, compounding the corruption further with every merge
 - One-time cleanup on login for already-saved sessions and the current running session: clears corrupted reagent-tier breakdowns and gearVariants/vendorTotal mismatches left over from before the above fixes existed
 
-## [1.5.8] - 2026-09-18
+## 1.5.8
 
 ### New
 
@@ -145,7 +151,7 @@
 - Main frame header reduced to the same 34px (was 40px) — icon toolbar still fits
 - Settings header separator was still hardcoded at a fixed offset and sat 3px higher than the other windows'; now tied to the shared header height like everywhere else
 
-## [1.5.7] - 2026-09-17
+## 1.5.7
 
 ### Changed
 
@@ -155,7 +161,7 @@
 
 - Hiding the Fishing Lure Bar (closing the main window, disabling it in Settings, or toggling it) could throw "ADDON_ACTION_BLOCKED" while in combat, since it parents a secure lure-apply button; hide is now deferred to combat end instead of failing
 
-## [1.5.6] - 2026-09-15
+## 1.5.6
 
 ### New
 
@@ -172,13 +178,13 @@
 - `ns.SmartAnchor` (edge-aware tooltip anchoring used by History, Log, Filter and Blacklist row tooltips) was called throughout the addon but never defined, causing an error on hover; now implemented
 - Closing the main window left the Fishing Lure Bar open (Loot Log, Filter, Blacklist, History, Settings and Venom Tracker already closed with it)
 
-## [1.5.5] - 2026-09-13
+## 1.5.5
 
 ### Fixed
 
 - Two drops of the same scaling/Adventurer's gear piece with identical displayed item level and quality could still show as separate, unsummed rows instead of one combined row (their underlying bonus-ID rolls differed even though nothing visible did); gear-variant rows are now grouped by displayed item level + quality instead of the raw bonus-ID key
 
-## [1.5.4] - 2026-09-08
+## 1.5.4
 
 ### Changed
 
@@ -190,7 +196,7 @@
 - Gear AH Threshold decision for scaling/Adventurer's gear variants was based on the combined AH value of all variants of an item instead of each variant's own AH value, so a cheap variant could wrongly show its (below-threshold) AH price while an expensive sibling variant stayed on vendor price
 - Settings sidebar: category labels (e.g. "Categories & Grouping") could render unwrapped on the very first open instead of wrapping onto multiple lines
 
-## [1.5.3] - 2026-09-07
+## 1.5.3
 
 ### New
 
@@ -204,7 +210,7 @@
 - Main frame could get stuck on vendor price (and skip the threshold sound) when the AH price wasn't cached yet at loot time; now self-corrects via delayed refresh
 - Threshold sound now fires even while its Equipment category is collapsed
 
-## [1.5.2] - 2026-09-07
+## 1.5.2
 
 ### Changed
 
@@ -219,20 +225,20 @@
 - Bag-scan price correction and the login bag-repair migration updated to match the new key
 - Session History detail view collapsed scaling-gear variants and reagent quality tiers back into one row for vendor-only items (e.g. BoP), instead of splitting per item level/tier like the main HUD already did; total gold was correct either way, only the row breakdown was missing
 
-## [1.5.1] - 2026-09-07
+## 1.5.1
 
 ### New
 
 - Settings: "Merge Junk into one entry" - collapses the whole Junk category into a single "Trash" row (main frame + Session History detail), display-only so existing sessions apply retroactively and the setting is reversible at any time
 
-## [1.5.0] - 2026-09-06
+## 1.5.0
 
 ### Fixed
 
 - Gear dropping under the same item ID at different item levels/qualities (e.g. Adventurer's/scaling gear) was merged into one tracked entry, mixing amounts and prices between variants; now split into separate rows per item level, on the main frame and in Session History detail, same as the existing reagent quality-tier split
 - One-time bag rescan on login repairs gear already merged this way, both in the live session and the most recently closed one (items no longer in bags keep their total amount under a single fallback entry)
 
-## [1.4.9] - 2026-09-05
+## 1.4.9
 
 ### New
 
@@ -245,7 +251,7 @@
 - Removed unused `trackedNames` setting and dead `ns.RefreshAllWindowChains` code; translated remaining German code comments to English
 - Deduplicated Vendor-Only Filter/Blacklist UI code into shared helpers (no behavior change)
 
-## [1.4.8] - 2026-09-04
+## 1.4.8
 
 ### New
 
@@ -264,13 +270,13 @@
 - Item names (main frame, Session History, Loot Log, Vendor-Only Filter, Blacklist) now resolve fresh from the item ID/link at display time instead of the language they were first looted in - old entries self-heal the same way
 - Fishing Lure Bar (and Venom Tracker) could lose their anchor to the main frame after certain reload timings, rendering detached; both now get a valid anchor immediately on creation instead of only on their first show
 
-## [1.4.7] - 2026-09-04
+## 1.4.7
 
 ### Fixed
 
 - Item names with multi-byte UTF-8 characters (e.g. German umlauts) no longer render broken glyphs when truncated for column display
 
-## [1.4.6] - 2026-08-31
+## 1.4.6
 
 ### New
 
@@ -282,13 +288,13 @@
 
 - Category/section headers (Filter, Blacklist, Session History, Session Details, main HUD) now render with a proper top and bottom border flush against the background, removing black gaps that appeared between headers and separator lines
 
-## [1.4.5] - 2026-08-30
+## 1.4.5
 
 ### Fixed
 
 - Gear AH Threshold now also applies to cosmetic Equipment (transmog-only items), which was previously skipped since it had no bind flags set yet
 
-## [1.4.4] - 2026-08-30
+## 1.4.4
 
 ### New
 
@@ -299,7 +305,7 @@
 
 - Deduplicated the repeated tooltip-style backdrop styling (9 occurrences across Settings/Blacklist/Filter) into one shared `ns.StyleBackdropBox()` helper
 
-## [1.4.3] - 2026-08-29
+## 1.4.3
 
 ### New
 
@@ -310,7 +316,7 @@
 - Venom Tracker: fixed stale Venom/Toxin value shown right after a catch (tooltip data lagged behind the actual stat); rescan is now retried shortly after trigger events
 - Venom Tracker: locale keyword mismatch now shows "n/a" instead of a misleading "0", with a one-time chat warning pointing to `/nft venomdump`
 
-## [1.4.2] - 2026-08-28
+## 1.4.2
 
 ### New
 
@@ -325,7 +331,7 @@
 
 - Venom Tracker: removed a redundant, frequently-firing event that caused unnecessary scans
 
-## [1.4.1] - 2026-08-25
+## 1.4.1
 
 ### New
 
@@ -335,13 +341,13 @@
 
 - Closing the main window now also closes Loot Log, Filter, Settings, Blacklist, Session History, and the Venom Tracker overlay instead of leaving them floating; Venom Tracker reappears automatically when the main window is reopened
 
-## [1.4.0] - 2026-08-25
+## 1.4.0
 
 ### New
 
 - Optional Coiled Huntress Venom Tracker overlay (Settings → Extras, off by default): shows Venom/Toxin stacks and Coiled Filament currency while the item is equipped; docked above the main frame by default, movable and independently repositionable (right-click resets position)
 
-## [1.3.0] - 2026-08-24
+## 1.3.0
 
 ### New
 
@@ -365,7 +371,7 @@
 
 - Dead legacy code (`CAT_VENDOR`/`CAT_MATS` aliases)
 
-## [1.2.1] - 2026-08-22
+## 1.2.1
 
 ### Fixed
 
@@ -376,7 +382,7 @@
 
 - AH/vendor pricing logic (Auctionator, TSM, vendor sell price) moved out of Core into its own `NightsFarmtrackerPriceHelper.lua` file
 
-## [1.2.0] - 2026-08-17
+## 1.2.0
 
 ### New
 
@@ -398,7 +404,7 @@
 - Settings window now docks to the left of MainFrame (same side as Session History) instead of opening centered on screen, with the same non-overlapping chain behavior as the other docked windows
 - Window docking unified into one system (`ns.WINDOW_CHAINS` + `ns.RefreshWindowChain`) instead of separate near-duplicate left/right implementations — Log/Filter/Blacklist and History/Settings both register into it the same way, making it straightforward to add another docked window later
 
-## [1.1.5] - 2026-08-09
+## 1.1.5
 
 ### New
 
@@ -420,7 +426,7 @@
 
 - Warbound-until-equipped gear was priced using the AH price instead of vendor price — `GetItemInfo` reports the same bindType as regular Bind-on-Equip for these items, so it's no longer sufficient on its own; now double-checked via `C_Item.IsBoundToAccountUntilEquip`
 
-## [1.1.4] - 2026-08-08
+## 1.1.4
 
 ### New
 
@@ -437,11 +443,11 @@
 - Help tooltip built once instead of on every hover
 - Settings widgets pooled/reused instead of recreated
 
-## [1.1.3] - 2026-08-12
+## 1.1.3
 
 - Interface version bumped to 120100 (WoW 12.1)
 
-## [1.1.2] - 2026-07-01
+## 1.1.2
 
 ### New
 
@@ -455,65 +461,65 @@
 - Color Theme not applied after reload
 - Settings scroll reset on every change
 
-## [1.1.1] - 2026-06-23
+## 1.1.1
 
 - "Merge" button for multi-session days
 - Quest items no longer tracked
 - Cleanup: duplicated logic consolidated into shared helpers
 
-## [1.1.0] - 2026-06-23
+## 1.1.0
 
 - New Loot Log window (per-character, persists across reload)
 - Reagent rank indicator moved to icon badge
 - Fixed: main frame anchor drift on collapse/expand and after entering world
 
-## [1.0.9] - 2026-06-22
+## 1.0.9
 
 - Pets/Mounts get own categories
 - Shift+Click Reset skips saving to history
 - Gold display: Classic vs Modern toggle
 - Fixed: off-by-one bug in item info lookup
 
-## [1.0.8] - 2026-06-19
+## 1.0.8
 
 - New Vendor-Only Filter window
 - Various fixes: filter button position, session history AH exclusion, junk cache-miss tracking, TSM field bug, redundant gold calc
 
-## [1.0.7] - 2026-06-18
+## 1.0.7
 
 - Fixed: junk items no longer use AH price
 
-## [1.0.6] - 2026-06-18
+## 1.0.6
 
 - Fixed: category totals undercounting mixed AH/vendor items
 
-## [1.0.5] - 2026-06-17
+## 1.0.5
 
 - Minimap button migrated to LibDBIcon-1.0
 
-## [1.0.4] - 2026-06-16
+## 1.0.4
 
 - Session merging automatic via Settings only
 - Icon buttons standardized, new PNG artwork
 
-## [1.0.3] - 2026-06-16
+## 1.0.3
 
 - Option to disable automatic same-day merging
 - Per-category price mode removed (global Settings control)
 
-## [1.0.2] - 2026-06-16
+## 1.0.2
 
 - Close button on main frame
 - Timer turns green while tracking
 - Option to split trade goods/reagents by subtype
 - Various fixes: copper tracking, day-merge data loss, tooltip Unicode
 
-## [1.0.1] - 2026-06-16
+## 1.0.1
 
 - Session history can be disabled, Settings frame scrolls
 - Gold overview panel, pet loot, encounter loot tracked
 - Various tracking/pricing fixes (see git history for details)
 
-## [1.0.0] - 2026-06-15
+## 1.0.0
 
 Initial release: loot tracking, vendor/AH pricing, reagent quality tiers, session timer, session history, minimap button, EN/DE localization.
