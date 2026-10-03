@@ -2,6 +2,10 @@
 
 ## 1.6.9
 
+### Fixed
+
+- Session History: the Vendor-Only filters (item, category, AH Price by Expansion) are now frozen into a session when it is saved. Previously History re-applied the filters as they were at viewing time, so items that were forced to vendor price while farming showed their AH price after the session was reset (sessions saved before this fix still follow the live filters)
+
 ### Changed
 
 - Item icons are larger (22 -> 30 px) with a 2 px gap between icons (row height 34 px); applies to the main window, Session History, Filter, Blacklist and Log lists

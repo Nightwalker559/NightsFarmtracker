@@ -137,8 +137,12 @@ local function MergeSessionInto(target, src, keepTimestamp)
                 isCosmetic=d.isCosmetic, name=d.name,
                 classID=d.classID, subClassID=d.subClassID, itemID=d.itemID, itemLink=d.itemLink,
                 variants=CopyVariants(d.variants, d.itemID, false),
+                filterFrozen=d.filterFrozen,
             }
         else
+            -- Only stays frozen if BOTH sides were frozen at save time; a
+            -- legacy (unfrozen) side falls back to the live vendor filters.
+            ei.filterFrozen = ei.filterFrozen and d.filterFrozen or nil
             local priorAmount      = ei.amount or 0
             local priorAhTotal     = ei.ahTotal or 0
 
@@ -246,8 +250,19 @@ function ns.SaveCurrentSession()
         -- calls) and silently desync the item's header total from its own
         -- variant rows.
         local variantsCopy = CopyVariants(data.variants, data.itemID, true)
+        -- Vendor-Only filters (item / category / AH-by-expansion) are frozen
+        -- into the entry here: a forced-vendor item is saved without any AH
+        -- value, so changing the filters later can't retroactively re-price
+        -- this session in History (see BuildSessionCategories).
+        local forceVendor = ns.IsForceVendor(data.itemID) or ns.IsForceVendorCategory(data)
+            or ns.IsForceVendorExpansion(data)
+        if forceVendor and variantsCopy then
+            for _, gv in pairs(variantsCopy) do gv.ahTotal = 0 end
+        end
         local ah
-        if variantsCopy then
+        if forceVendor then
+            ah = nil
+        elseif variantsCopy then
             local sum, any = 0, false
             for _, gv in pairs(variantsCopy) do
                 if (gv.ahTotal or 0) > 0 then sum = sum + gv.ahTotal; any = true end
@@ -268,7 +283,7 @@ function ns.SaveCurrentSession()
             isVendorTrash=data.isVendorTrash, isBoE=data.isBoE, isBoP=data.isBoP,
             isBoA=data.isBoA, canAH=data.canAH, isCosmetic=data.isCosmetic, name=data.name,
             classID=data.classID, subClassID=data.subClassID, itemID=data.itemID, itemLink=data.itemLink,
-            variants=variantsCopy,
+            variants=variantsCopy, filterFrozen=true,
         }
     end
     -- Sessions are stored one array per calendar day
@@ -797,7 +812,16 @@ local function BuildSessionCategories(session)
             cats[cat]={gold=0,items={},classID=d.classID}
             catOrder[#catOrder+1]=cat
         end
-        local isVendorOnly = ns.IsVendorOnly(d)
+        -- Entries saved with filterFrozen already had the Vendor-Only
+        -- filters applied at save time (forced-vendor items carry no AH
+        -- value), so only the item's own flags count here. Older entries
+        -- still follow the live filters.
+        local isVendorOnly
+        if d.filterFrozen then
+            isVendorOnly = d.isBoP or d.canAH == false
+        else
+            isVendorOnly = ns.IsVendorOnly(d)
+        end
         local qAtlas = session.qAtlas or NightsFarmtrackerDB.qAtlas or {}
 
         -- A reagent-tier breakdown (item is not Equipment - see ns.IsGear)
@@ -815,7 +839,7 @@ local function BuildSessionCategories(session)
         local isTier      = d.variants and not ns.IsGear(d)
         local qConsistent = isTier and VariantsSum(d.variants) == d.amount
         local ahTotal = d.ahTotal
-        if isTier and not qConsistent then
+        if isTier and not qConsistent and not (d.filterFrozen and (d.ahTotal or 0) == 0) then
             local p = ns.GetAHPriceForID(d.itemID, d.itemLink)
             ahTotal = p and (p * d.amount) or nil
         end
