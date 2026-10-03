@@ -2,6 +2,10 @@
 
 ## 1.6.9
 
+### New
+
+- Session History details: hovering an item's gold amount shows how many of its items were valued at AH price and how many at vendor price (with the gold for each). Applies to sessions saved from this version on
+
 ### Fixed
 
 - Session History: the Vendor-Only filters (item, category, AH Price by Expansion) are now frozen into a session when it is saved. Previously History re-applied the filters as they were at viewing time, so items that were forced to vendor price while farming showed their AH price after the session was reset (sessions saved before this fix still follow the live filters)

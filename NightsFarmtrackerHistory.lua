@@ -98,9 +98,15 @@ local function CopyVariants(variants, itemID, snapshotAH)
                 if ap then ahTotal = ap * gv.amount end
             end
         end
+        -- Units of this variant that carry an AH value (the rest are
+        -- vendor-priced) - frozen like ahTotal, for the History tooltip.
+        local ahAmount = gv.ahAmount
+        if ahAmount == nil and snapshotAH then
+            ahAmount = (ahTotal > 0) and gv.amount or 0
+        end
         copy[key] = { amount = gv.amount, quality = gv.quality, itemLevel = gv.itemLevel,
                       itemLink = gv.itemLink, sellPrice = gv.sellPrice, ahTotal = ahTotal,
-                      priceItemID = gv.priceItemID }
+                      priceItemID = gv.priceItemID, ahAmount = ahAmount }
     end
     return copy
 end
@@ -138,6 +144,7 @@ local function MergeSessionInto(target, src, keepTimestamp)
                 classID=d.classID, subClassID=d.subClassID, itemID=d.itemID, itemLink=d.itemLink,
                 variants=CopyVariants(d.variants, d.itemID, false),
                 filterFrozen=d.filterFrozen, histValue=d.histValue,
+                ahAmount=d.ahAmount, ahValue=d.ahValue,
             }
         else
             -- Only stays frozen if BOTH sides were frozen at save time; a
@@ -149,6 +156,12 @@ local function MergeSessionInto(target, src, keepTimestamp)
                 ei.histValue = ei.histValue + d.histValue
             else
                 ei.histValue = nil
+            end
+            if ei.ahAmount ~= nil and d.ahAmount ~= nil then
+                ei.ahAmount = ei.ahAmount + d.ahAmount
+                ei.ahValue  = (ei.ahValue or 0) + (d.ahValue or 0)
+            else
+                ei.ahAmount, ei.ahValue = nil, nil
             end
             local priorAmount      = ei.amount or 0
             local priorAhTotal     = ei.ahTotal or 0
@@ -196,8 +209,14 @@ local function MergeSessionInto(target, src, keepTimestamp)
                         if not egv then
                             ei.variants[key] = { amount = gv.amount, quality = gv.quality,
                                 itemLevel = gv.itemLevel, itemLink = gv.itemLink, sellPrice = gv.sellPrice,
-                                ahTotal = gv.ahTotal or 0, priceItemID = gv.priceItemID }
+                                ahTotal = gv.ahTotal or 0, priceItemID = gv.priceItemID,
+                                ahAmount = gv.ahAmount }
                         else
+                            if egv.ahAmount ~= nil and gv.ahAmount ~= nil then
+                                egv.ahAmount = egv.ahAmount + gv.ahAmount
+                            else
+                                egv.ahAmount = nil
+                            end
                             egv.amount      = (egv.amount or 0) + (gv.amount or 0)
                             egv.itemLink    = gv.itemLink or egv.itemLink
                             egv.quality     = gv.quality  or egv.quality
@@ -264,7 +283,7 @@ function ns.SaveCurrentSession()
         local forceVendor = ns.IsForceVendor(data.itemID) or ns.IsForceVendorCategory(data)
             or ns.IsForceVendorExpansion(data)
         if forceVendor and variantsCopy then
-            for _, gv in pairs(variantsCopy) do gv.ahTotal = 0 end
+            for _, gv in pairs(variantsCopy) do gv.ahTotal = 0; gv.ahAmount = 0 end
         end
         local ah
         if forceVendor then
@@ -288,6 +307,11 @@ function ns.SaveCurrentSession()
             and ns.HasAnyAH() and db.ahSource ~= "none" and (ah or 0) > 0 and ah or nil
         local histVendor = (vendor or 0) > 0 and vendor or nil
         local histValue  = (histAH and histVendor) and math.max(histAH, histVendor) or histAH or histVendor or 0
+        -- Which part of histValue came from the AH price (the whole item
+        -- when AH wins, nothing otherwise) - shown in the Detail tooltip.
+        local histAHWins = histAH ~= nil and (histVendor == nil or histAH >= histVendor)
+        local ahAmount   = histAHWins and (data.amount or 0) or 0
+        local ahValue    = histAHWins and histAH or 0
         newEntry.totalGold   = newEntry.totalGold   + val
         newEntry.totalVendor = newEntry.totalVendor + (vendor or 0)
         newEntry.totalAH     = newEntry.totalAH     + (ah or 0)
@@ -300,6 +324,7 @@ function ns.SaveCurrentSession()
             isBoA=data.isBoA, canAH=data.canAH, isCosmetic=data.isCosmetic, name=data.name,
             classID=data.classID, subClassID=data.subClassID, itemID=data.itemID, itemLink=data.itemLink,
             variants=variantsCopy, filterFrozen=true, histValue=histValue,
+            ahAmount=ahAmount, ahValue=ahValue,
         }
     end
     -- Sessions are stored one array per calendar day
@@ -696,11 +721,36 @@ local function AcquireDetRow()
         end
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Hover area over the gold amount: shows how many of the items were
+    -- valued at AH price and how many at vendor price (see BuildSessionCategories).
+    r.goldHit = CreateFrame("Frame", nil, r)
+    r.goldHit:SetPoint("TOPLEFT",     r.goldText, "TOPLEFT",     -4,  2)
+    r.goldHit:SetPoint("BOTTOMRIGHT", r.goldText, "BOTTOMRIGHT",  4, -2)
+    r.goldHit:EnableMouse(true)
+    r.goldHit:Hide()
+    r.goldHit:SetScript("OnEnter", function(self)
+        local b = r.breakdown
+        if not b then return end
+        GameTooltip:SetOwner(self, ns.SmartAnchor(r, "LEFT"))
+        GameTooltip:AddLine(r.itemName or "", 1, 1, 1)
+        if b.ahN > 0 then
+            GameTooltip:AddDoubleLine(string.format(ns.L["tip_priced_ah"], b.ahN),
+                ns.FormatGold(b.ahV), 0.75,0.75,0.75, 1,1,1)
+        end
+        if b.vN > 0 then
+            GameTooltip:AddDoubleLine(string.format(ns.L["tip_priced_vendor"], b.vN),
+                ns.FormatGold(b.vV), 0.75,0.75,0.75, 1,1,1)
+        end
+        GameTooltip:Show()
+    end)
+    r.goldHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return r
 end
 
 local function ReleaseDetRow(r)
     r:Hide(); r:ClearAllPoints(); r.itemID=nil; r.itemLink=nil; r.classID=nil; r.itemName=nil; r.iconBorder:Hide()
+    r.breakdown=nil; r.goldHit:Hide()
     r.icon:ClearAllPoints(); r.icon:SetPoint("LEFT", 4, 0)
     r.goldText:SetTextColor(unpack(ns.COL_GOLD))
     r.rankBadge:SetText("")
@@ -903,11 +953,21 @@ local function BuildSessionCategories(session)
                     end
                     if gv.sellPrice and gv.sellPrice > 0 then tV = gv.sellPrice * tc end
                     local tGold = (tAH and tAH > 0) and tAH or tV or 0
+                    local breakdown
+                    if gv.ahAmount ~= nil then
+                        -- Amount split is known: AH-priced units at their frozen AH
+                        -- total, the rest at vendor price (mixed sessions).
+                        local vN = math.max(0, tc - gv.ahAmount)
+                        local vV = (gv.sellPrice or 0) * vN
+                        tGold = (tAH or 0) + vV
+                        breakdown = { ahN = gv.ahAmount, ahV = tAH or 0, vN = vN, vV = vV }
+                    end
                     if tGold > 0 then
                         local rankIcon = qAtlas[tier] and CreateAtlasMarkup(qAtlas[tier],ns.RANK_ICON_W,ns.RANK_ICON_H) or ("|cffaaaaaa R"..tier.."|r")
                         cats[cat].items[#cats[cat].items+1] = {
                             name=d.name, d=d, gold=tGold, isRank=true,
                             tier=tier, tc=tc, tid=tid, tAH=tAH, tV=tV, rankIcon=rankIcon,
+                            breakdown=breakdown,
                         }
                     end
                 end
@@ -939,17 +999,30 @@ local function BuildSessionCategories(session)
                     local sp = ns.VariantSellPrice(gv, d)
                     if sp and sp > 0 then tV = sp * gv.amount end
                     local tGold = (tAH and tAH > 0) and tAH or tV or 0
+                    local breakdown
+                    if gv.ahAmount ~= nil then
+                        local vN = math.max(0, gv.amount - gv.ahAmount)
+                        local vV = ((sp and sp > 0) and sp or 0) * vN
+                        tGold = (tAH or 0) + vV
+                        breakdown = { ahN = gv.ahAmount, ahV = tAH or 0, vN = vN, vV = vV }
+                    end
                     if tGold > 0 then
                         cats[cat].items[#cats[cat].items+1] = {
                             name=d.name, d=d, gold=tGold, isGearVariant=true,
-                            ilvl=ilvl, gv=gv, tAH=tAH, tV=tV,
+                            ilvl=ilvl, gv=gv, tAH=tAH, tV=tV, breakdown=breakdown,
                         }
                     end
                 end
             end
         else
             if itemGold > 0 then
-                cats[cat].items[#cats[cat].items+1] = {name=d.name, d=d, gold=itemGold, isRank=false, rankIcon=ns.RankIconFromLink(d.itemLink)}
+                local breakdown
+                if d.filterFrozen and d.ahAmount ~= nil and d.histValue ~= nil then
+                    breakdown = { ahN = d.ahAmount, ahV = d.ahValue or 0,
+                                  vN = math.max(0, (d.amount or 0) - d.ahAmount),
+                                  vV = math.max(0, itemGold - (d.ahValue or 0)) }
+                end
+                cats[cat].items[#cats[cat].items+1] = {name=d.name, d=d, gold=itemGold, isRank=false, rankIcon=ns.RankIconFromLink(d.itemLink), breakdown=breakdown}
             end
         end
     end
@@ -1522,7 +1595,9 @@ local function RebuildDetailContent(session)
                 ir.nameText:SetText(ns.TruncateName(ns.DisplayName(entry.name, entry.tid)))
                 ir.rankBadge:SetText(entry.rankIcon or "")
                 ir.countText:SetText(tostring(entry.tc))
-                if entry.tAH and entry.tAH > 0 then
+                if entry.breakdown then
+                    ir.goldText:SetText(entry.gold > 0 and ns.FormatGold(entry.gold) or "")
+                elseif entry.tAH and entry.tAH > 0 then
                     ir.goldText:SetText(ns.FormatGold(entry.tAH))
                 elseif entry.tV and entry.tV > 0 then
                     ir.goldText:SetText(ns.FormatGold(entry.tV))
@@ -1539,7 +1614,9 @@ local function RebuildDetailContent(session)
                 ir.nameText:SetText(ns.TruncateName(ns.DisplayName(entry.name, gv.itemLink or entry.d.itemID)))
                 ir.rankBadge:SetText("")
                 ir.countText:SetText(tostring(gv.amount))
-                if entry.tAH and entry.tAH > 0 then
+                if entry.breakdown then
+                    ir.goldText:SetText(entry.gold > 0 and ns.FormatGold(entry.gold) or "")
+                elseif entry.tAH and entry.tAH > 0 then
                     ir.goldText:SetText(ns.FormatGold(entry.tAH))
                 elseif entry.tV and entry.tV > 0 then
                     ir.goldText:SetText(ns.FormatGold(entry.tV))
@@ -1568,6 +1645,10 @@ local function RebuildDetailContent(session)
                     ir.goldText:SetText("")
                 end
             end
+            -- AH/vendor split for the gold-hover tooltip (only known for
+            -- sessions saved with the frozen split; older ones have none).
+            ir.breakdown = entry.breakdown
+            ir.goldHit:SetShown(entry.breakdown ~= nil)
             activeDetRows[#activeDetRows+1]=ir; yOff = yOff + DET_ROW_H
         end
         yOff = yOff + 2

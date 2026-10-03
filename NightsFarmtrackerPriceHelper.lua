@@ -226,12 +226,14 @@ function ns.GroupGearVariantsForDisplay(gearVariants)
                 groups[gKey] = {
                     amount = gv.amount, quality = gv.quality, itemLevel = itemLevel,
                     itemLink = gv.itemLink, sellPrice = gv.sellPrice, ahTotal = gv.ahTotal,
+                    ahAmount = gv.ahAmount,
                 }
             else
                 g.amount    = g.amount + gv.amount
                 g.itemLink  = g.itemLink  or gv.itemLink
                 g.sellPrice = g.sellPrice or gv.sellPrice
                 if gv.ahTotal then g.ahTotal = (g.ahTotal or 0) + gv.ahTotal end
+                g.ahAmount = (g.ahAmount ~= nil and gv.ahAmount ~= nil) and (g.ahAmount + gv.ahAmount) or nil
             end
         end
     end
