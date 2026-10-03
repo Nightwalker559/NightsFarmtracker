@@ -15,8 +15,12 @@
 - Main window: item rows now show the same value that goes into the category total (vendor price when forced by filters / Gear AH Threshold / no AH source, otherwise the higher of AH and vendor price) - rows used to show the AH price even when the vendor price was higher
 - Vendor-Only Filter / Blacklist: categories that are switched on stay listed even when nothing of them is tracked (e.g. after a Reset) - they used to disappear from the list while still active
 
+- `/nft filter` no longer opens the Vendor-Only Filter window while that filter is switched off in Settings
+
 ### Changed
 
+- Settings: the Instance Lockout checkbox moved to the Display section (where the 1.6.8 notes already placed it)
+- Internal cleanup: removed dead code (`ns.IsTierVariants`, `ns.InitSettings`), merged duplicated helpers (icon buttons, drop-list windows, dropdowns, edit boxes, loot de-duplication, UTF-8 helpers), trimmed stale comments
 - Item icons are larger (22 -> 30 px) with a 2 px gap between icons (row height 34 px); applies to the main window, Session History, Filter, Blacklist and Log lists
 
 ## 1.6.8

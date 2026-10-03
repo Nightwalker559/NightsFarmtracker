@@ -16,7 +16,8 @@ local CONTENT_W   = ns.CONTENT_W
 local MAX_ROWS    = ns.MAX_ROWS
 local SCROLL_STEP = ns.SCROLL_STEP
 
-local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
+local ART     = ns.ART
+local MakeBtn = ns.MakeBtn
 
 local HDR_PAD    = 6
 local BTN_BAR_H  = 26
@@ -34,39 +35,13 @@ local cachedGold = 0
 local totalH     = 0
 
 ------------------------------------------------------------------------
--- Custom TGA button
-------------------------------------------------------------------------
-local function MakeBtn(parent, size, artFile)
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(size, size)
-    btn.tex = btn:CreateTexture(nil, "ARTWORK")
-    btn.tex:SetAllPoints()
-    btn.tex:SetTexture(ART .. artFile)
-    btn.tex:SetAlpha(0.75)
-    btn:SetScript("OnMouseDown", function(self)
-        self.tex:ClearAllPoints()
-        self.tex:SetSize(size-3, size-3)
-        self.tex:SetPoint("CENTER", 1, -1)
-    end)
-    btn:SetScript("OnMouseUp", function(self)
-        self.tex:ClearAllPoints(); self.tex:SetAllPoints()
-    end)
-    btn:SetScript("OnEnter", function(self) self.tex:SetAlpha(1.0) end)
-    btn:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75) end)
-    return btn
-end
-
-------------------------------------------------------------------------
 -- Main frame
 ------------------------------------------------------------------------
 local MainFrame = CreateFrame("Frame","NightsFarmtrackerMain",UIParent,"BackdropTemplate")
 MainFrame:SetSize(FRAME_W, COLLAPSED_H)
 MainFrame:SetPoint("TOP", UIParent, "TOP", 0, -150)
 MainFrame:Hide()
--- Explicit (was relying on the "MEDIUM" default before): every other
--- window (History/Settings/Filter/Blacklist/Log via ns.CreateWindowFrame,
--- Detail, Gold Overview, Venom Tracker, Fishing Lure Bar) now matches
--- this same strata - see their own SetFrameStrata("MEDIUM") calls.
+-- Same strata as every other window of the addon.
 MainFrame:SetFrameStrata("MEDIUM")
 MainFrame:SetMovable(true); MainFrame:EnableMouse(true); MainFrame:SetClampedToScreen(true)
 ns.ApplyFrameStyle(MainFrame)
@@ -287,16 +262,16 @@ end
 
 -- Closing the main window closes every popout that docks off it, so the
 -- user doesn't end up with orphaned windows floating on screen.
+local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "BlacklistFrame",
+                         "HistFrame", "DetailFrame", "VenomFrame" }
+
 MainFrame:HookScript("OnHide", function()
     GoldFrame:Hide()
-    if ns.LogFrame      and ns.LogFrame:IsShown()      then ns.LogFrame:Hide()      end
-    if ns.FilterFrame   and ns.FilterFrame:IsShown()   then ns.FilterFrame:Hide()   end
-    if ns.SettingsFrame and ns.SettingsFrame:IsShown() then ns.SettingsFrame:Hide() end
-    if ns.BlacklistFrame and ns.BlacklistFrame:IsShown() then ns.BlacklistFrame:Hide() end
-    if ns.HistFrame      and ns.HistFrame:IsShown()      then ns.HistFrame:Hide()      end
-    if ns.DetailFrame    and ns.DetailFrame:IsShown()    then ns.DetailFrame:Hide()    end
-    if ns.VenomFrame     and ns.VenomFrame:IsShown()     then ns.VenomFrame:Hide()     end
-    if ns.BaitFrame      and ns.BaitFrame:IsShown()      then ns.SafeHideBaitFrame()   end
+    for _, key in ipairs(POPOUT_FRAMES) do
+        local f = ns[key]
+        if f and f:IsShown() then f:Hide() end
+    end
+    if ns.BaitFrame and ns.BaitFrame:IsShown() then ns.SafeHideBaitFrame() end
 end)
 
 ------------------------------------------------------------------------
@@ -363,27 +338,6 @@ local function SafeSetMainHeight(height)
     MainFrame:SetHeight(height)
 end
 
-function ns.SetExpanded(expand)
-    NightsFarmtrackerDB.expanded = expand
-    if expand then
-        btnToggle.tex:SetTexture(ART.."btn_collapse.png")
-        if #itemOrder == 0 then
-            emptyHint:Show(); ScrollFrame:Hide()
-            SafeSetMainHeight(SCROLL_TOP + 60 + FOOTER_H)
-        else
-            emptyHint:Hide(); ScrollFrame:Show()
-            SafeSetMainHeight(ExpandedHeight())
-        end
-    else
-        emptyHint:Hide(); ScrollFrame:Hide()
-        btnToggle.tex:SetTexture(ART.."btn_expand.png")
-        SafeSetMainHeight(COLLAPSED_H)
-    end
-    if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
-        ns.ReanchorLogFrame()
-    end
-end
-
 local function UpdateFrameHeight()
     if not NightsFarmtrackerDB.expanded then return end
     if #itemOrder == 0 then
@@ -393,6 +347,21 @@ local function UpdateFrameHeight()
         emptyHint:Hide(); ScrollFrame:Show()
         ListFrame:SetSize(CONTENT_W, totalH)
         SafeSetMainHeight(ExpandedHeight())
+    end
+end
+
+function ns.SetExpanded(expand)
+    NightsFarmtrackerDB.expanded = expand
+    if expand then
+        btnToggle.tex:SetTexture(ART.."btn_collapse.png")
+        UpdateFrameHeight()
+    else
+        emptyHint:Hide(); ScrollFrame:Hide()
+        btnToggle.tex:SetTexture(ART.."btn_expand.png")
+        SafeSetMainHeight(COLLAPSED_H)
+    end
+    if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
+        ns.ReanchorLogFrame()
     end
 end
 
@@ -418,14 +387,17 @@ ns.SafeHideMainFrame = SafeHideMainFrame
 -- call this while in combat, and Show() is just as much on the
 -- ADDON_ACTION_BLOCKED list as Hide() (see comment above).
 local function SafeShowMainFrame()
-    if ns.DeferInCombat(function()
+    local function show()
         NightsFarmtrackerDB.visible = true
         MainFrame:Show()
-    end) then return end
-    NightsFarmtrackerDB.visible = true
-    MainFrame:Show()
+    end
+    if not ns.DeferInCombat(show) then show() end
 end
 ns.SafeShowMainFrame = SafeShowMainFrame
+
+function ns.ToggleMainFrame()
+    if MainFrame:IsShown() then SafeHideMainFrame() else SafeShowMainFrame() end
+end
 
 local heightWatcher = CreateFrame("Frame")
 heightWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -984,6 +956,11 @@ end
 ------------------------------------------------------------------------
 -- Button scripts
 ------------------------------------------------------------------------
+local function BtnLeave(self)
+    self.tex:SetAlpha(0.75)
+    GameTooltip:Hide()
+end
+
 btnClose:SetScript("OnClick", function()
     SafeHideMainFrame()
     GoldFrame:Hide()
@@ -994,7 +971,7 @@ btnClose:SetScript("OnEnter", function(self)
     GameTooltip:SetText(ns.L["close"])
     GameTooltip:Show()
 end)
-btnClose:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+btnClose:SetScript("OnLeave", BtnLeave)
 
 btnToggle:SetScript("OnClick", function()
     ns.SetExpanded(not NightsFarmtrackerDB.expanded)
@@ -1005,7 +982,7 @@ btnToggle:SetScript("OnEnter", function(self)
     GameTooltip:SetText(NightsFarmtrackerDB.expanded and ns.L["collapse"] or ns.L["expand"])
     GameTooltip:Show()
 end)
-btnToggle:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+btnToggle:SetScript("OnLeave", BtnLeave)
 
 btnPause:SetScript("OnClick", function()
     -- A finished fixed-length session can't be resumed (it would just
@@ -1024,7 +1001,7 @@ btnPause:SetScript("OnEnter", function(self)
     GameTooltip:SetText(NightsFarmtrackerDB.paused and ns.L["start_tracking"] or ns.L["pause_tracking"])
     GameTooltip:Show()
 end)
-btnPause:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+btnPause:SetScript("OnLeave", BtnLeave)
 
 btnReset:SetScript("OnClick", function() ns.Reset(IsShiftKeyDown()) end)
 btnReset:SetScript("OnEnter", function(self)
@@ -1035,11 +1012,11 @@ btnReset:SetScript("OnEnter", function(self)
     GameTooltip:AddLine(ns.L["reset_shift_hint"],0.5,0.5,0.5,true)
     GameTooltip:Show()
 end)
-btnReset:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+btnReset:SetScript("OnLeave", BtnLeave)
 
 -- Left-click: Session History · Right-click: Loot Log
 btnHistory:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-btnHistory:SetScript("OnClick", function(self, button)
+btnHistory:SetScript("OnClick", function(_, button)
     local db = NightsFarmtrackerDB
     if button == "RightButton" then
         if db.logWindowEnabled == true then ns.ToggleLogWindow() end
@@ -1064,11 +1041,11 @@ btnHistory:SetScript("OnEnter", function(self)
     end
     GameTooltip:Show()
 end)
-btnHistory:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+btnHistory:SetScript("OnLeave", BtnLeave)
 
 -- Left-click: Vendor-Only Filter · Right-click: Blacklist
 btnFilter:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-btnFilter:SetScript("OnClick", function(self, button)
+btnFilter:SetScript("OnClick", function(_, button)
     if button == "RightButton" then
         if NightsFarmtrackerDB.blacklistEnabled ~= false then ns.ToggleBlacklistWindow() end
     else
@@ -1092,7 +1069,7 @@ btnFilter:SetScript("OnEnter", function(self)
     end
     GameTooltip:Show()
 end)
-btnFilter:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+btnFilter:SetScript("OnLeave", BtnLeave)
 
 btnSettings:SetScript("OnClick", function() ns.ToggleSettings() end)
 btnSettings:SetScript("OnEnter", function(self)
@@ -1101,7 +1078,7 @@ btnSettings:SetScript("OnEnter", function(self)
     GameTooltip:SetText(ns.L["settings"])
     GameTooltip:Show()
 end)
-btnSettings:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+btnSettings:SetScript("OnLeave", BtnLeave)
 
 -- Built once at load time (static content) instead of on every hover.
 local helpSections = {
@@ -1129,7 +1106,7 @@ btnHelp:SetScript("OnEnter", function(self)
     end
     GameTooltip:Show()
 end)
-btnHelp:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+btnHelp:SetScript("OnLeave", BtnLeave)
 
 ------------------------------------------------------------------------
 -- Minimap button (LibDBIcon-1.0)
@@ -1149,11 +1126,7 @@ function ns.InitMinimapButton()
                 if btn == "RightButton" then
                     ns.ToggleSettings()
                 else
-                    if MainFrame:IsShown() then
-                        SafeHideMainFrame()
-                    else
-                        SafeShowMainFrame()
-                    end
+                    ns.ToggleMainFrame()
                 end
             end,
             OnTooltipShow = function(tt)
@@ -1185,7 +1158,10 @@ function ns.SetMinimapVisible(show)
     else         DBIcon:Hide("NightsFarmtracker") end
 end
 
-local function UpdateLeftButtons()
+-- Re-evaluates and re-lays-out the History/Log/Filter/Blacklist buttons.
+-- Called whenever a setting affecting their visibility changes (session
+-- history, loot log, vendor filter, or blacklist toggled on/off).
+function ns.RefreshLeftButtons()
     local db           = NightsFarmtrackerDB
     local historyShown = db.sessionHistoryEnabled ~= false
     local logShown     = db.logWindowEnabled      == true
@@ -1205,11 +1181,4 @@ local function UpdateLeftButtons()
     else
         btnFilter:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
     end
-end
-
--- Re-evaluates and re-lays-out the History/Log/Filter/Blacklist buttons.
--- Called whenever a setting affecting their visibility changes (session
--- history, loot log, vendor filter, or blacklist toggled on/off).
-function ns.RefreshLeftButtons()
-    UpdateLeftButtons()
 end

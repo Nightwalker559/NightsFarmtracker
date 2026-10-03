@@ -9,8 +9,6 @@
 ------------------------------------------------------------------------
 local _, ns = ...
 
-local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
-
 -- Since profession equipment slots (Dragonflight+), the fishing rod sits
 -- in its own dedicated tool slot instead of Main Hand.
 local FISHING_POLE_SLOT = GetInventorySlotInfo("FISHINGTOOLSLOT")
@@ -62,29 +60,6 @@ local RefreshBaitFrame -- forward declaration; defined below, used by drop/remov
 -- defensive in case load order ever changes).
 local function RepositionVenom()
     if ns.RepositionVenomTracker then ns.RepositionVenomTracker() end
-end
-
-------------------------------------------------------------------------
--- Custom TGA/PNG button, mirrors NightsFarmtrackerUI.lua's MakeBtn.
-------------------------------------------------------------------------
-local function MakeBtn(parent, size, artFile)
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(size, size)
-    btn.tex = btn:CreateTexture(nil, "ARTWORK")
-    btn.tex:SetAllPoints()
-    btn.tex:SetTexture(ART .. artFile)
-    btn.tex:SetAlpha(0.75)
-    btn:SetScript("OnMouseDown", function(self)
-        self.tex:ClearAllPoints()
-        self.tex:SetSize(size - 3, size - 3)
-        self.tex:SetPoint("CENTER", 1, -1)
-    end)
-    btn:SetScript("OnMouseUp", function(self)
-        self.tex:ClearAllPoints(); self.tex:SetAllPoints()
-    end)
-    btn:SetScript("OnEnter", function(self) self.tex:SetAlpha(1.0) end)
-    btn:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75) end)
-    return btn
 end
 
 ------------------------------------------------------------------------
@@ -285,7 +260,7 @@ local function EnsureBaitFrame()
     BaitFrame.buffText:SetWordWrap(true)
     BaitFrame.buffText:SetJustifyH("CENTER")
 
-    BaitFrame.closeButton = MakeBtn(BaitFrame, 14, "btn_close.png")
+    BaitFrame.closeButton = ns.MakeBtn(BaitFrame, 14, "btn_close.png")
     BaitFrame.closeButton:SetPoint("TOPRIGHT", -4, -4)
     BaitFrame.closeButton:SetScript("OnClick", function()
         -- Closing via X fully disables the bar, keeping the Settings
@@ -307,7 +282,7 @@ local function EnsureBaitFrame()
         end
     end)
 
-    BaitFrame:SetScript("OnMouseUp", function(self, button)
+    BaitFrame:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" then
             NightsFarmtrackerDB.baitPos = nil
             ApplyBaitPosition()

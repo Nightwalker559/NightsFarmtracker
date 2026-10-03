@@ -8,9 +8,8 @@
 ------------------------------------------------------------------------
 local _, ns = ...
 
-local ART       = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
-local ITEM_ID   = 244790 -- The Coiled Huntress
-local CURRENCY_ID = 3546 -- Coiled Filament
+local ITEM_ID     = 244790 -- The Coiled Huntress
+local CURRENCY_ID = 3546   -- Coiled Filament
 
 -- Tooltip keyword used to find the venom line; depends on client locale.
 local LOCALE_KEYWORDS = { deDE = "Toxin", enUS = "Venom", enGB = "Venom" }
@@ -19,30 +18,6 @@ local LABEL = LOCALE_KEYWORDS[GetLocale()] or "Venom"
 local VenomFrame
 local MIN_WIDTH = 150
 local WIDTH_PADDING = 24
-
-------------------------------------------------------------------------
--- Custom TGA/PNG button, mirrors NightsFarmtrackerUI.lua's MakeBtn so the
--- close button matches the rest of the addon's skin.
-------------------------------------------------------------------------
-local function MakeBtn(parent, size, artFile)
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(size, size)
-    btn.tex = btn:CreateTexture(nil, "ARTWORK")
-    btn.tex:SetAllPoints()
-    btn.tex:SetTexture(ART .. artFile)
-    btn.tex:SetAlpha(0.75)
-    btn:SetScript("OnMouseDown", function(self)
-        self.tex:ClearAllPoints()
-        self.tex:SetSize(size - 3, size - 3)
-        self.tex:SetPoint("CENTER", 1, -1)
-    end)
-    btn:SetScript("OnMouseUp", function(self)
-        self.tex:ClearAllPoints(); self.tex:SetAllPoints()
-    end)
-    btn:SetScript("OnEnter", function(self) self.tex:SetAlpha(1.0) end)
-    btn:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75) end)
-    return btn
-end
 
 ------------------------------------------------------------------------
 -- Build (lazy)
@@ -102,7 +77,7 @@ local function EnsureVenomFrame()
     VenomFrame.currencyText:SetTextColor(unpack(ns.COL_GOLD))
     VenomFrame.currencyText:SetText("...")
 
-    VenomFrame.closeButton = MakeBtn(VenomFrame, 14, "btn_close.png")
+    VenomFrame.closeButton = ns.MakeBtn(VenomFrame, 14, "btn_close.png")
     VenomFrame.closeButton:SetPoint("TOPRIGHT", -4, -4)
     VenomFrame.closeButton:SetScript("OnClick", function()
         -- Closing via X fully disables the bar, keeping the Settings
@@ -126,7 +101,7 @@ local function EnsureVenomFrame()
         end
     end)
 
-    VenomFrame:SetScript("OnMouseUp", function(self, button)
+    VenomFrame:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" then
             NightsFarmtrackerDB.venomPos = nil
             ApplyVenomPosition()

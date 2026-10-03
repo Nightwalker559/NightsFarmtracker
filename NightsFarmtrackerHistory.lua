@@ -3,7 +3,7 @@
 -- Narrower windows. Detail matches main frame width & single-line rows.
 ------------------------------------------------------------------------
 local _, ns = ...
-local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
+local ART = ns.ART
 
 ------------------------------------------------------------------------
 -- Layout — history list
@@ -175,13 +175,9 @@ local function MergeSessionInto(target, src, keepTimestamp)
                 -- own amount - never sum a corrupted breakdown into the
                 -- target, or the corruption compounds with every future
                 -- same-day merge instead of staying contained to its source.
-                -- Gear variants have no such gate - matches the pre-unified
-                -- behavior of q[]/qIDs[] vs. gearVariants respectively.
-                -- Classified via ns.IsGear(d), NOT by inspecting a variant
-                -- key's type - a stray legacy numeric key mixed into an
-                -- otherwise string-keyed gear table would misclassify it,
-                -- since pairs()/next() order over mixed key types is
-                -- undefined (see ns.IsTierVariants in PriceHelper.lua).
+                -- Gear variants have no such gate. Classified via ns.IsGear(d),
+                -- never by a variant key's type (mixed-type keys have an
+                -- undefined pairs() order).
                 local isTier   = not ns.IsGear(d)
                 local consistent = (not isTier) or (VariantsSum(d.variants) == (d.amount or 0))
                 if consistent then
@@ -431,7 +427,7 @@ StaticPopupDialogs["NFT_CONFIRM_MERGE_DAY"] = {
     text         = "%s",
     button1      = OKAY,
     button2      = CANCEL,
-    OnAccept     = function(self, data) ns.MergeDaySessions(data) end,
+    OnAccept     = function(_, data) ns.MergeDaySessions(data) end,
     timeout      = 0,
     whileDead    = true,
     hideOnEscape = true,
@@ -459,7 +455,7 @@ StaticPopupDialogs["NFT_CONFIRM_DELETE_MONTH"] = {
     text         = "%s",
     button1      = OKAY,
     button2      = CANCEL,
-    OnAccept     = function(self, data) ns.DeleteMonthSessions(data) end,
+    OnAccept     = function(_, data) ns.DeleteMonthSessions(data) end,
     timeout      = 0,
     whileDead    = true,
     hideOnEscape = true,
@@ -872,7 +868,7 @@ local function BuildSessionCategories(session)
 
     -- Build categories
     local cats, catOrder = {}, {}
-    for itemID, d in pairs(session.items) do
+    for _, d in pairs(session.items) do
         local cat = ns.CategoryName(d)
         if not cats[cat] then
             cats[cat]={gold=0,items={},classID=d.classID}
@@ -897,11 +893,7 @@ local function BuildSessionCategories(session)
         -- breakdown, so recompute it live off the item's real amount
         -- instead of trusting the stale, corrupted value. d.vendorTotal is
         -- unaffected (never derived from the tier breakdown).
-        -- Classified via ns.IsGear(d), NOT by inspecting a variant key's
-        -- type - a stray legacy numeric key mixed into an otherwise
-        -- string-keyed gear table would misclassify it, since pairs()/
-        -- next() order over mixed key types is undefined (see
-        -- ns.IsTierVariants in PriceHelper.lua).
+        -- Classified via ns.IsGear(d), never by a variant key's type.
         local isTier      = d.variants and not ns.IsGear(d)
         local qConsistent = isTier and VariantsSum(d.variants) == d.amount
         local ahTotal = d.ahTotal
@@ -1062,30 +1054,6 @@ local function BuildSessionCategories(session)
 end
 ns.BuildSessionCategories = BuildSessionCategories
 
-------------------------------------------------------------------------
--- One-time repair: recomputes every saved session's totalGold from its
--- own items via BuildSessionCategories - the exact same per-item/category
--- gold logic the Detail window itself displays, so the header/session-row/
--- month-row total can never disagree with what's shown when you expand a
--- category. Needed for sessions saved before the reagent-tier consistency
--- guard existed (see ns.AHTotal in PriceHelper.lua): those sessions' frozen
--- totalGold could include gold priced off a q[]/qIDs[] breakdown that
--- GetReagentQualityInfo had mis-tagged, inflating it far beyond the real
--- value.
---
--- Deliberately does NOT call ns.VendorTotal/ns.AHTotal/ns.ItemValue
--- directly here: for gear (data.gearVariants), those always price off a
--- fresh live AH lookup rather than the item's frozen per-variant price -
--- correct for live tracking and for freezing a brand new session, but
--- wrong for repairing an old one, since it would replace that session's
--- original (frozen, correct) gear value with today's current AH price.
--- BuildSessionCategories avoids that: it only takes the live-price path
--- for the one case that's actually broken (an inconsistent q[] breakdown).
---
--- totalVendor/totalAH are recomputed too for completeness (vendorTotal
--- summed as-is since VendorTotal was never affected; ahTotal likewise
--- except for the same inconsistent-q[] items) - neither is currently
--- shown anywhere, only totalGold and lootedGold are.
 ------------------------------------------------------------------------
 -- One-time cleanup for saved sessions whose per-item breakdown fields got
 -- corrupted before the merge-time guards above existed: a reagent-tier
@@ -1299,6 +1267,15 @@ function ns.RepairGearVariantItemLevels(sessions)
     return fixed
 end
 
+-- One-time repair: recomputes every saved session's totalGold/totalVendor/
+-- totalAH from its own items via BuildSessionCategories, so the session-row
+-- total can't disagree with what the Detail window shows (needed for
+-- sessions saved before the reagent-tier consistency guard existed, whose
+-- frozen totals were inflated by mis-tagged tiers). Deliberately does NOT
+-- go through ns.VendorTotal/ns.AHTotal/ns.ItemValue: those price gear off
+-- a live AH lookup, which would replace an old session's frozen gear value
+-- with today's price. Note: sessions without filterFrozen are valued with
+-- the CURRENT Vendor-Only filters here.
 function ns.RepairSessionTotals(sessions)
     if not sessions then return 0 end
     local fixed = 0
@@ -1384,10 +1361,8 @@ end
 -- One-time cleanup: a gear item's variants table can carry a stray
 -- NUMERIC key from older code (e.g. the old ns.MigrateGearVariantsFromBags
 -- remainder bucket, keyed by quality - now fixed to use a string) mixed
--- in with normal bonus-ID string keys. Classification (ns.IsGear-based,
--- see GetVariants/BuildSessionCategories) no longer cares about key
--- types, but a mixed-type table is still fragile for any other code that
--- might inspect a key's type the way the old ns.IsTierVariants did -
+-- in with normal bonus-ID string keys. Classification (ns.IsGear-based)
+-- doesn't care about key types, but a mixed-type table is still fragile -
 -- normalize every numeric key to a string here so every GEAR item's
 -- variants table ends up uniformly string-keyed. Reagent-tier variants
 -- (numeric keys 1/2/3) are untouched - those are looked up by that exact
@@ -1550,13 +1525,25 @@ function ns.StripRedundantGearItemLinkInSessions(sessions)
     return fixed
 end
 
+-- Row gold text. Plain rows and rows with a frozen AH/vendor split show
+-- entry.gold (the exact value the list was sorted by - BuildSessionCategories
+-- takes the LARGER of AH and vendor); older variant/tier rows show their AH
+-- total, else their vendor total.
+local function SetDetailGold(ir, entry)
+    local value = entry.gold
+    if (entry.isRank or entry.isGearVariant) and not entry.breakdown then
+        value = (entry.tAH and entry.tAH > 0) and entry.tAH or entry.tV
+    end
+    ir.goldText:SetText(value and value > 0 and ns.FormatGold(value) or "")
+end
+
 local function RebuildDetailContent(session)
     currentDetailSession = session
     for _,r in ipairs(activeDetRows) do ReleaseDetRow(r) end
     for _,r in ipairs(activeDetCats) do ReleaseDetCat(r)  end
     activeDetRows={}; activeDetCats={}
 
-    local cats, catOrder, hasAH = BuildSessionCategories(session)
+    local cats, catOrder = BuildSessionCategories(session)
 
     local yOff = 0; local totalItems = 0
     for _, catName in ipairs(catOrder) do
@@ -1586,7 +1573,7 @@ local function RebuildDetailContent(session)
             ir.icon:SetTexture(entry.d.icon or ns.FALLBACK_ICON)
             local q = entry.d.quality
             ns.ApplyQualityColor(ir.nameText, ir.iconBorder, q, {1,1,1})
-            ir.goldText:SetTextColor(unpack(ns.COL_GOLD))  -- immer gold, wie Hauptframe
+            ir.goldText:SetTextColor(unpack(ns.COL_GOLD))  -- always gold, like the main window
             if entry.isRank then
                 ir.itemID = entry.tid
                 ir.itemLink = nil
@@ -1595,15 +1582,6 @@ local function RebuildDetailContent(session)
                 ir.nameText:SetText(ns.TruncateName(ns.DisplayName(entry.name, entry.tid)))
                 ir.rankBadge:SetText(entry.rankIcon or "")
                 ir.countText:SetText(tostring(entry.tc))
-                if entry.breakdown then
-                    ir.goldText:SetText(entry.gold > 0 and ns.FormatGold(entry.gold) or "")
-                elseif entry.tAH and entry.tAH > 0 then
-                    ir.goldText:SetText(ns.FormatGold(entry.tAH))
-                elseif entry.tV and entry.tV > 0 then
-                    ir.goldText:SetText(ns.FormatGold(entry.tV))
-                else
-                    ir.goldText:SetText("")
-                end
             elseif entry.isGearVariant then
                 local gv = entry.gv
                 ns.ApplyQualityColor(ir.nameText, ir.iconBorder, gv.quality, {1,1,1})
@@ -1614,15 +1592,6 @@ local function RebuildDetailContent(session)
                 ir.nameText:SetText(ns.TruncateName(ns.DisplayName(entry.name, gv.itemLink or entry.d.itemID)))
                 ir.rankBadge:SetText("")
                 ir.countText:SetText(tostring(gv.amount))
-                if entry.breakdown then
-                    ir.goldText:SetText(entry.gold > 0 and ns.FormatGold(entry.gold) or "")
-                elseif entry.tAH and entry.tAH > 0 then
-                    ir.goldText:SetText(ns.FormatGold(entry.tAH))
-                elseif entry.tV and entry.tV > 0 then
-                    ir.goldText:SetText(ns.FormatGold(entry.tV))
-                else
-                    ir.goldText:SetText("")
-                end
             else
                 ir.itemID = entry.d.itemID
                 ir.itemLink = entry.d.itemLink
@@ -1631,20 +1600,8 @@ local function RebuildDetailContent(session)
                 ir.nameText:SetText(entry.d.isJunkMerged and ns.TruncateName(entry.name) or ns.TruncateName(ns.DisplayName(entry.name, entry.d.itemID)))
                 ir.rankBadge:SetText(entry.rankIcon or "")
                 ir.countText:SetText(tostring(entry.d.amount))
-                -- Use entry.gold directly (the exact value already sorted
-                -- on above) rather than re-deriving from ahTotal/vendorTotal
-                -- here: re-deriving with "prefer ahTotal whenever it's >0"
-                -- ignored that BuildSessionCategories' own itemGold takes
-                -- the LARGER of the two - a plain item whose vendor price
-                -- currently exceeds its AH price would sort by the bigger
-                -- (vendor) number but display the smaller (AH) one instead,
-                -- looking out of order even though the sort itself was correct.
-                if entry.gold and entry.gold > 0 then
-                    ir.goldText:SetText(ns.FormatGold(entry.gold))
-                else
-                    ir.goldText:SetText("")
-                end
             end
+            SetDetailGold(ir, entry)
             -- AH/vendor split for the gold-hover tooltip (only known for
             -- sessions saved with the frozen split; older ones have none).
             ir.breakdown = entry.breakdown

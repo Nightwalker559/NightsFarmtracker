@@ -132,7 +132,7 @@ end
 -- (Re-)configures a pooled radio row for its current position/label/value/
 -- callback. Called every time regardless of whether the row is freshly
 -- built or reused from the pool.
-local function ConfigureRadio(row, label, yOff, value, getGroup, setGroup)
+local function ConfigureRadio(row, label, yOff, value, _, setGroup)
     row:SetPoint("TOPLEFT", S_PAD, yOff)
     row.label:SetText(label)
     row.value = value
@@ -216,7 +216,7 @@ StaticPopupDialogs["NFT_PROFILE_DELETE_CONFIRM"] = {
     text         = ns.L and ns.L["profile_delete_confirm"] or "Delete profile \"%s\"? This cannot be undone.",
     button1      = OKAY,
     button2      = CANCEL,
-    OnAccept     = function(dialog, name)
+    OnAccept     = function(_, name)
         local wasActive = (name == ns.GetActiveProfileName())
         if ns.DeleteProfile(name) then
             if wasActive then ns.SetActiveProfile(ns.DEFAULT_PROFILE) end
@@ -247,10 +247,10 @@ local profileDropdown
 local profileButtons
 local deleteProfileRow
 
-local function MakeDropdown(parent, yOff)
+-- Boxed dropdown header (label + expand arrow) shared by every dropdown below.
+local function MakeDropdownBox(parent, width)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    frame:SetSize(S_W - S_PAD*2 - 40, 24)
-    frame:SetPoint("TOPLEFT", S_PAD, yOff)
+    frame:SetSize(width, 24)
     ns.StyleBackdropBox(frame, {0.05,0.08,0.09,1})
 
     frame.lbl = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -262,6 +262,25 @@ local function MakeDropdown(parent, yOff)
     arrow:SetPoint("RIGHT", -6, 0)
     arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
     arrow:SetVertexColor(unpack(ns.COL_ACCENT))
+
+    return frame
+end
+
+-- Popup list shown under a dropdown; its own frame on UIParent so it can
+-- overlap the settings window, and it swallows clicks meant for whatever
+-- sits behind it.
+local function MakePopupList()
+    local list = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    list:SetFrameStrata("TOOLTIP")
+    list:EnableMouse(true)
+    ns.StyleBackdropBox(list, {0.05,0.08,0.09,1})
+    list:Hide()
+    return list
+end
+
+local function MakeDropdown(parent, yOff)
+    local frame = MakeDropdownBox(parent, S_W - S_PAD*2 - 40)
+    frame:SetPoint("TOPLEFT", S_PAD, yOff)
 
     local sources = ns.TSM_SOURCES
     frame:EnableMouse(true)
@@ -285,6 +304,19 @@ local function MakeDropdown(parent, yOff)
     return frame
 end
 
+-- Enter/Escape release focus; the boxed frame around the EditBox is
+-- highlighted while it has focus.
+local function HookEditBoxFocus(frame, eb)
+    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEditFocusGained", function()
+        frame:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
+    end)
+    eb:SetScript("OnEditFocusLost", function()
+        frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+    end)
+end
+
 ------------------------------------------------------------------------
 -- Helper: EditBox for custom TSM price source
 ------------------------------------------------------------------------
@@ -306,14 +338,7 @@ local function MakeCustomSourceEB(parent, yOff)
         if tsmDropdown then tsmDropdown:Refresh() end
         ns.ClearPriceCache()
     end)
-    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEditFocusGained", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
-    end)
-    eb:SetScript("OnEditFocusLost", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
-    end)
+    HookEditBoxFocus(frame, eb)
     frame.eb = eb
     return frame
 end
@@ -408,14 +433,7 @@ local function MakeGearThresholdEB(parent, yOff)
         local gold = tonumber(self:GetText()) or 0
         NightsFarmtrackerDB.gearAHThreshold = gold * 10000
     end)
-    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEditFocusGained", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
-    end)
-    eb:SetScript("OnEditFocusLost", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
-    end)
+    HookEditBoxFocus(frame, eb)
 
     -- Parented to the outer settings list, not the bordered box, so it
     -- renders clearly outside the input field instead of hugging the edge.
@@ -482,14 +500,7 @@ local function MakeSessionLengthEB(parent, yOff)
         ns.UpdateTimerDisplay()
         ns.ApplyPauseVisuals()
     end)
-    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEditFocusGained", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
-    end)
-    eb:SetScript("OnEditFocusLost", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
-    end)
+    HookEditBoxFocus(frame, eb)
 
     -- Suffix label lives on the outer list (see MakeGearThresholdEB), so
     -- keep its visibility in sync with the reused frame explicitly.
@@ -536,26 +547,10 @@ local function CloseThemeMenu()
 end
 
 local function MakeThemeDropdown(parent, yOff)
-    local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    frame:SetSize(S_W - S_PAD*2 - 40, 24)
+    local frame = MakeDropdownBox(parent, S_W - S_PAD*2 - 40)
     frame:SetPoint("TOPLEFT", S_PAD, yOff)
-    ns.StyleBackdropBox(frame, {0.05,0.08,0.09,1})
 
-    frame.lbl = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    frame.lbl:SetPoint("LEFT",6,0)
-    frame.lbl:SetTextColor(0.85,0.85,0.85)
-
-    local arrow = frame:CreateTexture(nil,"ARTWORK")
-    arrow:SetSize(10, 8)
-    arrow:SetPoint("RIGHT", -6, 0)
-    arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
-    arrow:SetVertexColor(unpack(ns.COL_ACCENT))
-
-    local list = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-    list:SetFrameStrata("TOOLTIP")
-    list:EnableMouse(true)  -- blocks clicks from falling through to whatever sits behind the open list
-    ns.StyleBackdropBox(list, {0.05,0.08,0.09,1})
-    list:Hide()
+    local list = MakePopupList()
     themeMenuList = list
 
     local function ThemeLabel(theme)
@@ -619,31 +614,15 @@ local function CloseProfileMenu()
 end
 
 local function MakeProfileDropdown(parent)
-    local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    frame:SetSize(S_W - S_PAD*2 - 40, 24)
-    ns.StyleBackdropBox(frame, {0.05,0.08,0.09,1})
+    local frame = MakeDropdownBox(parent, S_W - S_PAD*2 - 40)
 
-    frame.lbl = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    frame.lbl:SetPoint("LEFT",6,0)
-    frame.lbl:SetTextColor(0.85,0.85,0.85)
-
-    local arrow = frame:CreateTexture(nil,"ARTWORK")
-    arrow:SetSize(10, 8)
-    arrow:SetPoint("RIGHT", -6, 0)
-    arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
-    arrow:SetVertexColor(unpack(ns.COL_ACCENT))
-
-    local list = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-    list:SetFrameStrata("TOOLTIP")
-    list:EnableMouse(true)  -- blocks clicks from falling through to whatever sits behind the open list
-    ns.StyleBackdropBox(list, {0.05,0.08,0.09,1})
-    list:Hide()
+    local list = MakePopupList()
     profileMenuList = list
 
     local function RebuildList()
         local names = ns.GetProfileList()
         local active = ns.GetActiveProfileName()
-        for i, row in ipairs(profileMenuRows) do row:Hide() end
+        for _, row in ipairs(profileMenuRows) do row:Hide() end
         for i, name in ipairs(names) do
             local row = profileMenuRows[i]
             if not row then
@@ -723,8 +702,6 @@ local function MakeProfileButtons(parent)
     MakeBtn("profile_copy", function() StaticPopup_Show("NFT_PROFILE_COPY") end)
     MakeBtn("profile_rename", function() StaticPopup_Show("NFT_PROFILE_RENAME") end)
 
-    function frame:Refresh() end -- nothing dynamic here anymore
-
     return frame
 end
 
@@ -746,28 +723,12 @@ local function MakeDeleteProfileRow(parent)
     local frame = CreateFrame("Frame", nil, parent)
     frame:SetSize(S_W - S_PAD*2, 24)
 
-    local dd = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    dd:SetSize(S_W - S_PAD*2 - 70, 24)
+    local dd = MakeDropdownBox(frame, S_W - S_PAD*2 - 70)
     dd:SetPoint("LEFT", 0, 0)
-    ns.StyleBackdropBox(dd, {0.05,0.08,0.09,1})
-
-    dd.lbl = dd:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    dd.lbl:SetPoint("LEFT",6,0)
-    dd.lbl:SetPoint("RIGHT",-6,0)
+    dd.lbl:SetPoint("RIGHT", -6, 0)
     dd.lbl:SetJustifyH("LEFT")
-    dd.lbl:SetTextColor(0.85,0.85,0.85)
 
-    local arrow = dd:CreateTexture(nil,"ARTWORK")
-    arrow:SetSize(10, 8)
-    arrow:SetPoint("RIGHT", -6, 0)
-    arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
-    arrow:SetVertexColor(unpack(ns.COL_ACCENT))
-
-    local list = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-    list:SetFrameStrata("TOOLTIP")
-    list:EnableMouse(true)  -- blocks clicks from falling through to whatever sits behind the open list
-    ns.StyleBackdropBox(list, {0.05,0.08,0.09,1})
-    list:Hide()
+    local list = MakePopupList()
     deleteMenuList = list
 
     frame.selected = nil
@@ -787,7 +748,7 @@ local function MakeDeleteProfileRow(parent)
 
     local function RebuildList()
         local names = Candidates()
-        for i, row in ipairs(deleteMenuRows) do row:Hide() end
+        for _, row in ipairs(deleteMenuRows) do row:Hide() end
         for i, name in ipairs(names) do
             local row = deleteMenuRows[i]
             if not row then
@@ -1261,6 +1222,12 @@ function ns.RebuildSettingsContent()
             end)
         y = y - 38
 
+        local lockoutRow = track(AcquireCheckbox(SListFrame), "checkbox")
+        ConfigureCheckbox(lockoutRow, ns.L["lockout_enabled"], y,
+            function() return db.instanceLockoutEnabled == true end,
+            function(v) ns.SetInstanceLockoutEnabled(v) end)
+        y = y - 38
+
         if not themeDropdown then
             themeDropdown = MakeThemeDropdown(SListFrame, y)
         else
@@ -1299,7 +1266,6 @@ function ns.RebuildSettingsContent()
         profileButtons:ClearAllPoints()
         profileButtons:SetPoint("TOPLEFT", S_PAD, y)
         profileButtons:Show()
-        profileButtons:Refresh()
         track(profileButtons, "other")
         y = y - 30
 
@@ -1412,12 +1378,6 @@ function ns.RebuildSettingsContent()
                 db.mergeJunkEntries = v
                 StaticPopup_Show("NFT_RELOAD")
             end)
-        y = y - 38
-
-        local lockoutRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(lockoutRow, ns.L["lockout_enabled"], y,
-            function() return db.instanceLockoutEnabled == true end,
-            function(v) ns.SetInstanceLockoutEnabled(v) end)
         y = y - 38
 
         return y
@@ -1623,8 +1583,4 @@ function ns.ToggleSettings()
         SF:Show()
         ns.RefreshWindowChain("left")
     end
-end
-
-function ns.InitSettings()
-    -- nothing to register — our settings are self-contained
 end

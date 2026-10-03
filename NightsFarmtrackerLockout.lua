@@ -11,8 +11,6 @@
 ------------------------------------------------------------------------
 local _, ns = ...
 
-local ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
-
 local MAX_RESETS = 9
 local LOCK_TIME  = 3600  -- seconds a reset counts against the limit
 local FRAME_H    = 28
@@ -130,13 +128,8 @@ local function EnsureFrame()
     countText:SetFontHeight(ns.FONT_NORMAL)
     LockoutFrame.countText = countText
 
-    local btn = CreateFrame("Button", nil, LockoutFrame)
-    btn:SetSize(16, 16)
+    local btn = ns.MakeBtn(LockoutFrame, 16, "btn_reset.png")
     btn:SetPoint("RIGHT", -pad, 0)
-    btn.tex = btn:CreateTexture(nil, "ARTWORK")
-    btn.tex:SetAllPoints()
-    btn.tex:SetTexture(ART .. "btn_reset.png")
-    btn.tex:SetAlpha(0.75)
     btn:SetScript("OnEnter", function(self)
         self.tex:SetAlpha(1)
         ShowTooltip(self)

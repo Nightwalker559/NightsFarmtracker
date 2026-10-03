@@ -292,17 +292,6 @@ function ns.GetVariants(data)
     } }
 end
 
--- DEPRECATED - do not use for classification. A variants table can end up
--- with a stray numeric key from legacy data (e.g. an old itemLevel-keyed
--- bucket predating the bonus-ID key scheme) mixed in with normal string
--- keys; since pairs()/next() order over mixed key types is undefined in
--- Lua, checking only the first key is unreliable - it can misclassify a
--- real gear item as reagent-tier depending on hash order. Callers should
--- use ns.IsGear(data) instead (classID/bind-flag based, unambiguous).
-function ns.IsTierVariants(variants)
-    return type(next(variants)) == "number"
-end
-
 -- Vendor sell price for one variant: trust its own recorded sellPrice,
 -- else look one up live via its item link (bonus IDs → correct scaled
 -- price) or, failing that, its price-lookup itemID. Exposed on ns since

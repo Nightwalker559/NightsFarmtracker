@@ -7,6 +7,7 @@ local ADDON_NAME, ns = ...
 -- Constants
 ------------------------------------------------------------------------
 ns.ADDON_NAME     = ADDON_NAME
+ns.ART            = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
 
 ------------------------------------------------------------------------
 -- Combat-safe deferral for popup windows. Frame:Show/Hide/SetPoint calls
@@ -78,8 +79,8 @@ ns.SCROLL_STEP = ns.ROW_H
 -- even numbers). Used via SetFontHeight() everywhere instead of scattered
 -- literals, so the whole addon can be resized from one place.
 ns.FONT_SMALL  = 10  -- secondary/info text (day-row info, merge button)
-ns.FONT_NORMAL = 12  -- default row/item text (was 11)
-ns.FONT_HEADER = 14  -- emphasized headers/titles (was 12)
+ns.FONT_NORMAL = 12  -- default row/item text
+ns.FONT_HEADER = 14  -- emphasized headers/titles
 
 -- Header height for title-only secondary windows (History, Detail, Filter,
 -- Blacklist, Log, Settings). MainFrame keeps its own taller header (it has
@@ -308,6 +309,12 @@ function ns.HandleItemDrop(callback)
     end
 end
 
+-- Wires both drop gestures (see above) on `frame` to onDrop().
+function ns.EnableItemDrop(frame, onDrop)
+    frame:SetScript("OnReceiveDrag", onDrop)
+    frame:SetScript("OnMouseUp", function(_, btn) if btn == "LeftButton" then onDrop() end end)
+end
+
 
 ------------------------------------------------------------------------
 -- Utility
@@ -387,23 +394,19 @@ end
 -- are never cut in the middle, which would render as a broken glyph.
 local NAME_MAX = 20
 
+-- Byte length of the UTF-8 character starting with lead byte `b`
+-- (a stray continuation byte counts as 1).
+local function Utf8CharBytes(b)
+    if b >= 0xF0 then return 4 end
+    if b >= 0xE0 then return 3 end
+    if b >= 0xC0 then return 2 end
+    return 1
+end
+
 local function Utf8Len(s)
-    local len = 0
-    local i = 1
-    local n = #s
+    local len, i, n = 0, 1, #s
     while i <= n do
-        local b = s:byte(i)
-        if b < 0x80 then
-            i = i + 1
-        elseif b >= 0xF0 then
-            i = i + 4
-        elseif b >= 0xE0 then
-            i = i + 3
-        elseif b >= 0xC0 then
-            i = i + 2
-        else
-            i = i + 1 -- stray continuation byte, treat as 1
-        end
+        i = i + Utf8CharBytes(s:byte(i))
         len = len + 1
     end
     return len
@@ -411,22 +414,9 @@ end
 
 -- Byte offset (exclusive end) of the first `charCount` UTF-8 characters.
 local function Utf8ByteOffset(s, charCount)
-    local i = 1
-    local n = #s
-    local count = 0
+    local i, n, count = 1, #s, 0
     while i <= n and count < charCount do
-        local b = s:byte(i)
-        if b < 0x80 then
-            i = i + 1
-        elseif b >= 0xF0 then
-            i = i + 4
-        elseif b >= 0xE0 then
-            i = i + 3
-        elseif b >= 0xC0 then
-            i = i + 2
-        else
-            i = i + 1
-        end
+        i = i + Utf8CharBytes(s:byte(i))
         count = count + 1
     end
     return i - 1
@@ -564,7 +554,7 @@ function ns.MigrateGearVariantsFromBags(items)
         end
     end
 
-    for itemID, d in pairs(targets) do
+    for _, d in pairs(targets) do
         local found = 0
         if d.variants then
             for _, gv in pairs(d.variants) do found = found + gv.amount end
@@ -573,10 +563,8 @@ function ns.MigrateGearVariantsFromBags(items)
         if remainder > 0 then
             d.variants = d.variants or {}
             -- String key, never a bare number: a numeric key mixed into an
-            -- otherwise bonus-ID-string-keyed variants table makes
-            -- ns.IsGear-independent type checks (like the old
-            -- ns.IsTierVariants) misclassify this item depending on Lua's
-            -- undefined pairs()/next() order over mixed key types.
+            -- otherwise bonus-ID-string-keyed variants table would make
+            -- key-type checks depend on Lua's undefined pairs() order.
             local key = "legacy_q" .. tostring(d.quality or 0)
             local gv  = d.variants[key]
             if not gv then
@@ -757,7 +745,7 @@ function ns.InitDB()
 
     if not getmetatable(NightsFarmtrackerDB) then
         setmetatable(NightsFarmtrackerDB, {
-            __index = function(t, k)
+            __index = function(_, k)
                 if ns.PROFILE_KEYS[k] then return ActiveProfileTable()[k] end
                 return nil
             end,
@@ -1089,15 +1077,12 @@ function ns.RefreshWindowChain(side)
     local prev = ns.MainFrame
     for _, key in ipairs(order) do
         local f = ns[key]
-        if f and f:IsShown() then
-            -- Log docks BELOW MainFrame while collapsed - it sits outside
-            -- the horizontal chain in that state, so skip it as a link.
-            if key == "LogFrame" and NightsFarmtrackerDB and NightsFarmtrackerDB.expanded == false then
-                -- skip
-            else
-                ns.DockFrame(f, prev, side)
-                prev = f
-            end
+        -- Log docks BELOW MainFrame while collapsed - it sits outside the
+        -- horizontal chain in that state, so it is skipped as a link.
+        local collapsedLog = key == "LogFrame" and NightsFarmtrackerDB and NightsFarmtrackerDB.expanded == false
+        if f and f:IsShown() and not collapsedLog then
+            ns.DockFrame(f, prev, side)
+            prev = f
         end
     end
 end
@@ -1293,8 +1278,7 @@ function ns.CreateDropZone(parent, height, onDrop)
     dz:SetBackdropColor(unpack(ns.COL_CAT_BG))
     dz:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
     dz:EnableMouse(true)
-    dz:SetScript("OnReceiveDrag", onDrop)
-    dz:SetScript("OnMouseUp", function(_, btn) if btn == "LeftButton" then onDrop() end end)
+    ns.EnableItemDrop(dz, onDrop)
     dz:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(1, 0.82, 0) end)
     dz:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(unpack(ns.COL_ACCENT)) end)
 
@@ -1327,7 +1311,58 @@ function ns.CreateClearAllButton(parent, pad, hasDataFn, popupName)
     return btn
 end
 
-ns.ART = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
+------------------------------------------------------------------------
+-- Scroll frame + list frame pair for the Vendor-Only Filter / Blacklist
+-- item lists: mouse-wheel scrolling in row steps, item drops accepted on
+-- the list area too. Caller sizes/positions the scroll frame (see
+-- ns.RebuildDropItemList). Returns scrollFrame, listFrame.
+------------------------------------------------------------------------
+function ns.CreateDropListScroll(window, onDrop)
+    local scrollFrame = CreateFrame("ScrollFrame", nil, window)
+    scrollFrame:SetWidth(ns.CONTENT_W)
+    scrollFrame:EnableMouseWheel(true)
+
+    local listFrame = CreateFrame("Frame", nil, scrollFrame)
+    listFrame:SetWidth(ns.CONTENT_W); listFrame:SetHeight(1)
+    listFrame:EnableMouse(true)
+    scrollFrame:SetScrollChild(listFrame)
+    ns.EnableItemDrop(listFrame, onDrop)
+
+    local function OnWheel(_, delta)
+        local cur  = scrollFrame:GetVerticalScroll()
+        local maxS = math.max(0, listFrame:GetHeight() - scrollFrame:GetHeight())
+        scrollFrame:SetVerticalScroll(math.max(0, math.min(cur - delta * ns.ROW_H, maxS)))
+    end
+    scrollFrame:SetScript("OnMouseWheel", OnWheel)
+    listFrame:SetScript("OnMouseWheel", OnWheel)
+
+    return scrollFrame, listFrame
+end
+
+------------------------------------------------------------------------
+-- Custom icon button (texture from the Media folder): dimmed until
+-- hovered, nudged while pressed. Shared by the main window and the
+-- Venom Tracker / Fishing Lure Bar overlays.
+------------------------------------------------------------------------
+function ns.MakeBtn(parent, size, artFile)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(size, size)
+    btn.tex = btn:CreateTexture(nil, "ARTWORK")
+    btn.tex:SetAllPoints()
+    btn.tex:SetTexture(ns.ART .. artFile)
+    btn.tex:SetAlpha(0.75)
+    btn:SetScript("OnMouseDown", function(self)
+        self.tex:ClearAllPoints()
+        self.tex:SetSize(size - 3, size - 3)
+        self.tex:SetPoint("CENTER", 1, -1)
+    end)
+    btn:SetScript("OnMouseUp", function(self)
+        self.tex:ClearAllPoints(); self.tex:SetAllPoints()
+    end)
+    btn:SetScript("OnEnter", function(self) self.tex:SetAlpha(1.0) end)
+    btn:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75) end)
+    return btn
+end
 
 ------------------------------------------------------------------------
 -- Shared collapsible checkbox section — one CreateSectionHeader title

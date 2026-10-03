@@ -130,8 +130,7 @@ local function EnsureBlacklistFrame()
     ns.BlacklistFrame = BlacklistFrame  -- exposed so other windows can anchor next to it
 
     -- accept item drops anywhere on the frame (fallback)
-    BlacklistFrame:SetScript("OnReceiveDrag", HandleDrop)
-    BlacklistFrame:SetScript("OnMouseUp", function(_, btn) if btn == "LeftButton" then HandleDrop() end end)
+    ns.EnableItemDrop(BlacklistFrame, HandleDrop)
 
     local hSep = BlacklistFrame:CreateTexture(nil,"ARTWORK"); hSep:SetHeight(1)
     hSep:SetColorTexture(unpack(ns.COL_BORDER))
@@ -166,26 +165,7 @@ local function EnsureBlacklistFrame()
     dzSep:SetColorTexture(unpack(ns.COL_BORDER))
     BlacklistFrame.dzSep = dzSep
 
-    BScrollFrame = CreateFrame("ScrollFrame", nil, BlacklistFrame)
-    BScrollFrame:SetWidth(ns.CONTENT_W)
-    BScrollFrame:EnableMouseWheel(true)
-
-    BListFrame = CreateFrame("Frame", nil, BScrollFrame)
-    BListFrame:SetWidth(ns.CONTENT_W); BListFrame:SetHeight(1)
-    BListFrame:EnableMouse(true)
-    BScrollFrame:SetScrollChild(BListFrame)
-
-    -- list area also accepts drops (convenience)
-    BListFrame:SetScript("OnReceiveDrag", HandleDrop)
-    BListFrame:SetScript("OnMouseUp", function(_, btn) if btn == "LeftButton" then HandleDrop() end end)
-
-    local function OnWheel(_, delta)
-        local cur  = BScrollFrame:GetVerticalScroll()
-        local maxS = math.max(0, BListFrame:GetHeight() - BScrollFrame:GetHeight())
-        BScrollFrame:SetVerticalScroll(math.max(0, math.min(cur - delta*ROW_H, maxS)))
-    end
-    BScrollFrame:SetScript("OnMouseWheel", OnWheel)
-    BListFrame:SetScript("OnMouseWheel", OnWheel)
+    BScrollFrame, BListFrame = ns.CreateDropListScroll(BlacklistFrame, HandleDrop)
 
     BlacklistFrame.emptyLabel = BlacklistFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     BlacklistFrame.emptyLabel:SetJustifyH("CENTER")

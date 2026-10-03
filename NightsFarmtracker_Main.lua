@@ -519,12 +519,7 @@ SLASH_FARMTRACK1 = "/nft"
 SlashCmdList["FARMTRACK"] = function(msg)
     local cmd = (msg or ""):lower():match("^%s*(%S*)")
     if cmd == "" then
-        -- Toggle main window
-        if MainFrame:IsShown() then
-            ns.SafeHideMainFrame()
-        else
-            ns.SafeShowMainFrame()
-        end
+        ns.ToggleMainFrame()
     elseif cmd == "debug" then
         ns.debugMode = not ns.debugMode
         print("|cff30b0c0Night's Farmtracker:|r Debug " .. (ns.debugMode and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
@@ -567,6 +562,21 @@ local recentChatLoot      = {}  -- seen from CHAT_MSG_LOOT
 local recentEncounterLoot = {}  -- seen from ENCOUNTER_LOOT_RECEIVED
 local CROSS_DEDUP_TTL     = 2   -- seconds
 
+-- True if the other event source already reported this item (consumes that
+-- marker, caller should skip). Otherwise marks it in `seen` for the other
+-- source to consume, and expires the mark after CROSS_DEDUP_TTL.
+local function SkipOrMarkLoot(seen, other, itemID)
+    if other[itemID] and other[itemID] > 0 then
+        other[itemID] = other[itemID] - 1
+        return true
+    end
+    seen[itemID] = (seen[itemID] or 0) + 1
+    C_Timer.After(CROSS_DEDUP_TTL, function()
+        if seen[itemID] and seen[itemID] > 0 then seen[itemID] = seen[itemID] - 1 end
+    end)
+    return false
+end
+
 EventFrame:RegisterEvent("ADDON_LOADED")
 EventFrame:RegisterEvent("PLAYER_LOGIN")
 EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -580,7 +590,6 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         ns.InitDB()
         ns.InitAccountDB()
         ns.InitItemDB()
-        ns.InitSettings()
 
         -- MainFrame and GoldFrame were built while UI.lua loaded, before
         -- SavedVariables/the saved color theme were available, so their
@@ -706,18 +715,8 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         if recentLoot[dedupKey] and (now - recentLoot[dedupKey]) < DEDUP_WINDOW then return end
         recentLoot[dedupKey] = now
 
-        -- Cross-event dedup: ENCOUNTER_LOOT_RECEIVED was faster → skip
-        if recentEncounterLoot[itemID] and recentEncounterLoot[itemID] > 0 then
-            recentEncounterLoot[itemID] = recentEncounterLoot[itemID] - 1
-            return
-        end
-        -- Mark so ENCOUNTER_LOOT_RECEIVED skips it if it arrives afterwards
-        recentChatLoot[itemID] = (recentChatLoot[itemID] or 0) + 1
-        C_Timer.After(CROSS_DEDUP_TTL, function()
-            if recentChatLoot[itemID] and recentChatLoot[itemID] > 0 then
-                recentChatLoot[itemID] = recentChatLoot[itemID] - 1
-            end
-        end)
+        -- Cross-event dedup against ENCOUNTER_LOOT_RECEIVED
+        if SkipOrMarkLoot(recentChatLoot, recentEncounterLoot, itemID) then return end
 
         ProcessLoot({{
             itemID      = itemID,
@@ -738,18 +737,8 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         local itemID = tonumber(link:match("item:(%d+)"))
         if not itemID then return end
 
-        -- Cross-event dedup: CHAT_MSG_LOOT was faster → skip
-        if recentChatLoot[itemID] and recentChatLoot[itemID] > 0 then
-            recentChatLoot[itemID] = recentChatLoot[itemID] - 1
-            return
-        end
-        -- Mark so CHAT_MSG_LOOT skips it if it arrives afterwards
-        recentEncounterLoot[itemID] = (recentEncounterLoot[itemID] or 0) + 1
-        C_Timer.After(CROSS_DEDUP_TTL, function()
-            if recentEncounterLoot[itemID] and recentEncounterLoot[itemID] > 0 then
-                recentEncounterLoot[itemID] = recentEncounterLoot[itemID] - 1
-            end
-        end)
+        -- Cross-event dedup against CHAT_MSG_LOOT
+        if SkipOrMarkLoot(recentEncounterLoot, recentChatLoot, itemID) then return end
 
         local color    = link:match("|cff(%x%x%x%x%x%x)|H")
         local itemName = link:match("%[(.-)%]")

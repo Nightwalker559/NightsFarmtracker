@@ -168,8 +168,7 @@ local function EnsureFilterFrame()
     hSep:SetPoint("TOPLEFT", F_PAD, -(F_HDR_H-1)); hSep:SetPoint("TOPRIGHT", -F_PAD, -(F_HDR_H-1))
 
     -- accept item drops anywhere on the frame (fallback)
-    FilterFrame:SetScript("OnReceiveDrag", HandleDrop)
-    FilterFrame:SetScript("OnMouseUp", function(_, btn) if btn == "LeftButton" then HandleDrop() end end)
+    ns.EnableItemDrop(FilterFrame, HandleDrop)
 
     -- Category checkbox section header - clickable to collapse/expand,
     -- same interaction pattern AND visual style as the HUD's own category
@@ -222,26 +221,7 @@ local function EnsureFilterFrame()
     dzSep:SetColorTexture(unpack(ns.COL_BORDER))
     FilterFrame.dzSep = dzSep
 
-    FScrollFrame = CreateFrame("ScrollFrame", nil, FilterFrame)
-    FScrollFrame:SetWidth(ns.CONTENT_W)
-    FScrollFrame:EnableMouseWheel(true)
-
-    FListFrame = CreateFrame("Frame", nil, FScrollFrame)
-    FListFrame:SetWidth(ns.CONTENT_W); FListFrame:SetHeight(1)
-    FListFrame:EnableMouse(true)
-    FScrollFrame:SetScrollChild(FListFrame)
-
-    -- list area also accepts drops (convenience)
-    FListFrame:SetScript("OnReceiveDrag", HandleDrop)
-    FListFrame:SetScript("OnMouseUp", function(_, btn) if btn == "LeftButton" then HandleDrop() end end)
-
-    local function OnWheel(_, delta)
-        local cur  = FScrollFrame:GetVerticalScroll()
-        local maxS = math.max(0, FListFrame:GetHeight() - FScrollFrame:GetHeight())
-        FScrollFrame:SetVerticalScroll(math.max(0, math.min(cur - delta*ROW_H, maxS)))
-    end
-    FScrollFrame:SetScript("OnMouseWheel", OnWheel)
-    FListFrame:SetScript("OnMouseWheel", OnWheel)
+    FScrollFrame, FListFrame = ns.CreateDropListScroll(FilterFrame, HandleDrop)
 
     FilterFrame.emptyLabel = FilterFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     FilterFrame.emptyLabel:SetJustifyH("CENTER")
@@ -258,6 +238,7 @@ end
 -- Public API
 ------------------------------------------------------------------------
 function ns.ToggleFilterWindow()
+    if NightsFarmtrackerDB.vendorFilterEnabled == false then return end
     if ns.DeferInCombat(ns.ToggleFilterWindow) then return end
     EnsureFilterFrame()
     if FilterFrame:IsShown() then
