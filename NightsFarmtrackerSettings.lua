@@ -530,12 +530,13 @@ local THEME_ROW_H = 20
 ------------------------------------------------------------------------
 local exportBtn
 local function MakeExportButton(parent)
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(S_W - S_PAD*2, 18)
+    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    ns.StyleBackdropBox(btn)
     local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    text:SetAllPoints(); text:SetJustifyH("LEFT")
+    text:SetPoint("CENTER")
     text:SetTextColor(unpack(ns.COL_ACCENT))
     text:SetText(ns.L["export_open_btn"])
+    btn:SetSize(text:GetStringWidth() + 20, 20)
     btn:SetScript("OnEnter", function() text:SetTextColor(1,1,1) end)
     btn:SetScript("OnLeave", function() text:SetTextColor(unpack(ns.COL_ACCENT)) end)
     btn:SetScript("OnClick", function() ns.ToggleExportWindow() end)
@@ -1452,7 +1453,8 @@ function ns.RebuildSettingsContent()
         exportHint:SetPoint("TOPLEFT", S_PAD, y)
         exportHint:SetTextColor(0.5,0.5,0.5)
         exportHint:SetText(ns.L["export_hint"])
-        y = y - 28
+        -- Button sits 2 px below the (wrapped) hint, however many lines it takes.
+        y = y - math.ceil(exportHint:GetStringHeight()) - 2
 
         if not exportBtn then
             exportBtn = MakeExportButton(SListFrame)
