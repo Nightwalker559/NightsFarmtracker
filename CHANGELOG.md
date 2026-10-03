@@ -2,6 +2,10 @@
 
 ## 1.7.0
 
+### New
+
+- Data Export: pick which month to export (or all months) before the export text opens
+
 ### Changed
 
 - Rank icons (R1/R2/R3) now sit on the bottom-right corner of the item icon instead of beside it
