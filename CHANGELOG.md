@@ -12,6 +12,7 @@
 - Item names start 4 px from the icon, giving names and amounts more room
 - Settings -> Data Export: the export button now has a border and sits 2 px below the info text
 - Borders of buttons, dropdowns, checkboxes and input fields are now 1 px like the window frames
+- German: "Neustart erforderlich" now reads "Neuladen erforderlich" (it reloads the UI)
 
 ## 1.6.9
 

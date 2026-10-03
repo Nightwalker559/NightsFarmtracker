@@ -349,7 +349,7 @@ if GetLocale() == "deDE" then
     L["coin_silver"] = "s"
     L["coin_copper"] = "k"
     L["minimap_button"]    = "Minimap-Button anzeigen"
-    L["reload_required"]   = "Neustart erforderlich."
+    L["reload_required"]   = "Neuladen erforderlich."
     L["cat_junk"]          = "Müll"
     L["junk_merged_name"] = "Plunder"
     L["cat_gear"]          = "Ausrüstung"
