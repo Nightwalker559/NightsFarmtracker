@@ -11,6 +11,7 @@
 - Rank icons (R1/R2/R3) now sit on the bottom-right corner of the item icon instead of beside it
 - Item names start 4 px from the icon, giving names and amounts more room
 - Settings -> Data Export: the export button now has a border and sits 2 px below the info text
+- Borders of buttons, dropdowns, checkboxes and input fields are now 1 px like the window frames
 
 ## 1.6.9
 
