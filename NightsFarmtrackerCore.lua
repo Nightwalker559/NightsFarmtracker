@@ -69,8 +69,8 @@ ns.CHECKBOX_ROW_H = 16  -- row height for checkbox-list sections (category filte
 ns.CAT_INDENT  = 8
 ns.FOOTER_H    = 32
 ns.ICON_SIZE   = 30
-ns.RANK_ICON_W = 14   -- width of the R1/R2/R3 atlas markup (CreateAtlasMarkup)
-ns.RANK_ICON_H = 16   -- height of the R1/R2/R3 atlas markup
+ns.RANK_ICON_W = 12   -- width of the R1/R2/R3 atlas markup (CreateAtlasMarkup)
+ns.RANK_ICON_H = 14   -- height of the R1/R2/R3 atlas markup
 ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
 ns.MAX_ROWS    = 8
 ns.SCROLL_STEP = ns.ROW_H
@@ -1088,20 +1088,17 @@ function ns.RefreshWindowChain(side)
 end
 
 ------------------------------------------------------------------------
--- Icon badge helper — small slot between the item icon and item name
+-- Icon badge helper — overlay on the bottom-right corner of the item icon
 -- (used for crafting-reagent rank icons R1/R2/R3). Shared by every frame
 -- that shows item icons, so the badge position/size stays identical.
--- Anchor item names to this badge's RIGHT (not the icon's), so the column
--- stays consistent whether or not a given row actually has a rank icon.
+-- It sits on the icon itself, so item names anchor to the icon's RIGHT and
+-- no horizontal space is reserved for it.
 ------------------------------------------------------------------------
-local ICON_BADGE_W = 16  -- reserved width of the badge column
-
 function ns.CreateIconBadge(parent, icon)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    fs:SetPoint("LEFT", icon, "RIGHT", 2, 0)
-    fs:SetWidth(ICON_BADGE_W)
+    fs:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, -2)
     fs:SetFontHeight(ns.FONT_SMALL)
-    fs:SetJustifyH("CENTER")
+    fs:SetJustifyH("RIGHT")
     return fs
 end
 

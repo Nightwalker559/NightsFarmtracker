@@ -678,7 +678,7 @@ local function AcquireDetRow()
 
     -- Single-line: icon | name | count | gold (y=0 = centered with icon)
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.nameText:SetPoint("LEFT",  r.rankBadge, "RIGHT", 4,    0)
+    r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 3, 0)
     r.nameText:SetPoint("RIGHT", r,           "RIGHT", -128, 0)
     r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(ns.FONT_NORMAL); r.nameText:SetWordWrap(false)
 
@@ -1568,7 +1568,7 @@ local function RebuildDetailContent(session)
             -- Indent icon like in the main frame
             ir.icon:ClearAllPoints(); ir.icon:SetPoint("LEFT", 4 + ns.CAT_INDENT, 0)
             ir.nameText:ClearAllPoints()
-            ir.nameText:SetPoint("LEFT",  ir.rankBadge, "RIGHT", 4,    0)
+            ir.nameText:SetPoint("LEFT",  ir.icon, "RIGHT", 3, 0)
             ir.nameText:SetPoint("RIGHT", ir,           "RIGHT", -128, 0)
             ir.icon:SetTexture(entry.d.icon or ns.FALLBACK_ICON)
             local q = entry.d.quality

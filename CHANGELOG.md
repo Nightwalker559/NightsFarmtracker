@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0
+
+### Changed
+
+- Rank icons (R1/R2/R3) now sit on the bottom-right corner of the item icon instead of beside it
+- Item names start 3 px from the icon, giving names and amounts more room
+
 ## 1.6.9
 
 ### New
