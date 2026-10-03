@@ -56,7 +56,7 @@ local function AcquireRow()
     r.rankBadge = ns.CreateIconBadge(r, r.icon)
 
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 3, 0)
+    r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 4, 0)
     r.nameText:SetPoint("RIGHT", r,           "RIGHT", -40, 0)
     r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(ns.FONT_NORMAL)
     r.nameText:SetTextColor(0.85,0.85,0.85)
