@@ -86,7 +86,7 @@ local function AcquireRadio(parent)
     ns.StyleBackdropBox(dot)
 
     local fill = dot:CreateTexture(nil,"ARTWORK")
-    fill:SetSize(7,7); fill:SetPoint("CENTER")
+    fill:SetPoint("TOPLEFT", 1, -1); fill:SetPoint("BOTTOMRIGHT", -1, 1)
     fill:SetColorTexture(unpack(ns.COL_ACCENT)); fill:Hide()
     dot.fill = fill
 
@@ -379,7 +379,7 @@ function ns.ToggleGearThresholdConfig(anchor)
             box:SetSize(14, 14); box:SetPoint("LEFT", 0, 0)
             ns.StyleBackdropBox(box)
             local check = box:CreateTexture(nil, "ARTWORK")
-            check:SetSize(7, 7); check:SetPoint("CENTER")
+            check:SetPoint("TOPLEFT", 1, -1); check:SetPoint("BOTTOMRIGHT", -1, 1)
             check:SetColorTexture(unpack(ns.COL_ACCENT))
 
             local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -841,7 +841,7 @@ local function AcquireCheckbox(parent)
     ns.StyleBackdropBox(box)
 
     local check = box:CreateTexture(nil,"ARTWORK")
-    check:SetSize(7,7); check:SetPoint("CENTER")
+    check:SetPoint("TOPLEFT", 1, -1); check:SetPoint("BOTTOMRIGHT", -1, 1)
     check:SetColorTexture(unpack(ns.COL_ACCENT))
     row.check = check
 

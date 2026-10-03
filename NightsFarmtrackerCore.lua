@@ -1195,7 +1195,7 @@ function ns.CreateCheckboxRow(parent, width, height)
     ns.StyleBackdropBox(box)
 
     local mark = box:CreateTexture(nil,"ARTWORK")
-    mark:SetSize(6,6); mark:SetPoint("CENTER")
+    mark:SetPoint("TOPLEFT", 1, -1); mark:SetPoint("BOTTOMRIGHT", -1, 1)
     mark:SetColorTexture(unpack(ns.COL_ACCENT))
     r.mark = mark
 
