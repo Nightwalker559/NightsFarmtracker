@@ -52,7 +52,7 @@ local activeCatRows = {}
 local catRowPool    = {}
 
 local function RebuildCategorySection()
-    local names   = ns.GetTrackedCategoryNames()
+    local names   = ns.GetTrackedCategoryNames(NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.forceVendorCategories)
     local entries = {}
     for i, name in ipairs(names) do entries[i] = { key = name, label = name } end
 

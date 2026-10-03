@@ -973,6 +973,7 @@ end
 
 -- True if this item's expansion is forced to vendor price by the filter.
 function ns.IsForceVendorExpansion(data)
+    if NightsFarmtrackerDB and NightsFarmtrackerDB.vendorFilterEnabled == false then return false end
     if not ns.HasAHExpansionSelection() then return false end
     local expID = ns.GetItemExpansionID(data)
     if expID == nil then return false end

@@ -139,7 +139,7 @@ local function ProcessLoot(items)
                 -- obsolete/irrelevant item class (WoW Token, obsolete money/permanent) - never tracked
             elseif ns.IsBlacklisted(itemID) then
                 -- itemID explicitly blacklisted — never tracked, wins over everything else
-            elseif ns.IsBlacklistCategory({ classID = classID, subClassID = subClassID, quality = quality, itemSubType = itemSubType }) then
+            elseif ns.IsBlacklistCategory(catData) then
                 -- category blacklisted
             elseif db.excludedItemIDs[itemID] then
                 -- itemID explicitly excluded — survives a client-language switch

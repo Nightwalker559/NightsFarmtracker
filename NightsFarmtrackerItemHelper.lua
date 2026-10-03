@@ -252,9 +252,20 @@ end
 -- Filter and Blacklist windows show it as an always-available toggle.
 -- Shared by both windows' category checkbox sections.
 ------------------------------------------------------------------------
-function ns.GetTrackedCategoryNames()
+function ns.GetTrackedCategoryNames(activeCategories)
     local junkName = ns.L and ns.L["cat_junk"] or "Junk"
     local seen, names = { [junkName] = true }, { junkName }
+    -- Categories already switched on in the calling window stay listed even
+    -- when nothing of them is tracked right now (e.g. after a Reset) -
+    -- otherwise an active filter would be invisible and impossible to undo.
+    if activeCategories then
+        for name, enabled in pairs(activeCategories) do
+            if enabled == true and not seen[name] then
+                seen[name] = true
+                names[#names + 1] = name
+            end
+        end
+    end
     local db = NightsFarmtrackerDB
     if db and db.count then
         for _, data in pairs(db.count) do
