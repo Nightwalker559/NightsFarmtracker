@@ -418,6 +418,30 @@ local function UpdateSummary(itemGoldTotal)
 end
 
 ------------------------------------------------------------------------
+-- Ctrl+Left-click: item -> Vendor-Only Filter, Ctrl+Right-click -> Blacklist.
+-- Name/icon/quality come from the session data (db.count) so the entry
+-- looks right in the Filter/Blacklist windows without an item-info lookup.
+------------------------------------------------------------------------
+local function AddItemToList(itemID, itemName, toBlacklist)
+    local d = NightsFarmtrackerDB.count[itemID]
+    local name, icon, quality = (d and d.name) or itemName, d and d.icon, d and d.quality
+    local prefix = "|cff30b0c0Night's Farmtracker:|r "
+    if toBlacklist then
+        ns.AddBlacklist(itemID, name, icon, quality)
+        print(prefix .. ns.L["msg_added_blacklist"]:format(name))
+        ns.RebuildBlacklistList()
+    elseif ns.IsForceVendor(itemID) then
+        print(prefix .. ns.L["msg_already_vendor"]:format(name))
+        return
+    else
+        ns.AddForceVendor(itemID, name, icon, quality)
+        print(prefix .. ns.L["msg_added_vendor"]:format(name))
+        ns.RebuildFilterList()
+    end
+    ns.RefreshHUD()  -- also drops a just-blacklisted item from the live count
+end
+
+------------------------------------------------------------------------
 -- Row pool
 ------------------------------------------------------------------------
 local function AcquireRow()
@@ -443,9 +467,16 @@ local function AcquireRow()
             elseif btn == "RightButton" and IsShiftKeyDown() then
                 ns.ExcludeItem(self.categoryName)
             end
-        elseif self.itemName then
-            if btn == "RightButton" and IsShiftKeyDown() and not self.isJunkMerged then
+        elseif self.itemName and not self.isJunkMerged then
+            local db = NightsFarmtrackerDB
+            if btn == "RightButton" and IsShiftKeyDown() then
                 ns.ExcludeItemByID(self.baseItemID, self.itemName)
+            elseif IsControlKeyDown() and self.baseItemID then
+                if btn == "LeftButton" and db.vendorFilterEnabled ~= false then
+                    AddItemToList(self.baseItemID, self.itemName, false)
+                elseif btn == "RightButton" and db.blacklistEnabled ~= false then
+                    AddItemToList(self.baseItemID, self.itemName, true)
+                end
             end
         end
     end)
@@ -468,7 +499,14 @@ local function AcquireRow()
                 GameTooltip:AddLine(self.itemName,1,1,1)
             end
             if not self.isJunkMerged then
+                local db = NightsFarmtrackerDB
                 GameTooltip:AddLine(" ")
+                if db.vendorFilterEnabled ~= false then
+                    GameTooltip:AddLine(ns.L["item_tip_ctrl_lclick"],0.5,0.5,0.5)
+                end
+                if db.blacklistEnabled ~= false then
+                    GameTooltip:AddLine(ns.L["item_tip_ctrl_rclick"],0.5,0.5,0.5)
+                end
                 GameTooltip:AddLine(ns.L["item_tip_shift_rclick"],0.5,0.5,0.5)
             end
             GameTooltip:Show()
@@ -1101,30 +1139,73 @@ btnSettings:SetScript("OnEnter", function(self)
 end)
 btnSettings:SetScript("OnLeave", BtnLeave)
 
+-- Hover shows only the essentials; clicking the button opens the full
+-- info window (all sections, what Ctrl-click does, slash commands).
 -- Built once at load time (static content) instead of on every hover.
+local helpTipSections = {
+    { title = ns.L["help_categories"], lines = { ns.L["help_cat_click"], ns.L["help_cat_rclick"] } },
+    { title = ns.L["help_items"],      lines = { ns.L["help_item_ctrl_lclick"], ns.L["help_item_ctrl_rclick"], ns.L["help_item_rclick"] } },
+}
+
 local helpSections = {
     { title = ns.L["help_categories"], lines = { ns.L["help_cat_click"], ns.L["help_cat_rclick"] } },
-    { title = ns.L["help_items"],      lines = { ns.L["help_item_hover"], ns.L["help_item_rclick"] } },
+    { title = ns.L["help_items"],      lines = { ns.L["help_item_hover"], ns.L["help_item_ctrl_lclick"], ns.L["help_item_ctrl_rclick"], ns.L["help_item_rclick"],
+                                                 ns.L["help_detail_vendor"], ns.L["help_detail_blacklist"], ns.L["help_detail_undo"] } },
     { title = ns.L["help_gold"],       lines = { ns.L["help_gold_click"] } },
     { title = ns.L["help_reset"],      lines = { ns.L["help_reset_shift"] } },
     { title = ns.L["help_histlog"],    lines = { ns.L["help_histlog_left"], ns.L["help_histlog_right"] } },
     { title = ns.L["help_filter"],     lines = { ns.L["help_filter_left"], ns.L["help_filter_right"] } },
     { title = ns.L["help_fishing"],    lines = { ns.L["help_fishing_hint"] } },
     { title = ns.L["help_export"],     lines = { ns.L["help_export_hint"] } },
+    { title = ns.L["help_commands"],   lines = { ns.L["help_cmd_nft"], ns.L["help_cmd_filter"], ns.L["help_cmd_hud"], ns.L["help_cmd_export"], ns.L["help_cmd_fishing"] } },
 }
 table.sort(helpSections, function(a,b) return a.title < b.title end)
 
+local HelpFrame
+local function BuildHelpText()
+    local out = {}
+    for _, section in ipairs(helpSections) do
+        out[#out+1] = "|cffffffff" .. section.title .. "|r"
+        for _, line in ipairs(section.lines) do out[#out+1] = "|cffb3b3b3" .. line .. "|r" end
+        out[#out+1] = " "
+    end
+    return table.concat(out, "\n")
+end
+
+local function ToggleHelpWindow()
+    if not HelpFrame then
+        local W = 420
+        HelpFrame = ns.CreateWindowFrame("NightsFarmtrackerHelpWnd", ns.L["help_detail_title"], {width = W, titleColor = ns.COL_ACCENT})
+        HelpFrame:SetPoint("CENTER")
+        local hdrH = ns.WINDOW_HDR_H
+        local sep = HelpFrame:CreateTexture(nil, "ARTWORK")
+        sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
+        sep:SetPoint("TOPLEFT", ns.PAD, -(hdrH - 1)); sep:SetPoint("TOPRIGHT", -ns.PAD, -(hdrH - 1))
+        local fs = HelpFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("TOPLEFT", ns.PAD, -(hdrH + 8))
+        fs:SetWidth(W - 2 * ns.PAD)
+        fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
+        fs:SetSpacing(2)
+        fs:SetText(BuildHelpText())
+        HelpFrame:SetHeight(hdrH + 8 + math.ceil(fs:GetStringHeight()) + 8)
+    end
+    HelpFrame:SetShown(not HelpFrame:IsShown())
+end
+
+btnHelp:SetScript("OnClick", ToggleHelpWindow)
 btnHelp:SetScript("OnEnter", function(self)
     self.tex:SetAlpha(1)
     GameTooltip:SetOwner(self,"ANCHOR_BOTTOMRIGHT")
     GameTooltip:AddLine(ns.L["help_title"],unpack(ns.COL_ACCENT))
     GameTooltip:AddLine(" ")
-    for _,section in ipairs(helpSections) do
+    for _,section in ipairs(helpTipSections) do
         GameTooltip:AddLine(section.title, 1,1,1)
         for _,line in ipairs(section.lines) do
             GameTooltip:AddLine(line, 0.7,0.7,0.7)
         end
     end
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine(ns.L["help_more"], unpack(ns.COL_ACCENT))
     GameTooltip:Show()
 end)
 btnHelp:SetScript("OnLeave", BtnLeave)

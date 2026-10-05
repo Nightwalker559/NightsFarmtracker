@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.2
+
+### New
+
+- Ctrl+Left-click on an item adds it to the Vendor-Only Filter, Ctrl+Right-click to the Blacklist
+- Info button: click opens a detailed help window with shortcuts and commands
+
+### Changed
+
+- Info tooltip on hover shows only the essentials
+
 ## 1.7.1
 
 ### New

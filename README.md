@@ -23,7 +23,9 @@ Night's Farmtracker sits in your HUD while you grind and counts everything you l
 - Blacklist window: drop items or whole categories in to never track them, account-wide
 - Account-wide session history, unlimited sessions, day-level merging, past months collapsed into a monthly group (current month stays expanded); optional Compact mode folds past months into one entry to keep saved-variables size bounded
 - Data Export: copy the saved history (all months or a single month) as JSON for use outside the game
+- Ctrl+Left-click an item to add it to the Vendor-Only Filter, Ctrl+Right-click to blacklist it
 - Shift+Right-click to exclude items or categories from tracking
+- Info button: short hover tooltip, click for the full help window (shortcuts and commands)
 - Minimap button, draggable and repositionable
 - 13 selectable color themes
 - Profiles (Settings → Profiles): settings live in switchable profiles instead of being tied to one character — create, copy, rename and delete profiles, switch anytime
