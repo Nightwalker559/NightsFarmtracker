@@ -96,8 +96,22 @@ end
 ------------------------------------------------------------------------
 -- Item row pool (Vendor-Only item drop list - see ns.RebuildDropItemList)
 ------------------------------------------------------------------------
-local activeRows = {}
-local rowPool    = {}
+local activeRows    = {}
+local rowPool       = {}
+local activeHeaders = {}  -- expansion group headers above the item rows
+local headerPool    = {}
+
+StaticPopupDialogs["NFT_CONFIRM_REMOVE_FILTER_GROUP"] = {
+    text         = ns.L and ns.L["filter_remove_group_confirm"] or "Remove %s items of \"%s\" from the Vendor-Only Filter? This cannot be undone.",
+    button1      = OKAY,
+    button2      = CANCEL,
+    OnAccept     = function(_, data)
+        for _, itemID in ipairs(data.ids) do ns.RemoveForceVendor(itemID) end
+        ns.RebuildFilterList()
+        ns.RefreshHUD()
+    end,
+    timeout      = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
 
 ------------------------------------------------------------------------
 -- List rebuild — category section, then AH-by-expansion section, then
@@ -131,6 +145,12 @@ function ns.RebuildFilterList()
             ns.RemoveForceVendor(itemID)
             ns.RebuildFilterList()
             ns.RefreshHUD()
+        end,
+        headerPool = headerPool, headers = activeHeaders,
+        collapsed = ns.GetCollapsedTable("filterItemGroupsCollapsed"),
+        rebuild = ns.RebuildFilterList,
+        onRemoveGroup = function(groupName, itemIDs)
+            StaticPopup_Show("NFT_CONFIRM_REMOVE_FILTER_GROUP", #itemIDs, groupName, { ids = itemIDs })
         end,
     })
 end

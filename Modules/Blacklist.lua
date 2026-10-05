@@ -69,8 +69,22 @@ end
 ------------------------------------------------------------------------
 -- Item row pool (Blacklist item drop list - see ns.RebuildDropItemList)
 ------------------------------------------------------------------------
-local activeRows = {}
-local rowPool    = {}
+local activeRows    = {}
+local rowPool       = {}
+local activeHeaders = {}  -- expansion group headers above the item rows
+local headerPool    = {}
+
+StaticPopupDialogs["NFT_CONFIRM_REMOVE_BLACKLIST_GROUP"] = {
+    text         = ns.L and ns.L["blacklist_remove_group_confirm"] or "Remove %s items of \"%s\" from the Blacklist? This cannot be undone.",
+    button1      = OKAY,
+    button2      = CANCEL,
+    OnAccept     = function(_, data)
+        for _, itemID in ipairs(data.ids) do ns.RemoveBlacklist(itemID) end
+        ns.RebuildBlacklistList()
+        ns.RefreshHUD()
+    end,
+    timeout      = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
 
 ------------------------------------------------------------------------
 -- List rebuild — category section, then the drop zone and item list.
@@ -102,6 +116,12 @@ function ns.RebuildBlacklistList()
             ns.RemoveBlacklist(itemID)
             ns.RebuildBlacklistList()
             ns.RefreshHUD()
+        end,
+        headerPool = headerPool, headers = activeHeaders,
+        collapsed = ns.GetCollapsedTable("blacklistItemGroupsCollapsed"),
+        rebuild = ns.RebuildBlacklistList,
+        onRemoveGroup = function(groupName, itemIDs)
+            StaticPopup_Show("NFT_CONFIRM_REMOVE_BLACKLIST_GROUP", #itemIDs, groupName, { ids = itemIDs })
         end,
     })
 end

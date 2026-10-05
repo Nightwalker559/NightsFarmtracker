@@ -6,6 +6,7 @@
 
 - Ctrl+Left-click on an item adds it to the Vendor-Only Filter, Ctrl+Right-click to the Blacklist
 - Info button: click opens a detailed help window with shortcuts and commands
+- Vendor-Only Filter and Blacklist item lists grouped by expansion; collapse a group or remove it with its X
 
 ### Changed
 

@@ -899,7 +899,7 @@ end
 
 function ns.AddForceVendor(itemID, name, icon, quality)
     if not itemID then return end
-    NightsFarmtrackerAccountDB.forceVendor[itemID] = { name = name, icon = icon, quality = quality }
+    NightsFarmtrackerAccountDB.forceVendor[itemID] = { name = name, icon = icon, quality = quality, expansionID = select(15, C_Item.GetItemInfo(itemID)) }
 end
 
 function ns.RemoveForceVendor(itemID)
@@ -989,7 +989,7 @@ end
 
 function ns.AddBlacklist(itemID, name, icon, quality)
     if not itemID then return end
-    NightsFarmtrackerAccountDB.blacklist[itemID] = { name = name, icon = icon, quality = quality }
+    NightsFarmtrackerAccountDB.blacklist[itemID] = { name = name, icon = icon, quality = quality, expansionID = select(15, C_Item.GetItemInfo(itemID)) }
 end
 
 function ns.RemoveBlacklist(itemID)
@@ -1437,6 +1437,14 @@ function ns.RebuildCheckboxSection(frame, header, pool, rows, padX, secTop, titl
     return secTop + ns.CAT_ROW_H + n * ns.CHECKBOX_ROW_H + 4
 end
 
+-- Per-profile table of collapsed item groups (expansionID -> true), created
+-- on first use; read fresh on every rebuild so a profile switch is picked up.
+function ns.GetCollapsedTable(key)
+    local db = NightsFarmtrackerDB
+    if type(db[key]) ~= "table" then db[key] = {} end
+    return db[key]
+end
+
 ------------------------------------------------------------------------
 -- Shared drop-list item rebuild — used by the Vendor-Only Filter and
 -- Blacklist windows for their bottom item list: pooled icon+name rows
@@ -1448,9 +1456,50 @@ end
 -- cfg fields: window, listFrame, scrollFrame, emptyLabel (frames/widgets),
 -- pool, rows (this list's own row pool + active-rows table), padX,
 -- listTop, ftrH, minVisH, maxVisH (layout), items (itemID -> {name,icon,
--- quality} table), onShiftRemove(itemID) (passed straight to
+-- quality, expansionID} table), onShiftRemove(itemID) (passed straight to
 -- ns.CreateDropListItemRow for newly-created rows).
+--
+-- Items are grouped under one collapsible header per expansion (newest
+-- first, items without known expansion last). Extra cfg fields for that:
+-- headerPool, headers (the list's own header pool + active headers),
+-- collapsed (table expansionID -> true, persisted by the caller), rebuild()
+-- (re-runs the whole window rebuild after a collapse toggle) and
+-- onRemoveGroup(expansionName, itemIDs) (the header's X button).
 ------------------------------------------------------------------------
+local UNKNOWN_EXPANSION = -1
+
+-- Header for one expansion group: ns.CreateSectionHeader + a small X button
+-- on the right that removes the whole group.
+local function CreateItemGroupHeader(parent)
+    local h = ns.CreateSectionHeader(parent, ns.CONTENT_W)
+    h:SetScript("OnMouseUp", function(self)
+        self.collapsed[self.groupKey] = not self.collapsed[self.groupKey] or nil
+        self.rebuild()
+    end)
+    h:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
+        GameTooltip:AddLine(self.groupName, 1, 1, 1)
+        GameTooltip:AddLine(ns.L["cat_tip_click"], 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    h:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    local x = CreateFrame("Button", nil, h)
+    x:SetSize(12, 12)
+    x:SetPoint("RIGHT", -4, 0)
+    local tex = x:CreateTexture(nil, "ARTWORK")
+    tex:SetAllPoints(); tex:SetTexture(ns.ART .. "btn_close.png"); tex:SetAlpha(0.6)
+    x:SetScript("OnClick", function() h.onRemove(h.groupName, h.groupIDs) end)
+    x:SetScript("OnEnter", function(self)
+        tex:SetAlpha(1)
+        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
+        GameTooltip:AddLine(ns.L["group_remove_tip"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    x:SetScript("OnLeave", function() tex:SetAlpha(0.6); GameTooltip:Hide() end)
+    return h
+end
+
 function ns.RebuildDropItemList(cfg)
     local pool, rows = cfg.pool, cfg.rows
     for _, r in ipairs(rows) do
@@ -1459,25 +1508,75 @@ function ns.RebuildDropItemList(cfg)
     end
     for i = #rows, 1, -1 do rows[i] = nil end
 
-    local list = {}
-    for itemID, entry in pairs(cfg.items or {}) do
-        list[#list + 1] = { itemID = itemID, name = entry.name, icon = entry.icon, quality = entry.quality }
+    local headerPool, headers = cfg.headerPool, cfg.headers
+    for _, h in ipairs(headers) do
+        h:Hide(); h:ClearAllPoints()
+        headerPool[#headerPool + 1] = h
     end
-    table.sort(list, function(a, b) return (a.name or "") < (b.name or "") end)
+    for i = #headers, 1, -1 do headers[i] = nil end
+
+    -- Bucket by expansion. Entries saved before 1.7.2 have no expansionID:
+    -- resolve it now (GetItemInfo) and store it; if the item isn't cached
+    -- yet it goes under "Unknown" and a load is requested for next time.
+    local groups, count = {}, 0
+    for itemID, entry in pairs(cfg.items or {}) do
+        local exp = entry.expansionID
+        if exp == nil then
+            exp = select(15, C_Item.GetItemInfo(itemID))
+            if exp ~= nil then entry.expansionID = exp
+            else C_Item.RequestLoadItemDataByID(itemID) end
+        end
+        exp = exp or UNKNOWN_EXPANSION
+        local g = groups[exp]
+        if not g then g = {}; groups[exp] = g end
+        g[#g + 1] = { itemID = itemID, name = entry.name, icon = entry.icon, quality = entry.quality }
+        count = count + 1
+    end
+
+    local order = {}
+    for exp in pairs(groups) do order[#order + 1] = exp end
+    table.sort(order, function(a, b)
+        if a == UNKNOWN_EXPANSION then return false end
+        if b == UNKNOWN_EXPANSION then return true end
+        return a > b
+    end)
 
     local yOff = 0
-    for _, e in ipairs(list) do
-        local r = table.remove(pool)
-        if r then r:SetParent(cfg.listFrame); r:Show()
-        else r = ns.CreateDropListItemRow(cfg.listFrame, cfg.onShiftRemove) end
-        r:SetPoint("TOPLEFT", 0, -yOff)
-        r.sep:SetShown(yOff > 0)
-        r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
-        r.nameText:SetText(ns.TruncateName(ns.DisplayName(e.name, e.itemID) or ("Item " .. e.itemID)))
-        r.itemID = e.itemID
-        ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
-        rows[#rows + 1] = r
-        yOff = yOff + ns.ROW_H
+    for _, exp in ipairs(order) do
+        local list = groups[exp]
+        table.sort(list, function(a, b) return (a.name or "") < (b.name or "") end)
+
+        local groupName = exp == UNKNOWN_EXPANSION and ns.L["group_unknown"]
+                          or ns.EXPANSION_NAMES[exp] or ("Expansion " .. exp)
+        local collapsed = cfg.collapsed[exp]
+
+        local h = table.remove(headerPool)
+        if h then h:SetParent(cfg.listFrame); h:Show()
+        else h = CreateItemGroupHeader(cfg.listFrame) end
+        h:SetPoint("TOPLEFT", 0, -yOff)
+        h.text:SetText((collapsed and "+ " or "- ") .. groupName .. " (" .. #list .. ")")
+        h.groupKey, h.groupName, h.collapsed, h.rebuild, h.onRemove = exp, groupName, cfg.collapsed, cfg.rebuild, cfg.onRemoveGroup
+        local ids = {}
+        for i, e in ipairs(list) do ids[i] = e.itemID end
+        h.groupIDs = ids
+        headers[#headers + 1] = h
+        yOff = yOff + ns.CAT_ROW_H
+
+        if not collapsed then
+            for i, e in ipairs(list) do
+                local r = table.remove(pool)
+                if r then r:SetParent(cfg.listFrame); r:Show()
+                else r = ns.CreateDropListItemRow(cfg.listFrame, cfg.onShiftRemove) end
+                r:SetPoint("TOPLEFT", 0, -yOff)
+                r.sep:SetShown(i > 1)
+                r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
+                r.nameText:SetText(ns.TruncateName(ns.DisplayName(e.name, e.itemID) or ("Item " .. e.itemID)))
+                r.itemID = e.itemID
+                ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
+                rows[#rows + 1] = r
+                yOff = yOff + ns.ROW_H
+            end
+        end
     end
 
     cfg.scrollFrame:ClearAllPoints()
@@ -1491,7 +1590,7 @@ function ns.RebuildDropItemList(cfg)
 
     cfg.emptyLabel:ClearAllPoints()
     cfg.emptyLabel:SetPoint("TOP", cfg.window, "TOP", 0, -(cfg.listTop + 14))
-    cfg.emptyLabel:SetShown(#list == 0)
+    cfg.emptyLabel:SetShown(count == 0)
 end
 
 ------------------------------------------------------------------------
