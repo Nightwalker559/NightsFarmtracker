@@ -1177,6 +1177,9 @@ local function ToggleHelpWindow()
         local W = 420
         HelpFrame = ns.CreateWindowFrame("NightsFarmtrackerHelpWnd", ns.L["help_detail_title"], {width = W, titleColor = ns.COL_ACCENT})
         HelpFrame:SetPoint("CENTER")
+        -- Above the main window, Venom Tracker and Lure Bar (all MEDIUM) which it can overlap.
+        HelpFrame:SetFrameStrata("HIGH")
+        HelpFrame:SetToplevel(true)
         local hdrH = ns.WINDOW_HDR_H
         local sep = HelpFrame:CreateTexture(nil, "ARTWORK")
         sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
