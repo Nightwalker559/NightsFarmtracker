@@ -55,13 +55,16 @@ local BTN_GAP = 4
 local BUFF_ROW_H = 16
 local RefreshBaitFrame -- forward declaration; defined below, used by drop/remove handlers
 
--- True once the bar has created its SecureActionButtonTemplate lure buttons.
--- Those are anchored to the main window, so in combat lockdown the main
--- window can no longer be resized/moved (see SafeSetMainHeight in UI.lua).
--- Without them nothing protected depends on the main window and it can be
--- resized freely, even in combat.
-function ns.BaitHasSecureButtons()
-    return next(buttonPool) ~= nil
+-- True while protected frames are anchored to the main window: the bar has
+-- created its SecureActionButtonTemplate lure buttons AND still sits at its
+-- default spot above the main window (a dragged bar, db.baitPos, is anchored
+-- to UIParent instead). WoW blocks resizing/moving a frame that a protected
+-- frame is anchored to during combat lockdown - regardless of whether the
+-- protected frame would actually shift - so SafeSetMainHeight (UI.lua) must
+-- defer in exactly this case. Otherwise the main window can be resized
+-- freely, even in combat.
+function ns.BaitDependsOnMainFrame()
+    return next(buttonPool) ~= nil and NightsFarmtrackerDB.baitPos == nil
 end
 
 -- Small helper to avoid repeating the "if it exists, call it" guard at
