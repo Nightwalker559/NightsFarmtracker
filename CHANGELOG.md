@@ -8,6 +8,7 @@
 
 ### Changed
 
+- Files reorganized into Core, Modules and Locales folders; one file per language
 - Item list rebuilds once per frame instead of once per loot
 - Item-info lookups cached; far fewer API calls per rebuild
 - Venom Tracker and Lure Bar only listen to events while enabled

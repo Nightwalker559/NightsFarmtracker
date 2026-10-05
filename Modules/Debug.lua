@@ -4,7 +4,7 @@
 -- sessionsdump) live here, building their output into a Buffer instead
 -- of spamming individual print() lines, then showing it all at once in
 -- a copyable window (see ns.CreateCopyTextWindow/ns.ShowCopyText in
--- NightsFarmtrackerCore.lua) - easier to read and to paste into a bug
+-- Core/Core.lua) - easier to read and to paste into a bug
 -- report than a wall of chat messages.
 ------------------------------------------------------------------------
 local _, ns = ...

@@ -12,21 +12,29 @@ Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
 Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 
-NightsFarmtrackerLocals.lua
-NightsFarmtrackerCore.lua
-NightsFarmtrackerPriceHelper.lua
-NightsFarmtrackerItemHelper.lua
-NightsFarmtrackerUI.lua
-NightsFarmtrackerHistory.lua
-NightsFarmtrackerExport.lua
-NightsFarmtrackerDebug.lua
-NightsFarmtrackerRepairs.lua
-NightsFarmtrackerLog.lua
-NightsFarmtrackerSettings.lua
-NightsFarmtrackerFilter.lua
-NightsFarmtrackerBlacklist.lua
-NightsFarmtrackerVenomTracker.lua
-NightsFarmtrackerBaitFrame.lua
-NightsFarmtrackerLockout.lua
-NightsFarmtrackerHud.lua
-NightsFarmtracker_Main.lua
+# Localization (enUS first: it creates ns.L, deDE only overrides)
+Locales\enUS.lua
+Locales\deDE.lua
+
+# Core
+Core\Core.lua
+Core\PriceHelper.lua
+Core\ItemHelper.lua
+Core\Repairs.lua
+Core\UI.lua
+
+# Modules
+Modules\History.lua
+Modules\Export.lua
+Modules\Debug.lua
+Modules\Log.lua
+Modules\Settings.lua
+Modules\Filter.lua
+Modules\Blacklist.lua
+Modules\VenomTracker.lua
+Modules\BaitFrame.lua
+Modules\Lockout.lua
+Modules\Hud.lua
+
+# Events, loot processing, slash commands (loads last)
+Core\Main.lua

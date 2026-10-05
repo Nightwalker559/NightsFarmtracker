@@ -448,7 +448,7 @@ end
 
 -- Item classification/value helpers (CategoryName, GearCategoryName, IsGear,
 -- IsGearThresholdVendorOnly, IsVendorOnly, ItemValue) and the Junk-merge
--- display helpers now live in NightsFarmtrackerItemHelper.lua.
+-- display helpers now live in Core/ItemHelper.lua.
 
 ------------------------------------------------------------------------
 -- Item key migration (name-keyed -> itemID-keyed)
@@ -1617,8 +1617,8 @@ end
 -- Generic copyable text window - scrolling, pre-selected EditBox. WoW
 -- addons can't write the OS clipboard directly, so the standard pattern
 -- is: show the text, select it all, let the user Ctrl+C. Shared by Data
--- Export (NightsFarmtrackerExport.lua) and the Debug dump commands
--- (NightsFarmtrackerDebug.lua) so both get one copy of this UI code.
+-- Export (Modules/Export.lua) and the Debug dump commands
+-- (Modules/Debug.lua) so both get one copy of this UI code.
 --
 -- ns.CreateCopyTextWindow(name, title) builds one such window (call once,
 -- keep the returned frame). ns.ShowCopyText(frame, text) fills it and

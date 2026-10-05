@@ -322,7 +322,7 @@ end
 -- Combat-safe frame height. MainFrame:SetHeight() can throw
 -- ADDON_ACTION_BLOCKED when called during combat lockdown; defer to
 -- PLAYER_REGEN_ENABLED instead of failing silently (same pattern as
--- SafeHideBaitFrame in NightsFarmtrackerBaitFrame.lua).
+-- SafeHideBaitFrame in Modules/BaitFrame.lua).
 ------------------------------------------------------------------------
 local pendingHeightUpdate = false
 

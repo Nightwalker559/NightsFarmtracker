@@ -96,7 +96,7 @@ end
 
 ------------------------------------------------------------------------
 -- Gear / vendor-only / value resolution
--- VendorTotal/AHTotal live in NightsFarmtrackerPriceHelper.lua
+-- VendorTotal/AHTotal live in Core/PriceHelper.lua
 ------------------------------------------------------------------------
 
 -- True if this item counts as Equipment for GearAHThreshold purposes

@@ -155,7 +155,7 @@ local function ScanVenom()
     if NightsFarmtrackerDB.venomTrackerEnabled ~= true then return end
     -- Bail out entirely in combat: VenomFrame:Show()/Hide() can throw
     -- ADDON_ACTION_BLOCKED during combat lockdown (same shared-execution
-    -- taint as BaitFrame, see NightsFarmtrackerBaitFrame.lua). The
+    -- taint as BaitFrame, see Modules/BaitFrame.lua). The
     -- PLAYER_REGEN_ENABLED watcher below re-scans right after combat ends.
     if InCombatLockdown() then return end
     if not ns.MainFrame or not ns.MainFrame:IsShown() then
@@ -281,7 +281,7 @@ end)
 
 -- Re-show the overlay when the main window reopens (it's force-hidden
 -- together with MainFrame, see MainFrame:HookScript("OnHide", ...) in
--- NightsFarmtrackerUI.lua).
+-- Core/UI.lua).
 if ns.MainFrame then
     ns.MainFrame:HookScript("OnShow", function()
         ScanVenom()

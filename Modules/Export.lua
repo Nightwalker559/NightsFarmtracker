@@ -59,7 +59,7 @@ end
 -- Build export data
 ------------------------------------------------------------------------
 -- Same per-item/category gold values Session History shows (see
--- BuildSessionCategories in NightsFarmtrackerHistory.lua) - only rows
+-- BuildSessionCategories in Modules/History.lua) - only rows
 -- with a non-zero gold value are ever added there, so no extra filtering
 -- needed here.
 local function BuildCategoriesList(agg)
@@ -100,7 +100,7 @@ end
 
 -- Aggregates every saved session into one virtual, non-persisted session
 -- per calendar month (same merge BuildMonthAggregate/the "/nft monthdump"
--- diagnostic use - see NightsFarmtrackerHistory.lua / NightsFarmtracker_Main.lua),
+-- diagnostic use - see Modules/History.lua / Core/Main.lua),
 -- then runs each month through BuildCategoriesList. `onlyMonth` ("YYYY-MM")
 -- limits the export to that one month; nil exports every month.
 function ns.BuildFullExportJSON(onlyMonth)
@@ -141,7 +141,7 @@ end
 -- Export windows. Step 1: a month picker ("All months" + every month with
 -- saved sessions, newest first). Step 2: the copy-text window (shared
 -- helper, see ns.CreateCopyTextWindow/ns.ShowCopyText in
--- NightsFarmtrackerCore.lua) with the JSON for the chosen selection.
+-- Core/Core.lua) with the JSON for the chosen selection.
 ------------------------------------------------------------------------
 local PICK_W, PICK_ROW_H, PICK_MAX_ROWS = 260, 22, 10
 
