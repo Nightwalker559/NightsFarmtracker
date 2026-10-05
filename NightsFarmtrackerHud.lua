@@ -436,10 +436,7 @@ function ns.SetHudVisible(show)
     if show == nil then show = not active end
     if show == active then return end
 
-    if show and not Enabled() then
-        Msg(L["hud_disabled"])
-        return
-    end
+    if show and not Enabled() then return end   -- feature off: key binding and /nft hud do nothing
     if InCombatLockdown() then
         if show then
             Msg(L["hud_combat"])
