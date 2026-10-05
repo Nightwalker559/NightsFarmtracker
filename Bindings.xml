@@ -1,5 +1,8 @@
 <Bindings>
-	<Binding name="NFT_TOGGLE_HUD" header="NIGHTSFARMTRACKER" category="ADDONS">
+	<!-- category = name of the global that holds the section title (BINDING_HEADER_NIGHTSFARMTRACKER,
+	     defined in Modules/Hud.lua). The old header="..." attribute makes retail list the binding
+	     under the generic "Addons" block instead of its own section. -->
+	<Binding name="NFT_TOGGLE_HUD" category="BINDING_HEADER_NIGHTSFARMTRACKER">
 		NightsFarmtracker_ToggleHud()
 	</Binding>
 </Bindings>
