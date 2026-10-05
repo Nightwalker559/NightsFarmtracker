@@ -15,6 +15,7 @@
 
 ### Fixed
 
+- Window now grows with new items at once, also in combat; new items were cut off until combat ended
 - Changing price source or gear threshold now refreshes the list immediately
 - Opening Settings no longer clears the price cache
 - Empty category could leave a blank scroll area

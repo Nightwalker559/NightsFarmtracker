@@ -319,15 +319,18 @@ local function ExpandedHeight()
 end
 
 ------------------------------------------------------------------------
--- Combat-safe frame height. MainFrame:SetHeight() can throw
--- ADDON_ACTION_BLOCKED when called during combat lockdown; defer to
--- PLAYER_REGEN_ENABLED instead of failing silently (same pattern as
--- SafeHideBaitFrame in Modules/BaitFrame.lua).
+-- Combat-safe frame height. MainFrame:SetHeight() throws
+-- ADDON_ACTION_BLOCKED during combat lockdown, but only while a protected
+-- frame is anchored to it - that is the case once the Fishing Lure Bar has
+-- created its secure lure buttons (ns.BaitHasSecureButtons). Only then is the
+-- change deferred to PLAYER_REGEN_ENABLED (same pattern as SafeHideBaitFrame
+-- in Modules/BaitFrame.lua). Otherwise the window must follow the item list
+-- at once: deferring it always left new items cut off until combat ended.
 ------------------------------------------------------------------------
 local pendingHeightUpdate = false
 
 local function SafeSetMainHeight(height)
-    if InCombatLockdown() then
+    if InCombatLockdown() and ns.BaitHasSecureButtons and ns.BaitHasSecureButtons() then
         pendingHeightUpdate = true
         return
     end

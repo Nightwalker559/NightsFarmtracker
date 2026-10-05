@@ -55,6 +55,15 @@ local BTN_GAP = 4
 local BUFF_ROW_H = 16
 local RefreshBaitFrame -- forward declaration; defined below, used by drop/remove handlers
 
+-- True once the bar has created its SecureActionButtonTemplate lure buttons.
+-- Those are anchored to the main window, so in combat lockdown the main
+-- window can no longer be resized/moved (see SafeSetMainHeight in UI.lua).
+-- Without them nothing protected depends on the main window and it can be
+-- resized freely, even in combat.
+function ns.BaitHasSecureButtons()
+    return next(buttonPool) ~= nil
+end
+
 -- Small helper to avoid repeating the "if it exists, call it" guard at
 -- every call site below (Venom Tracker loads before this file, but stay
 -- defensive in case load order ever changes).
