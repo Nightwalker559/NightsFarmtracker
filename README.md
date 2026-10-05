@@ -45,7 +45,7 @@ Tip: pair with [Better Fishing](https://www.curseforge.com/wow/addons/better-fis
 Stretches the minimap over the screen so gathering nodes and tracking blips are readable all around your character. The feature is off by default; while it is disabled, the addon does not touch the minimap and the key binding does nothing.
 
 1. Enable it under **Settings → Minimap HUD**.
-2. Set your own key under **Options → Keybindings → AddOns → Night's Farmtracker** (there is no default key), or use `/nft hud`.
+2. Set your own key under **Options → Keybindings → Night's Farmtracker** (there is no default key), or use `/nft hud`.
 3. Press the key to open and close the HUD.
 
 Notes:

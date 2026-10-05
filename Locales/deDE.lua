@@ -211,7 +211,7 @@ L["bait_no_active_buff"]      = "Kein Köder aktiv"
 -- Minimap-HUD
 L["sec_hud"]                  = "Minimap-HUD"
 L["hud_enabled"]              = "Minimap-HUD aktivieren (zieht die Minimap beim Farmen über den Bildschirm)"
-L["hud_keybind_hint"]         = "Taste unter Optionen > Tastaturbelegung > AddOns > Night's Farmtracker festlegen, oder /nft hud benutzen."
+L["hud_keybind_hint"]         = "Taste unter Optionen > Tastaturbelegung > Night's Farmtracker festlegen, oder /nft hud benutzen."
 L["hud_binding"]              = "Minimap-HUD umschalten"
 L["hud_combat"]               = "Das Minimap-HUD kann nicht im Kampf geöffnet werden."
 L["hud_combat_close"]         = "Das Minimap-HUD wird nach dem Kampf geschlossen."

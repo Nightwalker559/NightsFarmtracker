@@ -3,7 +3,7 @@
 -- Stretches the minimap over the screen while farming, so gathering nodes
 -- and tracking blips can be read around the character. Off by default;
 -- toggled via Settings -> Minimap HUD, and opened/closed with a key binding
--- the player sets under Options -> Keybindings -> AddOns (no default key)
+-- the player sets under Options -> Keybindings -> Night's Farmtracker (no default key)
 -- or with /nft hud.
 --
 -- How it works (same idea as the FarmHud addon, much smaller):
