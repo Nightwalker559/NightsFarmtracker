@@ -228,10 +228,25 @@ end
 ------------------------------------------------------------------------
 local watcher = CreateFrame("Frame")
 watcher:RegisterEvent("PLAYER_LOGIN")
-watcher:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-watcher:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-watcher:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
-watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+
+-- The tracker's events are only registered while the feature is enabled, so
+-- a disabled tracker costs nothing at all (UNIT_SPELLCAST_SUCCEEDED and
+-- CURRENCY_DISPLAY_UPDATE fire constantly). The cast event is limited to
+-- the player: the unfiltered event also fires for every nameplate/party
+-- unit.
+local function UpdateWatcher()
+    if NightsFarmtrackerDB and NightsFarmtrackerDB.venomTrackerEnabled == true then
+        watcher:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+        watcher:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+        watcher:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
+        watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+    else
+        watcher:UnregisterEvent("PLAYER_EQUIPMENT_CHANGED")
+        watcher:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+        watcher:UnregisterEvent("CURRENCY_DISPLAY_UPDATE")
+        watcher:UnregisterEvent("PLAYER_REGEN_ENABLED")
+    end
+end
 
 -- Tooltip data (C_TooltipInfo) can briefly lag behind the actual value
 -- right after an event fires (e.g. right after a catch), so a scan
@@ -244,13 +259,18 @@ local function ScanVenomDelayed()
 end
 
 watcher:SetScript("OnEvent", function(_, event, unit)
+    if event == "PLAYER_LOGIN" then UpdateWatcher() end
     if not NightsFarmtrackerDB or NightsFarmtrackerDB.venomTrackerEnabled ~= true then return end
     if event == "PLAYER_REGEN_ENABLED" then
         ScanVenom()
         ScanCurrency()
         return
     end
-    if event == "UNIT_SPELLCAST_SUCCEEDED" and unit ~= "player" then return end
+    if event == "UNIT_SPELLCAST_SUCCEEDED" then
+        -- every spell the player casts lands here; only a catch with the
+        -- rod equipped can change the venom value
+        if unit ~= "player" or not FindItemSlot() then return end
+    end
     if event == "CURRENCY_DISPLAY_UPDATE" then
         ScanCurrency()
         return
@@ -274,6 +294,7 @@ end
 ------------------------------------------------------------------------
 function ns.SetVenomTrackerEnabled(enabled)
     NightsFarmtrackerDB.venomTrackerEnabled = enabled and true or false
+    UpdateWatcher()
     if enabled then
         NightsFarmtrackerDB.venomUserHidden = false
         EnsureVenomFrame()

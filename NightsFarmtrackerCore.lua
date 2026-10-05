@@ -610,6 +610,7 @@ ns.PROFILE_KEYS = {
     gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
     tsmCustomSource=true, colorTheme=true, venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
+    hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
 }
 
 ns.DEFAULT_PROFILE = "Default"
@@ -636,6 +637,7 @@ local function NewProfileDefaults()
         baitFrameEnabled      = false,
         mergeJunkEntries      = false,
         instanceLockoutEnabled = false,
+        hudEnabled            = false,
     }
 end
 
@@ -810,6 +812,7 @@ function ns.InitDB()
     if db.tsmCustomSource == nil then db.tsmCustomSource = ""         end
     if db.colorTheme      == nil then db.colorTheme      = "default"  end
     if db.venomTrackerEnabled == nil then db.venomTrackerEnabled = false end
+    if db.hudEnabled          == nil then db.hudEnabled          = false end
     ns.ApplyColorTheme(db.colorTheme)
 end
 
@@ -1310,6 +1313,20 @@ function ns.CreateClearAllButton(parent, pad, hasDataFn, popupName)
 end
 
 ------------------------------------------------------------------------
+-- Mouse-wheel handler for a ScrollFrame: scrolls `scroll` by `step` pixels
+-- per wheel notch, clamped to the height of its scroll child. Shared by
+-- every scrolling window so the clamp logic lives in one place; assign the
+-- result to OnMouseWheel of the ScrollFrame (and of its child / rows, so
+-- scrolling also works while hovering them).
+------------------------------------------------------------------------
+function ns.MakeWheelHandler(scroll, child, step)
+    return function(_, delta)
+        local maxS = math.max(0, child:GetHeight() - scroll:GetHeight())
+        scroll:SetVerticalScroll(math.max(0, math.min(scroll:GetVerticalScroll() - delta * step, maxS)))
+    end
+end
+
+------------------------------------------------------------------------
 -- Scroll frame + list frame pair for the Vendor-Only Filter / Blacklist
 -- item lists: mouse-wheel scrolling in row steps, item drops accepted on
 -- the list area too. Caller sizes/positions the scroll frame (see
@@ -1326,11 +1343,7 @@ function ns.CreateDropListScroll(window, onDrop)
     scrollFrame:SetScrollChild(listFrame)
     ns.EnableItemDrop(listFrame, onDrop)
 
-    local function OnWheel(_, delta)
-        local cur  = scrollFrame:GetVerticalScroll()
-        local maxS = math.max(0, listFrame:GetHeight() - scrollFrame:GetHeight())
-        scrollFrame:SetVerticalScroll(math.max(0, math.min(cur - delta * ns.ROW_H, maxS)))
-    end
+    local OnWheel = ns.MakeWheelHandler(scrollFrame, listFrame, ns.ROW_H)
     scrollFrame:SetScript("OnMouseWheel", OnWheel)
     listFrame:SetScript("OnMouseWheel", OnWheel)
 
@@ -1660,11 +1673,7 @@ function ns.CreateCopyTextWindow(name, title)
     box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     scrollFrame:SetScrollChild(box)
 
-    scrollFrame:SetScript("OnMouseWheel", function(self, delta)
-        local cur  = self:GetVerticalScroll()
-        local maxS = math.max(0, box:GetHeight() - self:GetHeight())
-        self:SetVerticalScroll(math.max(0, math.min(cur - delta * 22, maxS)))
-    end)
+    scrollFrame:SetScript("OnMouseWheel", ns.MakeWheelHandler(scrollFrame, box, 22))
 
     frame.scrollFrame = scrollFrame
     frame.box = box

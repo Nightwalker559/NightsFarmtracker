@@ -1,0 +1,5 @@
+<Bindings>
+	<Binding name="NFT_TOGGLE_HUD" header="NIGHTSFARMTRACKER" category="ADDONS">
+		NightsFarmtracker_ToggleHud()
+	</Binding>
+</Bindings>

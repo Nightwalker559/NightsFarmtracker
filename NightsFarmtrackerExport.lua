@@ -21,8 +21,12 @@ local _, ns = ...
 local JSON_ESCAPES = {
     ["\""] = "\\\"", ["\\"] = "\\\\", ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t",
 }
+-- Any other control character must be \u-escaped, or the JSON is invalid.
+local function JSONEscape(c)
+    return JSON_ESCAPES[c] or string.format("\\u%04x", c:byte())
+end
 local function JSONString(s)
-    return "\"" .. tostring(s):gsub('[%c"\\]', JSON_ESCAPES) .. "\""
+    return "\"" .. tostring(s):gsub('[%c"\\]', JSONEscape) .. "\""
 end
 
 local function JSONValue(v)
@@ -230,10 +234,7 @@ local function EnsurePickFrame()
     local content = CreateFrame("Frame", nil, scroll)
     content:SetWidth(PICK_W - ns.PAD * 2 - 4)
     scroll:SetScrollChild(content)
-    scroll:SetScript("OnMouseWheel", function(self, delta)
-        local maxS = math.max(0, content:GetHeight() - self:GetHeight())
-        self:SetVerticalScroll(math.max(0, math.min(self:GetVerticalScroll() - delta * PICK_ROW_H, maxS)))
-    end)
+    scroll:SetScript("OnMouseWheel", ns.MakeWheelHandler(scroll, content, PICK_ROW_H))
     PickFrame.scroll, PickFrame.content = scroll, content
 end
 

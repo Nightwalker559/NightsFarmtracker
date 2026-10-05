@@ -416,11 +416,22 @@ end
 ------------------------------------------------------------------------
 local watcher = CreateFrame("Frame")
 watcher:RegisterEvent("PLAYER_LOGIN")
-watcher:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-watcher:RegisterEvent("BAG_UPDATE_DELAYED")
-watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+watcher:RegisterEvent("PLAYER_REGEN_ENABLED")   -- always: completes a hide deferred during combat
+
+-- Equipment and bag events are only needed while the bar is enabled
+-- (BAG_UPDATE_DELAYED fires on every loot/vendor/bank action).
+local function UpdateWatcher()
+    if NightsFarmtrackerDB and NightsFarmtrackerDB.baitFrameEnabled == true then
+        watcher:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+        watcher:RegisterEvent("BAG_UPDATE_DELAYED")
+    else
+        watcher:UnregisterEvent("PLAYER_EQUIPMENT_CHANGED")
+        watcher:UnregisterEvent("BAG_UPDATE_DELAYED")
+    end
+end
 
 watcher:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_LOGIN" then UpdateWatcher() end
     if event == "PLAYER_REGEN_ENABLED" and pendingHide then
         pendingHide = false
         SafeHideBaitFrame()
@@ -438,6 +449,7 @@ end
 ------------------------------------------------------------------------
 function ns.SetBaitFrameEnabled(enabled)
     NightsFarmtrackerDB.baitFrameEnabled = enabled and true or false
+    UpdateWatcher()
     if enabled then
         NightsFarmtrackerDB.baitUserHidden = false
         EnsureBaitFrame()

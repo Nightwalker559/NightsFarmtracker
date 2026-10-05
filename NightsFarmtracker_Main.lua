@@ -66,6 +66,7 @@ local LINK_QUALITY = {
 }
 
 local pendingLoot = {}
+local delayedRefreshTicket = 0   -- see the delayed re-check at the end of ProcessLoot
 
 -- canAH: BoE, Bind-on-Use and unbound items (0/nil), plus Trade Goods, may
 -- go on the AH (all still tradeable before the bind actually triggers).
@@ -306,8 +307,14 @@ local function ProcessLoot(items)
         -- on the next loot event otherwise, so an item that priced as
         -- vendor-only on this pass (AH price not yet available) would stay
         -- stuck showing vendor price/never trigger the threshold sound.
-        -- One delayed re-check self-corrects that.
-        C_Timer.After(2, ns.RefreshHUD)
+        -- One delayed re-check self-corrects that. Only the timer of the
+        -- LAST loot of a burst fires (ticket check), so N drops in quick
+        -- succession cost one delayed rebuild instead of N.
+        delayedRefreshTicket = delayedRefreshTicket + 1
+        local ticket = delayedRefreshTicket
+        C_Timer.After(2, function()
+            if ticket == delayedRefreshTicket then ns.RefreshHUD() end
+        end)
     end
 end
 
@@ -531,6 +538,8 @@ SlashCmdList["FARMTRACK"] = function(msg)
         ns.DumpVenomTooltip()
     elseif cmd == "bait" then
         ns.ToggleBaitFrame()
+    elseif cmd == "hud" then
+        ns.HudSlash((msg or ""):match("^%s*%S*%s*(.*)$"))
     elseif cmd == "export" then
         ns.ToggleExportWindow()
     elseif cmd == "test" then
@@ -544,7 +553,7 @@ SlashCmdList["FARMTRACK"] = function(msg)
     elseif cmd == "sessionsdump" then
         ns.DebugSessionsDump()
     else
-        print("|cff30b0c0Night's Farmtracker:|r /nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump")
+        print("|cff30b0c0Night's Farmtracker:|r /nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump")
     end
 end
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.7.1
+
+### New
+
+- Minimap HUD (optional): enlarges the minimap while farming; enable in Settings, set a key in Keybindings, or /nft hud
+
+### Changed
+
+- Item list rebuilds once per frame instead of once per loot
+- Item-info lookups cached; far fewer API calls per rebuild
+- Venom Tracker and Lure Bar only listen to events while enabled
+
+### Fixed
+
+- Changing price source or gear threshold now refreshes the list immediately
+- Opening Settings no longer clears the price cache
+- Empty category could leave a blank scroll area
+- Data Export: control characters in names now produce valid JSON
+
 ## 1.7.0
 
 ### New

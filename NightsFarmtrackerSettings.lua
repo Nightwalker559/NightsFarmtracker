@@ -292,6 +292,7 @@ local function MakeDropdown(parent, yOff)
         NightsFarmtrackerDB.tsmPriceSource = sources[idx]
         frame.lbl:SetText(sources[idx])
         ns.ClearPriceCache()
+        ns.RefreshHUD()
     end)
 
     function frame:Refresh()
@@ -333,10 +334,15 @@ local function MakeCustomSourceEB(parent, yOff)
     eb:SetMaxLetters(64)
     eb:SetFontObject(GameFontNormalSmall)
     eb:SetTextColor(0.85, 0.85, 0.85)
-    eb:SetScript("OnTextChanged", function(self)
+    -- userInput is false when RebuildSettingsContent fills the box with
+    -- SetText; only react to what the player actually typed (otherwise every
+    -- click in Settings would wipe the price cache).
+    eb:SetScript("OnTextChanged", function(self, userInput)
+        if not userInput then return end
         NightsFarmtrackerDB.tsmCustomSource = self:GetText()
         if tsmDropdown then tsmDropdown:Refresh() end
         ns.ClearPriceCache()
+        ns.RefreshHUD()
     end)
     HookEditBoxFocus(frame, eb)
     frame.eb = eb
@@ -429,9 +435,11 @@ local function MakeGearThresholdEB(parent, yOff)
     eb:SetMaxLetters(7)
     eb:SetFontObject(GameFontNormalSmall)
     eb:SetTextColor(0.85, 0.85, 0.85)
-    eb:SetScript("OnTextChanged", function(self)
+    eb:SetScript("OnTextChanged", function(self, userInput)
+        if not userInput then return end
         local gold = tonumber(self:GetText()) or 0
         NightsFarmtrackerDB.gearAHThreshold = gold * 10000
+        ns.RefreshHUD()
     end)
     HookEditBoxFocus(frame, eb)
 
@@ -495,7 +503,8 @@ local function MakeSessionLengthEB(parent, yOff)
     eb:SetMaxLetters(4)
     eb:SetFontObject(GameFontNormalSmall)
     eb:SetTextColor(0.85, 0.85, 0.85)
-    eb:SetScript("OnTextChanged", function(self)
+    eb:SetScript("OnTextChanged", function(self, userInput)
+        if not userInput then return end
         NightsFarmtrackerDB.sessionLength = tonumber(self:GetText()) or 0
         ns.UpdateTimerDisplay()
         ns.ApplyPauseVisuals()
@@ -1063,7 +1072,7 @@ function ns.RebuildSettingsContent()
         end
 
         local function getAH()  return db.ahSource or "auto" end
-        local function setAH(v) db.ahSource = v; ns.ClearPriceCache() end
+        local function setAH(v) db.ahSource = v; ns.ClearPriceCache(); ns.RefreshHUD() end
 
         for _, opt in ipairs(ahOptions) do
             local row = track(AcquireRadio(SListFrame), "radio")
@@ -1441,6 +1450,30 @@ function ns.RebuildSettingsContent()
     end)
 
     -- ----------------------------------------------------------------
+    -- Section: Minimap HUD
+    -- ----------------------------------------------------------------
+    addSection("sec_hud", function(y)
+        local hudLbl = track(AcquireSectionLabel(SListFrame), "section")
+        hudLbl:SetPoint("TOPLEFT", S_PAD, y)
+        hudLbl:SetText(ns.L["sec_hud"])
+        y = y - 26
+
+        local hudRow = track(AcquireCheckbox(SListFrame), "checkbox")
+        ConfigureCheckbox(hudRow, ns.L["hud_enabled"], y,
+            function() return db.hudEnabled == true end,
+            function(v) ns.SetHudEnabled(v) end)
+        y = y - 38
+
+        local hudHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
+        hudHint:SetPoint("TOPLEFT", S_PAD, y)
+        hudHint:SetTextColor(0.5,0.5,0.5)
+        hudHint:SetText(ns.L["hud_keybind_hint"])
+        y = y - math.ceil(hudHint:GetStringHeight()) - 10
+
+        return y
+    end)
+
+    -- ----------------------------------------------------------------
     -- Section: Data Export
     -- ----------------------------------------------------------------
     addSection("sec_export", function(y)
@@ -1549,11 +1582,7 @@ local function EnsureSettingsFrame()
     SListFrame:SetHeight(1)
     SScrollFrame:SetScrollChild(SListFrame)
 
-    local function OnWheel(_, delta)
-        local cur  = SScrollFrame:GetVerticalScroll()
-        local maxS = math.max(0, SListFrame:GetHeight() - SScrollFrame:GetHeight())
-        SScrollFrame:SetVerticalScroll(math.max(0, math.min(cur - delta * S_SCROLL_STEP, maxS)))
-    end
+    local OnWheel = ns.MakeWheelHandler(SScrollFrame, SListFrame, S_SCROLL_STEP)
     SScrollFrame:SetScript("OnMouseWheel", OnWheel)
     SListFrame:EnableMouseWheel(true)
     SListFrame:SetScript("OnMouseWheel", OnWheel)

@@ -181,11 +181,7 @@ local function EnsureLogFrame()
     LListFrame:SetWidth(ns.CONTENT_W); LListFrame:SetHeight(1)
     LScrollFrame:SetScrollChild(LListFrame)
 
-    local function OnWheel(_, delta)
-        local cur  = LScrollFrame:GetVerticalScroll()
-        local maxS = math.max(0, LListFrame:GetHeight() - LScrollFrame:GetHeight())
-        LScrollFrame:SetVerticalScroll(math.max(0, math.min(cur - delta*ROW_H, maxS)))
-    end
+    local OnWheel = ns.MakeWheelHandler(LScrollFrame, LListFrame, ROW_H)
     LScrollFrame:SetScript("OnMouseWheel", OnWheel)
     LListFrame:SetScript("OnMouseWheel", OnWheel)
 

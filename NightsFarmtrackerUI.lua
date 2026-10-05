@@ -169,11 +169,7 @@ local ListFrame = CreateFrame("Frame", nil, ScrollFrame)
 ListFrame:SetSize(CONTENT_W, 1)
 ScrollFrame:SetScrollChild(ListFrame)
 
-local function OnWheel(_, delta)
-    local cur  = ScrollFrame:GetVerticalScroll()
-    local maxS = math.max(0, ListFrame:GetHeight() - ScrollFrame:GetHeight())
-    ScrollFrame:SetVerticalScroll(math.max(0, math.min(cur - delta * SCROLL_STEP, maxS)))
-end
+local OnWheel = ns.MakeWheelHandler(ScrollFrame, ListFrame, SCROLL_STEP)
 ScrollFrame:EnableMouseWheel(true)
 ScrollFrame:SetScript("OnMouseWheel", OnWheel)
 ListFrame:EnableMouseWheel(true)
@@ -381,7 +377,6 @@ local function SafeHideMainFrame()
     NightsFarmtrackerDB.visible = false
     MainFrame:Hide()
 end
-ns.SafeHideMainFrame = SafeHideMainFrame
 
 -- Symmetric guard for Show(): SlashCmdList and the minimap icon can also
 -- call this while in combat, and Show() is just as much on the
@@ -393,7 +388,6 @@ local function SafeShowMainFrame()
     end
     if not ns.DeferInCombat(show) then show() end
 end
-ns.SafeShowMainFrame = SafeShowMainFrame
 
 function ns.ToggleMainFrame()
     if MainFrame:IsShown() then SafeHideMainFrame() else SafeShowMainFrame() end
@@ -577,6 +571,13 @@ local function PlaceRow(row, yOff, name, icon, nameColor, quality)
     itemRows[name] = row
 end
 
+-- Hands back a category header row that turned out to have nothing to show.
+local function DropLastHeader(row, name)
+    ReleaseRow(row)
+    itemRows[name] = nil
+    itemOrder[#itemOrder] = nil   -- PlaceRow appended it; keep #itemOrder = real rows
+end
+
 -- Same rule as ns.ItemValue: vendor price when forced (filters, BoP, no AH
 -- source, Gear AH Threshold), otherwise the higher of AH and vendor price -
 -- so a row always shows the value that goes into its category total.
@@ -587,8 +588,14 @@ end
 
 ------------------------------------------------------------------------
 -- RefreshHUD
+-- BuildHUD rebuilds the whole item list (every row, price lookup and sort).
+-- Callers ask for a refresh on every loot event, every settings click and
+-- again 2 s after each drop, so a loot burst (AoE loot, mailbox, bank
+-- withdraw) used to rebuild the list dozens of times back to back.
+-- ns.RefreshHUD only queues one rebuild for the next frame; any number of
+-- requests inside the same frame collapse into it.
 ------------------------------------------------------------------------
-ns.RefreshHUD = function()
+local function BuildHUD()
     local savedScroll = ScrollFrame:GetVerticalScroll()
     for _, row in pairs(itemRows) do ReleaseRow(row) end
     itemRows, itemOrder = {}, {}
@@ -808,8 +815,7 @@ ns.RefreshHUD = function()
 
             -- Skip category entirely if no displayable items
             if #flat == 0 and not isCollapsed then
-                ReleaseRow(hdr)
-                itemRows[catName] = nil
+                DropLastHeader(hdr, catName)
                 yOffset = yOffset - CAT_ROW_H
             else
 
@@ -882,6 +888,17 @@ ns.RefreshHUD = function()
     if ns.FilterFrame and ns.FilterFrame:IsShown() then
         ns.RebuildFilterList()
     end
+end
+
+local refreshQueued = false
+
+function ns.RefreshHUD()
+    if refreshQueued then return end
+    refreshQueued = true
+    C_Timer.After(0, function()
+        refreshQueued = false   -- reset first: a later request must still get through if BuildHUD errors
+        BuildHUD()
+    end)
 end
 
 ------------------------------------------------------------------------

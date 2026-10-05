@@ -52,18 +52,51 @@ ns.EXPANSION_ORDER = {0,1,2,3,4,5,6,7,8,9,10,11}
 -- to an external addon's API can mismatch its own internal lookup if the link
 -- isn't in the exact form that addon expects; GetItemInfo returns the
 -- canonical link Auctionator (and others) key their price data on.
+--
+-- Memoized: the canonical form of a given link never changes, but this runs
+-- for every item several times per list rebuild (price lookups, gear
+-- variant keys, expansion filter), and each GetItemInfo call returns 17
+-- values. Only a real lookup is cached - when the client has not cached the
+-- item yet the raw link is returned and the next call tries again. The
+-- cache is bounded (reset when it grows past MEMO_LIMIT).
+local MEMO_LIMIT = 2000
+local cleanLinkMemo, cleanLinkCount = {}, 0
+
 function ns.CleanItemLink(itemLink)
     if not itemLink then return nil end
-    return select(2, C_Item.GetItemInfo(itemLink)) or itemLink
+    local clean = cleanLinkMemo[itemLink]
+    if clean then return clean end
+    clean = select(2, C_Item.GetItemInfo(itemLink))
+    if not clean then return itemLink end
+    if cleanLinkCount >= MEMO_LIMIT then
+        wipe(cleanLinkMemo); cleanLinkCount = 0
+    end
+    cleanLinkMemo[itemLink] = clean
+    cleanLinkCount = cleanLinkCount + 1
+    return clean
 end
 
 -- Expansion ID (expacID) an item belongs to, per Enum.ExpansionLevel.
 -- itemLink carries bonus IDs so this stays consistent with CleanItemLink's
 -- other callers; falls back to itemID. Returns nil if uncached/unknown.
+-- Memoized like CleanItemLink (an item's expansion never changes; the AH-by-
+-- expansion filter asks for it for every item on every list rebuild).
+local expansionMemo, expansionCount = {}, 0
+
 function ns.GetItemExpansionID(data)
     local src = ns.CleanItemLink(data.itemLink) or data.itemID
     if not src then return nil end
-    return select(15, C_Item.GetItemInfo(src))
+    local expID = expansionMemo[src]
+    if expID ~= nil then return expID end
+    expID = select(15, C_Item.GetItemInfo(src))
+    if expID ~= nil then
+        if expansionCount >= MEMO_LIMIT then
+            wipe(expansionMemo); expansionCount = 0
+        end
+        expansionMemo[src] = expID
+        expansionCount = expansionCount + 1
+    end
+    return expID
 end
 
 ------------------------------------------------------------------------
