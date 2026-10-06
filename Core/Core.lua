@@ -61,7 +61,7 @@ ns.CLASS_PRIORITY = {
 -- priority instead of silently falling through to the default (50).
 
 -- UI layout
-ns.FRAME_W     = 310
+ns.FRAME_W     = 330
 ns.PAD         = 10
 ns.ROW_H       = 34
 ns.CAT_ROW_H   = 22
@@ -611,6 +611,7 @@ ns.PROFILE_KEYS = {
     tsmCustomSource=true, colorTheme=true, venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
+    showPriceSource=true,
 }
 
 ns.DEFAULT_PROFILE = "Default"
@@ -638,6 +639,7 @@ local function NewProfileDefaults()
         mergeJunkEntries      = false,
         instanceLockoutEnabled = false,
         hudEnabled            = false,
+        showPriceSource       = false,
     }
 end
 
@@ -813,6 +815,7 @@ function ns.InitDB()
     if db.colorTheme      == nil then db.colorTheme      = "default"  end
     if db.venomTrackerEnabled == nil then db.venomTrackerEnabled = false end
     if db.hudEnabled          == nil then db.hudEnabled          = false end
+    if db.showPriceSource     == nil then db.showPriceSource     = false end
     ns.ApplyColorTheme(db.colorTheme)
 end
 

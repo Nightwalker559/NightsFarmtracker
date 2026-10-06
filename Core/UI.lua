@@ -570,6 +570,13 @@ local function AcquireRow()
     row.goldText:SetTextColor(unpack(ns.COL_GOLD))
     row.goldText:SetFontHeight(ns.FONT_NORMAL)
 
+    -- Price source tag ("AH" / "V"), sits left of the gold amount; only
+    -- filled in by ShowGold when the setting is on.
+    row.srcText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.srcText:SetPoint("RIGHT", row.goldText, "LEFT", -4, 0)
+    row.srcText:SetJustifyH("RIGHT")
+    row.srcText:SetFontHeight(ns.FONT_SMALL)
+
     return row
 end
 
@@ -593,6 +600,7 @@ local function ReleaseRow(row)
     row.goldText:ClearAllPoints()
     row.goldText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.goldText:SetFontHeight(ns.FONT_NORMAL)
+    row.srcText:SetText("")
     row.rankBadge:SetText("")
     rowPool[#rowPool+1] = row
 end
@@ -623,9 +631,21 @@ end
 -- Same rule as ns.ItemValue: vendor price when forced (filters, BoP, no AH
 -- source, Gear AH Threshold), otherwise the higher of AH and vendor price -
 -- so a row always shows the value that goes into its category total.
+-- With "Show price source" on, a small "AH" / "V" tag tells which of the two
+-- it is; the name and count columns shift left to make room for it.
+local SRC_SHIFT = 22
 local function ShowGold(row, ah, vendor, forceVendor)
     local shown = forceVendor and (vendor or 0) or math.max(ah or 0, vendor or 0)
     row.goldText:SetText(shown > 0 and ns.FormatGold(shown) or "")
+    if NightsFarmtrackerDB.showPriceSource and shown > 0 then
+        local fromAH = not forceVendor and (ah or 0) >= (vendor or 0)
+        row.srcText:SetText(fromAH and "AH" or "V")
+        if fromAH then row.srcText:SetTextColor(0.4, 0.75, 1) else row.srcText:SetTextColor(0.6, 0.6, 0.6) end
+        row.nameText:SetPoint("RIGHT", row, "RIGHT", -128 - SRC_SHIFT, 0)
+        row.countText:SetPoint("RIGHT", row, "RIGHT", -90 - SRC_SHIFT, 0)
+    else
+        row.srcText:SetText("")
+    end
 end
 
 ------------------------------------------------------------------------

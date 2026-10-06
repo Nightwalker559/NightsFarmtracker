@@ -124,6 +124,7 @@ L["session_length_reached"] = "Session length reached - tracking paused."
 L["session_length_reached_resume"] = "Session length reached. Reset to start a new session, or change the length in Settings."
 L["gold_display_classic"] = "Classic gold display (icons)"
 L["gold_display_modern"]  = "Modern gold display (colored text)"
+L["show_price_source"]    = "Show price source before item value (AH / V)"
 -- Modern gold display suffixes
 L["coin_gold"]   = "g"
 L["coin_silver"] = "s"

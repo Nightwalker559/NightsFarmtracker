@@ -1206,7 +1206,16 @@ function ns.RebuildSettingsContent()
         local gdRow2 = track(AcquireRadio(SListFrame), "radio")
         ConfigureRadio(gdRow2, ns.L["gold_display_modern"], y, "modern", getGoldDisplay, setGoldDisplay)
         gdRow2:SetSelected(getGoldDisplay()=="modern"); gdRow2:SetEnabled(true)
-        y = y - 24
+        y = y - 28
+
+        local srcRow = track(AcquireCheckbox(SListFrame), "checkbox")
+        ConfigureCheckbox(srcRow, ns.L["show_price_source"], y,
+            function() return db.showPriceSource == true end,
+            function(v)
+                db.showPriceSource = v
+                ns.RefreshHUD()
+            end)
+        y = y - 38
 
         local mmRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(mmRow, ns.L["minimap_button"], y,
