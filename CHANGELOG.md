@@ -14,6 +14,10 @@
 - Info tooltip on hover shows only the essentials
 - Main window and the other windows are slightly wider (310 to 330)
 
+### Fixed
+
+- Item tooltips in the main window, History, Log and Lure Bar now show the Auctionator Vendor/Auction lines consistently (they were missing for most items)
+
 ## 1.7.1
 
 ### New

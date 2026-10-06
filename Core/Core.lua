@@ -260,12 +260,44 @@ function ns.Log(...) if ns.debugMode then print("|cff44aaaa[NFT]:|r", ...) end e
 -- ours. Only affects our own rows; normal in-game item tooltips
 -- elsewhere are untouched.
 ------------------------------------------------------------------------
+-- Auctionator adds its Vendor/Auction lines through hooks that fire reliably
+-- for SetItemByID (as in the Vendor-Only Filter) but not for SetHyperlink.
+-- So plain items are shown by ID - the link adds nothing for them (crafting
+-- quality tiers are separate item IDs). Only items whose tooltip depends on
+-- the link's own data keep SetHyperlink: gear (item level/stats of this
+-- drop), battle pets and Mythic keystones.
+local KEYSTONE_ITEM_ID = 180653
+local function TooltipNeedsLink(id, classID)
+    return classID == 2 or classID == 4 or classID == 17 or id == KEYSTONE_ITEM_ID
+end
+
+-- Safety net for the SetHyperlink path: if Auctionator is loaded but its
+-- lines did not get added, add them ourselves (never twice).
+local function EnsureAuctionatorLines(link)
+    local A = Auctionator
+    if not (A and A.Tooltip and A.Tooltip.ShowTipWithPricing and A.Locales and A.Locales.Apply) then return end
+    local ok, label = pcall(A.Locales.Apply, "AUCTION")
+    if not ok or not label then return end
+    for i = 2, GameTooltip:NumLines() do
+        local fs = _G["GameTooltipTextLeft" .. i]
+        local text = fs and fs:GetText()
+        if text and text:find(label, 1, true) == 1 then return end
+    end
+    A.Tooltip.ShowTipWithPricing(GameTooltip, link, 1)
+end
+
 function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID)
     GameTooltip:SetOwner(owner, anchor or "ANCHOR_RIGHT")
+    local linkID, classID
     if hyperlink then
+        local id, _, _, _, _, cls = C_Item.GetItemInfoInstant(hyperlink)
+        linkID, classID = id, cls
+    end
+    if hyperlink and (not linkID or TooltipNeedsLink(linkID, classID)) then
         GameTooltip:SetHyperlink(hyperlink)
+        EnsureAuctionatorLines(hyperlink)
     else
-        GameTooltip:SetItemByID(itemID)
+        GameTooltip:SetItemByID(linkID or itemID)
     end
     if ShoppingTooltip1 then ShoppingTooltip1:Hide() end
     if ShoppingTooltip2 then ShoppingTooltip2:Hide() end
