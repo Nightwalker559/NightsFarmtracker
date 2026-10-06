@@ -570,11 +570,11 @@ local function AcquireRow()
     row.goldText:SetTextColor(unpack(ns.COL_GOLD))
     row.goldText:SetFontHeight(ns.FONT_NORMAL)
 
-    -- Price source tag ("AH" / "V") in its own fixed column between the
-    -- count and the gold amount; only filled in by ShowGold when the
+    -- Price source tag ("AH" / "V") in its own fixed column at the right
+    -- edge, after the gold amount; only filled in by ShowGold when the
     -- setting is on.
     row.srcText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.srcText:SetPoint("RIGHT", row, "RIGHT", -92, 0)
+    row.srcText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.srcText:SetWidth(20)
     row.srcText:SetJustifyH("LEFT")
     row.srcText:SetFontHeight(ns.FONT_SMALL)
@@ -643,6 +643,7 @@ local function ShowGold(row, ah, vendor, forceVendor)
         local fromAH = not forceVendor and (ah or 0) >= (vendor or 0)
         row.srcText:SetText(fromAH and "AH" or "V")
         if fromAH then row.srcText:SetTextColor(0.4, 0.75, 1) else row.srcText:SetTextColor(0.6, 0.6, 0.6) end
+        row.goldText:SetPoint("RIGHT", row, "RIGHT", -4 - SRC_SHIFT, 0)
         row.nameText:SetPoint("RIGHT", row, "RIGHT", -128 - SRC_SHIFT, 0)
         row.countText:SetPoint("RIGHT", row, "RIGHT", -90 - SRC_SHIFT, 0)
     else
@@ -799,7 +800,8 @@ local function BuildHUD()
         hdr.nameText:SetText((isCollapsed and "+ " or "- ")..catName)
         hdr.nameText:SetFontHeight(ns.FONT_NORMAL)
         hdr.goldText:ClearAllPoints()
-        hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", -4, 0)
+        -- same right edge as the item amounts below (they leave room for the AH/V tag)
+        hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", NightsFarmtrackerDB.showPriceSource and (-4 - SRC_SHIFT) or -4, 0)
         hdr.goldText:SetFontHeight(ns.FONT_NORMAL)
 
         hdr.goldText:SetText(cat.totalGold > 0 and ns.FormatGold(cat.totalGold) or "")
