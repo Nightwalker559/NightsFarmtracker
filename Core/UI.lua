@@ -570,11 +570,13 @@ local function AcquireRow()
     row.goldText:SetTextColor(unpack(ns.COL_GOLD))
     row.goldText:SetFontHeight(ns.FONT_NORMAL)
 
-    -- Price source tag ("AH" / "V"), sits left of the gold amount; only
-    -- filled in by ShowGold when the setting is on.
+    -- Price source tag ("AH" / "V") in its own fixed column between the
+    -- count and the gold amount; only filled in by ShowGold when the
+    -- setting is on.
     row.srcText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.srcText:SetPoint("RIGHT", row.goldText, "LEFT", -4, 0)
-    row.srcText:SetJustifyH("RIGHT")
+    row.srcText:SetPoint("RIGHT", row, "RIGHT", -92, 0)
+    row.srcText:SetWidth(20)
+    row.srcText:SetJustifyH("LEFT")
     row.srcText:SetFontHeight(ns.FONT_SMALL)
 
     return row
@@ -633,7 +635,7 @@ end
 -- so a row always shows the value that goes into its category total.
 -- With "Show price source" on, a small "AH" / "V" tag tells which of the two
 -- it is; the name and count columns shift left to make room for it.
-local SRC_SHIFT = 22
+local SRC_SHIFT = 24
 local function ShowGold(row, ah, vendor, forceVendor)
     local shown = forceVendor and (vendor or 0) or math.max(ah or 0, vendor or 0)
     row.goldText:SetText(shown > 0 and ns.FormatGold(shown) or "")
