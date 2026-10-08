@@ -147,11 +147,13 @@ local function EnsureFrame()
     LockoutFrame:SetScript("OnEnter", function(self) ShowTooltip(self) end)
     LockoutFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- 1s refresh of the countdown while visible.
-    local elapsed = 0
-    LockoutFrame:SetScript("OnUpdate", function(_, dt)
-        elapsed = elapsed + dt
-        if elapsed >= 1 then elapsed = 0; UpdateText() end
+    -- 1s refresh of the countdown, only while visible (not a per-frame OnUpdate).
+    local ticker
+    LockoutFrame:HookScript("OnShow", function()
+        if not ticker then ticker = C_Timer.NewTicker(1, function() UpdateText() end) end
+    end)
+    LockoutFrame:HookScript("OnHide", function()
+        if ticker then ticker:Cancel(); ticker = nil end
     end)
 
     -- Frames below the main window (Log while collapsed) chain below this

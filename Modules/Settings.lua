@@ -1231,6 +1231,12 @@ function ns.RebuildSettingsContent()
             end)
         y = y - 38
 
+        local compRow = track(AcquireCheckbox(SListFrame), "checkbox")
+        ConfigureCheckbox(compRow, ns.L["compartment_button"], y,
+            function() return ns.IsInCompartment() end,
+            function(v) ns.SetInCompartment(v) end)
+        y = y - 38
+
         local logRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(logRow, ns.L["log_window_enabled"], y,
             function() return db.logWindowEnabled == true end,

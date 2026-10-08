@@ -1287,6 +1287,19 @@ function ns.SetMinimapVisible(show)
     else         DBIcon:Hide("NightsFarmtracker") end
 end
 
+-- Entry in Blizzard's Addon Compartment (the minimap addon menu). LibDBIcon
+-- stores the choice in our minimap table (db.minimap.showInCompartment) and
+-- re-adds it on the next login by itself.
+function ns.IsInCompartment()
+    return LibStub("LibDBIcon-1.0"):IsButtonInCompartment("NightsFarmtracker")
+end
+
+function ns.SetInCompartment(show)
+    local DBIcon = LibStub("LibDBIcon-1.0")
+    if show then DBIcon:AddButtonToCompartment("NightsFarmtracker")
+    else         DBIcon:RemoveButtonFromCompartment("NightsFarmtracker") end
+end
+
 -- Re-evaluates and re-lays-out the History/Log/Filter/Blacklist buttons.
 -- Called whenever a setting affecting their visibility changes (session
 -- history, loot log, vendor filter, or blacklist toggled on/off).

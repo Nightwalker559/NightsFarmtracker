@@ -130,6 +130,7 @@ L["coin_gold"]   = "g"
 L["coin_silver"] = "s"
 L["coin_copper"] = "c"
 L["minimap_button"]    = "Show minimap button"
+L["compartment_button"] = "Show in minimap addon menu"
 L["reload_required"]   = "Reload required."
 -- Categories
 L["cat_junk"]       = "Junk"

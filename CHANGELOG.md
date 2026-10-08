@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### New
+
+- Settings: optional entry in the minimap addon menu
+
+### Changed
+
+- Gold text uses C_CurrencyInfo.GetCoinTextureString (old global is deprecated)
+- Instance reset counter ticks once a second instead of every frame
+- Addon list category: Loot
+
 ## 1.7.3
 
 ### Fixed

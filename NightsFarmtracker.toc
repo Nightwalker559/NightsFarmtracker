@@ -6,6 +6,7 @@
 ## SavedVariables: NightsFarmtrackerAccountDB
 ## SavedVariablesPerCharacter: NightsFarmtrackerDB
 ## IconTexture: Interface\AddOns\NightsFarmtracker\Media\Icon
+## Category: Loot
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua

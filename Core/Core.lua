@@ -373,7 +373,7 @@ local function FormatGoldClassic(copper)
         -- Gold + silver (rounded to the nearest silver coin). Post-process
         -- Blizzard's own icon string to add the separator to the leading
         -- gold digits only — silver/copper stay 2-digit, never need one.
-        local str = GetCoinTextureString(math.floor(copper / 100) * 100)
+        local str = C_CurrencyInfo.GetCoinTextureString(math.floor(copper / 100) * 100)
         local goldDigits, rest = str:match("^(%d+)(.*)$")
         if goldDigits then
             str = AddThousandsSep(goldDigits) .. rest
@@ -381,7 +381,7 @@ local function FormatGoldClassic(copper)
         return str
     end
     -- Under 1g: silver + copper
-    return GetCoinTextureString(copper)
+    return C_CurrencyInfo.GetCoinTextureString(copper)
 end
 
 -- GOLD_COLOR_CODE / SILVER_COLOR_CODE / COPPER_COLOR_CODE are not always
