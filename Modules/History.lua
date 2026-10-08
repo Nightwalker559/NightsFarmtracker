@@ -247,6 +247,32 @@ local function MergeSessionInto(target, src, keepTimestamp)
 end
 ns.MergeSessionInto = MergeSessionInto
 
+-- Sessions saved before the timestamp became the real start time carry the
+-- save (Reset) time, so a session farmed on day A and reset on day B sits
+-- under key A but shows up under day B in the History window, which groups
+-- by timestamp. Pull such timestamps back onto their storage day (noon;
+-- the time of day isn't known). Returns how many were fixed.
+function ns.RepairSessionTimestampsToDayKey(sessions)
+    if not sessions then return 0 end
+    local fixed = 0
+    for dayKey, list in pairs(sessions) do
+        local y, m, d
+        if type(dayKey) == "string" and type(list) == "table" then
+            y, m, d = dayKey:match("^(%d+)-(%d+)-(%d+)$")
+        end
+        if y then
+            local noon = time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 })
+            for _, session in ipairs(list) do
+                if session.timestamp and date("%Y-%m-%d", session.timestamp) ~= dayKey then
+                    session.timestamp = noon
+                    fixed = fixed + 1
+                end
+            end
+        end
+    end
+    return fixed
+end
+
 function ns.SaveCurrentSession()
     local db = NightsFarmtrackerDB
     if not db or not next(db.count or {}) then return end
@@ -255,8 +281,11 @@ function ns.SaveCurrentSession()
     if not NightsFarmtrackerAccountDB then NightsFarmtrackerAccountDB = {} end
     if not NightsFarmtrackerAccountDB.sessions then NightsFarmtrackerAccountDB.sessions = {} end
     local sessions = NightsFarmtrackerAccountDB.sessions
+    -- Stamped with when the session started (not when it is saved), so the
+    -- date History shows and groups by matches the storage day key below.
+    local startedAt = db.sessionStartTime or time()
     local newEntry = {
-        timestamp=time(), duration=math.floor(db.totalTime),
+        timestamp=startedAt, duration=math.floor(db.totalTime),
         totalGold=0, totalVendor=0, totalAH=0, items={},
         qAtlas=db.qAtlas or {},
         lootedGold=db.lootedGold or 0,
@@ -332,7 +361,7 @@ function ns.SaveCurrentSession()
     -- day it happens to be reset on instead of the day it ran. mergeDaily
     -- folds into that day's existing entry if there is one; otherwise a new
     -- one is added.
-    local todayKey = date("%Y-%m-%d", db.sessionStartTime or newEntry.timestamp)
+    local todayKey = date("%Y-%m-%d", startedAt)
     local todayList = sessions[todayKey]
     if db.mergeDaily ~= false and todayList and todayList[1] then
         MergeSessionInto(todayList[1], newEntry, true)

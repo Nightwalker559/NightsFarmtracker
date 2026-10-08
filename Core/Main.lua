@@ -656,18 +656,19 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         -- ElvUI repositions the minimap; refresh corrects the button position.
         local DBIcon = LibStub and LibStub("LibDBIcon-1.0", true)
         if DBIcon then
-            C_Timer.After(0, function() DBIcon:Refresh("NightsFarmtracker") end)
+            RunNextFrame(function() DBIcon:Refresh("NightsFarmtracker") end)
         end
         -- Some ElvUI/WindTools setups also re-anchor unrelated addon frames
         -- after entering the world (observed: our "TOP" anchor silently
         -- becomes "RIGHT", reintroducing the symmetric collapse/expand bug).
         -- Re-apply our saved TOP anchor here, after other addons had their turn.
-        C_Timer.After(0, function()
+        RunNextFrame(function()
             local pos = NightsFarmtrackerDB.pos
             if pos and pos[1] == "TOP" then
                 MainFrame:ClearAllPoints()
                 MainFrame:SetPoint("TOP", UIParent, "TOP", pos[3], pos[4])
             end
+            if ns.ReapplyBaitPosition then ns.ReapplyBaitPosition() end
         end)
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 

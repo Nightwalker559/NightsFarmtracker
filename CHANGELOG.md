@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Session History: sessions show under the day they were farmed; old entries are corrected once
+- Main window resizes immediately when looting in combat with the Lure Bar active
+
+### Changed
+
+- Lure Bar and Venom Tracker update on game events instead of fixed re-check timers
+- Internal: zero-delay timers replaced by RunNextFrame
+
 ## 1.7.2
 
 ### New

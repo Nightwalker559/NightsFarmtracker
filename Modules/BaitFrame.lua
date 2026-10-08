@@ -54,6 +54,12 @@ local BTN_SIZE = 30
 local BTN_GAP = 4
 local BUFF_ROW_H = 16
 local RefreshBaitFrame -- forward declaration; defined below, used by drop/remove handlers
+-- True only while the bar is anchored to MainFrame itself (fallback when
+-- MainFrame has no screen position yet); normally it is anchored to UIParent
+-- at MainFrame's top-right corner, see ApplyBaitPosition.
+local baitAnchoredToMain = false
+-- MainFrame top/right the bar was last synced to (default position only).
+local syncedTop, syncedRight
 
 -- True while protected frames are anchored to the main window: the bar has
 -- created its SecureActionButtonTemplate lure buttons AND still sits at its
@@ -64,7 +70,7 @@ local RefreshBaitFrame -- forward declaration; defined below, used by drop/remov
 -- defer in exactly this case. Otherwise the main window can be resized
 -- freely, even in combat.
 function ns.BaitDependsOnMainFrame()
-    return next(buttonPool) ~= nil and NightsFarmtrackerDB.baitPos == nil
+    return next(buttonPool) ~= nil and NightsFarmtrackerDB.baitPos == nil and baitAnchoredToMain
 end
 
 -- Small helper to avoid repeating the "if it exists, call it" guard at
@@ -91,10 +97,14 @@ end
 -- two parenthesised groups (bonus, then duration) -- distinct enough to
 -- match locale-independently without needing the exact label text.
 ------------------------------------------------------------------------
+local poleTooltipID  -- dataInstanceID of the last pole tooltip, see TOOLTIP_DATA_UPDATE in the watcher
+
 local function ScanActiveLureBuff()
+    poleTooltipID = nil
     if not FISHING_POLE_SLOT or not HasFishingPoleEquipped() then return nil end
     local tooltipData = C_TooltipInfo.GetInventoryItem("player", FISHING_POLE_SLOT)
     if not tooltipData then return nil end
+    poleTooltipID = tooltipData.dataInstanceID
     for _, line in ipairs(tooltipData.lines) do
         if line.leftText and line.leftText:match("%(%+%d+.-%)%s*%(.-%)%s*$") then
             return line.leftText
@@ -178,11 +188,40 @@ end
 local function ApplyBaitPosition()
     local pos = NightsFarmtrackerDB.baitPos
     BaitFrame:ClearAllPoints()
+    baitAnchoredToMain = false
     if pos then
         BaitFrame:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3])
-    else
-        BaitFrame:SetPoint("BOTTOMRIGHT", ns.MainFrame, "TOPRIGHT", 0, 1)
+        return
     end
+    -- Default spot: just above MainFrame's top-right corner. Anchored to
+    -- UIParent at that corner's screen position rather than to MainFrame:
+    -- WoW blocks resizing a frame a protected frame (the lure buttons) is
+    -- anchored to while in combat, which left MainFrame too small when
+    -- looting in combat. MainFrame is TOP-anchored, so its top/right edges
+    -- don't move when its height changes; only dragging moves them, see
+    -- ns.ReapplyBaitPosition.
+    local main = ns.MainFrame
+    local top, right = main:GetTop(), main:GetRight()
+    if top and right then
+        local s = main:GetEffectiveScale() / BaitFrame:GetEffectiveScale()
+        BaitFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", right * s, top * s + 1)
+        syncedTop, syncedRight = top, right
+    else
+        BaitFrame:SetPoint("BOTTOMRIGHT", main, "TOPRIGHT", 0, 1)
+        baitAnchoredToMain = true
+        syncedTop, syncedRight = nil, nil
+    end
+end
+
+-- Re-sync the default-position bar after MainFrame moved (drag, ElvUI
+-- re-anchor). Needs a layout change on the secure lure buttons' parent, so
+-- not in combat: PLAYER_REGEN_ENABLED re-runs it.
+function ns.ReapplyBaitPosition()
+    if not BaitFrame or NightsFarmtrackerDB.baitPos then return end
+    if not BaitFrame:IsShown() then return end
+    if InCombatLockdown() then return end
+    ApplyBaitPosition()
+    if ns.RepositionVenomTracker then ns.RepositionVenomTracker() end
 end
 
 local function AcquireButton(index)
@@ -214,10 +253,9 @@ local function AcquireButton(index)
             -- type2 is nil (see ConfigureButtonAction), so right click never
             -- ran a secure action -- safe to remove the slot here.
             RemoveBaitSlot(self.slotIndex)
-        else
-            C_Timer.After(0.5, RefreshBaitFrame)
-            C_Timer.After(1.5, RefreshBaitFrame)
         end
+        -- Lure consumed -> BAG_UPDATE_DELAYED; lure applied to the pole ->
+        -- UNIT_INVENTORY_CHANGED (both handled by the watcher below).
     end)
     -- Accept item drops directly on a button too (not just empty frame
     -- background), both drag-hold-release and click-to-place methods.
@@ -435,24 +473,65 @@ local function UpdateWatcher()
     if NightsFarmtrackerDB and NightsFarmtrackerDB.baitFrameEnabled == true then
         watcher:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
         watcher:RegisterEvent("BAG_UPDATE_DELAYED")
+        watcher:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")  -- lure applied/expired on the pole
+        watcher:RegisterEvent("TOOLTIP_DATA_UPDATE")                   -- pole tooltip data resolved late
     else
         watcher:UnregisterEvent("PLAYER_EQUIPMENT_CHANGED")
         watcher:UnregisterEvent("BAG_UPDATE_DELAYED")
+        watcher:UnregisterEvent("UNIT_INVENTORY_CHANGED")
+        watcher:UnregisterEvent("TOOLTIP_DATA_UPDATE")
     end
 end
 
-watcher:SetScript("OnEvent", function(_, event)
+-- Events can burst; coalesce into one refresh next frame.
+local refreshQueued = false
+local function QueueRefresh()
+    if refreshQueued then return end
+    refreshQueued = true
+    RunNextFrame(function()
+        refreshQueued = false
+        RefreshBaitFrame()
+    end)
+end
+
+watcher:SetScript("OnEvent", function(_, event, arg1)
     if event == "PLAYER_LOGIN" then UpdateWatcher() end
-    if event == "PLAYER_REGEN_ENABLED" and pendingHide then
-        pendingHide = false
-        SafeHideBaitFrame()
+    if event == "PLAYER_REGEN_ENABLED" then
+        if pendingHide then
+            pendingHide = false
+            SafeHideBaitFrame()
+        end
+        ns.ReapplyBaitPosition()   -- MainFrame may have been dragged during combat
     end
     if not NightsFarmtrackerDB or NightsFarmtrackerDB.baitFrameEnabled ~= true then return end
-    RefreshBaitFrame()
+    if event == "UNIT_INVENTORY_CHANGED" then
+        QueueRefresh()
+    elseif event == "TOOLTIP_DATA_UPDATE" then
+        -- fires for every tooltip lookup in the game; only our pole's matters
+        if poleTooltipID and arg1 == poleTooltipID then QueueRefresh() end
+    else
+        RefreshBaitFrame()
+    end
 end)
 
 if ns.MainFrame then
     ns.MainFrame:HookScript("OnShow", RefreshBaitFrame)
+    -- The bar is not anchored to MainFrame (see ApplyBaitPosition), so it
+    -- follows MainFrame's corner itself: a cheap per-frame compare that only
+    -- re-anchors when the corner actually moved (drag, ElvUI re-anchor).
+    -- Idle while the bar uses a custom position (db.baitPos) or is hidden;
+    -- in combat the re-anchor is skipped and retried every frame until it
+    -- is allowed again.
+    local follower = CreateFrame("Frame")
+    follower:SetScript("OnUpdate", function()
+        if not BaitFrame or not BaitFrame:IsShown() then return end
+        if NightsFarmtrackerDB.baitPos then return end
+        local main = ns.MainFrame
+        local top, right = main:GetTop(), main:GetRight()
+        if top and (top ~= syncedTop or right ~= syncedRight) then
+            ns.ReapplyBaitPosition()
+        end
+    end)
 end
 
 ------------------------------------------------------------------------

@@ -151,7 +151,10 @@ local function ScanCurrency()
     end
 end
 
+local rodTooltipID  -- dataInstanceID of the last rod tooltip, see TOOLTIP_DATA_UPDATE in the watcher
+
 local function ScanVenom()
+    rodTooltipID = nil
     if NightsFarmtrackerDB.venomTrackerEnabled ~= true then return end
     -- Bail out entirely in combat: VenomFrame:Show()/Hide() can throw
     -- ADDON_ACTION_BLOCKED during combat lockdown (same shared-execution
@@ -182,6 +185,7 @@ local function ScanVenom()
 
     local tooltipData = C_TooltipInfo.GetInventoryItem("player", slot)
     if not tooltipData then return end
+    rodTooltipID = tooltipData.dataInstanceID
 
     for _, line in ipairs(tooltipData.lines) do
         if line.leftText then
@@ -240,27 +244,44 @@ local function UpdateWatcher()
         watcher:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
         watcher:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
         watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+        watcher:RegisterEvent("TOOLTIP_DATA_UPDATE")
     else
         watcher:UnregisterEvent("PLAYER_EQUIPMENT_CHANGED")
         watcher:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
         watcher:UnregisterEvent("CURRENCY_DISPLAY_UPDATE")
         watcher:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        watcher:UnregisterEvent("TOOLTIP_DATA_UPDATE")
     end
 end
 
 -- Tooltip data (C_TooltipInfo) can briefly lag behind the actual value
 -- right after an event fires (e.g. right after a catch), so a scan
--- triggered immediately can still show the previous number. Re-scan a
--- couple of times shortly after to catch the updated value.
+-- triggered immediately can still show the previous number. Scan once now,
+-- once next frame, and again whenever the game reports that the rod's
+-- tooltip data resolved (TOOLTIP_DATA_UPDATE, matched by dataInstanceID).
+local scanQueued = false
+local function QueueScan()
+    if scanQueued then return end
+    scanQueued = true
+    RunNextFrame(function()
+        scanQueued = false
+        ScanVenom()
+    end)
+end
+
 local function ScanVenomDelayed()
     ScanVenom()
-    C_Timer.After(0.5, ScanVenom)
-    C_Timer.After(1.5, ScanVenom)
+    QueueScan()
 end
 
 watcher:SetScript("OnEvent", function(_, event, unit)
     if event == "PLAYER_LOGIN" then UpdateWatcher() end
     if not NightsFarmtrackerDB or NightsFarmtrackerDB.venomTrackerEnabled ~= true then return end
+    if event == "TOOLTIP_DATA_UPDATE" then
+        -- fires for every tooltip lookup in the game; only our rod's matters
+        if rodTooltipID and unit == rodTooltipID then QueueScan() end
+        return
+    end
     if event == "PLAYER_REGEN_ENABLED" then
         ScanVenom()
         ScanCurrency()

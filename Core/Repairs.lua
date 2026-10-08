@@ -79,6 +79,7 @@ ns.ACCOUNT_REPAIRS = {
     { 11, "gearVariantItemLevelsV2", function() return ns.RepairGearVariantItemLevels(NightsFarmtrackerAccountDB.sessions) end },
     -- Re-run of #4 with the same field-name bug fixed.
     { 12, "gearVariantPricingV2", function() return ns.RepairGearVariantPricing(NightsFarmtrackerAccountDB.sessions) end },
+    { 13, "timestampsToDayKey", function() return ns.RepairSessionTimestampsToDayKey(NightsFarmtrackerAccountDB.sessions) end },
 }
 
 -- Per-character repairs, applied directly to the LIVE (unsaved) session in

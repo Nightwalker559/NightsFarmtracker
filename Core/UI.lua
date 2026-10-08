@@ -961,7 +961,7 @@ local refreshQueued = false
 function ns.RefreshHUD()
     if refreshQueued then return end
     refreshQueued = true
-    C_Timer.After(0, function()
+    RunNextFrame(function()
         refreshQueued = false   -- reset first: a later request must still get through if BuildHUD errors
         BuildHUD()
     end)
