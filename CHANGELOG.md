@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.7.4
+## 1.7.3
 
 ### New
 
@@ -8,24 +8,16 @@
 
 ### Fixed
 
+- Session History: sessions show under the day they were farmed; old entries are corrected once
+- Main window resizes immediately when looting in combat with the Lure Bar active
 - Re-enabling the minimap button no longer asks for a reload
 
 ### Changed
 
+- Lure Bar and Venom Tracker update on game events instead of fixed re-check timers
 - Gold text uses C_CurrencyInfo.GetCoinTextureString (old global is deprecated)
 - Instance reset counter ticks once a second instead of every frame
 - Addon list category: Loot
-
-## 1.7.3
-
-### Fixed
-
-- Session History: sessions show under the day they were farmed; old entries are corrected once
-- Main window resizes immediately when looting in combat with the Lure Bar active
-
-### Changed
-
-- Lure Bar and Venom Tracker update on game events instead of fixed re-check timers
 - Internal: zero-delay timers replaced by RunNextFrame
 
 ## 1.7.2
