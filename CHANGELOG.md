@@ -6,6 +6,10 @@
 
 - Settings: optional entry in the minimap addon menu
 
+### Fixed
+
+- Re-enabling the minimap button no longer asks for a reload
+
 ### Changed
 
 - Gold text uses C_CurrencyInfo.GetCoinTextureString (old global is deprecated)

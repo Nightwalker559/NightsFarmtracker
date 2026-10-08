@@ -1220,15 +1220,7 @@ function ns.RebuildSettingsContent()
         local mmRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(mmRow, ns.L["minimap_button"], y,
             function() return not db.minimapHidden end,
-            function(v)
-                db.minimapHidden = not v
-                db.minimap.hide  = not v
-                if v then
-                    StaticPopup_Show("NFT_RELOAD")
-                else
-                    ns.SetMinimapVisible(false)
-                end
-            end)
+            function(v) ns.SetMinimapVisible(v) end)  -- the button is registered at login even when hidden, so no reload needed
         y = y - 38
 
         local compRow = track(AcquireCheckbox(SListFrame), "checkbox")
