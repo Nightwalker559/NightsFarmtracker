@@ -2,17 +2,20 @@
 
 ## 1.7.4
 
+### New
+
+- /reload pauses the running session
+- Relog (new login) saves the session to History and starts a fresh one
+
 ### Changed
 
-- /reload pauses the running session instead of continuing it
-- Relog (new login) saves the session to History and starts a fresh one
-- Loot Log: amount sits 6 px after the item name, window is as wide as its widest row
+- Loot Log: amount sits 6 px after the item name, window width follows its content
 
 ### Fixed
 
-- Identical loot lines in the same moment (loot-all, herb procs) are no longer counted once
-- Boss loot event was read with the wrong arguments and never counted; now a fallback if the chat line is missing
-- Item names containing "x" plus a number can no longer be read as a quantity
+- Identical loot lines in the same moment (loot-all, herb procs) are now all counted
+- Boss loot event was read with the wrong arguments; now a fallback if the chat line is missing
+- Item names containing "x" plus a number are no longer read as a quantity
 
 ## 1.7.3
 
