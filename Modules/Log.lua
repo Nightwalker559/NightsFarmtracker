@@ -14,6 +14,13 @@ local MAX_VIS_H   = 8 * ROW_H
 local MIN_VIS_H   = 30
 local MAX_ENTRIES = 100  -- in-memory cap, oldest entries drop off
 
+-- Row layout (the window is as wide as its widest row, see RebuildLogList)
+local TIME_W         = 38
+local ROW_GAP        = 4   -- time|icon|name
+local ROW_EDGE       = 4   -- left/right row padding
+local NAME_COUNT_GAP = 6   -- name|amount
+local EMPTY_PAD      = 20  -- room around the "no entries" label
+
 local LogFrame, LScrollFrame, LListFrame
 
 -- Backed by NightsFarmtrackerDB.logEntries (SavedVariablesPerCharacter), so
@@ -56,14 +63,13 @@ local function AcquireRow()
     r.rankBadge = ns.CreateIconBadge(r, r.icon)
 
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 4, 0)
-    r.nameText:SetPoint("RIGHT", r,           "RIGHT", -40, 0)
+    r.nameText:SetPoint("LEFT", r.icon, "RIGHT", ROW_GAP, 0)
     r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(ns.FONT_NORMAL)
     r.nameText:SetTextColor(0.85,0.85,0.85)
 
     r.countText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.countText:SetPoint("RIGHT", r, "RIGHT", -4, 0)
-    r.countText:SetJustifyH("RIGHT"); r.countText:SetFontHeight(ns.FONT_NORMAL)
+    r.countText:SetPoint("LEFT", r.nameText, "RIGHT", NAME_COUNT_GAP, 0)
+    r.countText:SetJustifyH("LEFT"); r.countText:SetFontHeight(ns.FONT_NORMAL)
     r.countText:SetTextColor(unpack(ns.COL_GOLD))
 
     r:EnableMouse(true)
@@ -91,7 +97,7 @@ local function RebuildLogList()
     for _, r in ipairs(activeRows) do ReleaseRow(r) end
     activeRows = {}
 
-    local yOff = 0
+    local yOff, widest = 0, 0
     for _, e in ipairs(NightsFarmtrackerDB.logEntries or {}) do
         local r = AcquireRow()
         r:SetPoint("TOPLEFT", 0, -yOff)
@@ -105,7 +111,22 @@ local function RebuildLogList()
         ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
         activeRows[#activeRows+1] = r
         yOff = yOff + ROW_H
+        widest = math.max(widest, ROW_EDGE + TIME_W + ROW_GAP + ns.ICON_SIZE + ROW_GAP
+            + r.nameText:GetStringWidth() + NAME_COUNT_GAP + r.countText:GetStringWidth() + ROW_EDGE)
     end
+
+    -- Window width follows the widest row; never narrower than the title
+    -- (plus close button) or, with no entries, the "empty" label.
+    local minW = LogFrame.titleFS:GetStringWidth() + 2 * (LOG_PAD + 22)
+    if #activeRows == 0 then
+        minW = math.max(minW, LogFrame.emptyLabel:GetStringWidth() + 2 * EMPTY_PAD)
+    end
+    local frameW   = math.ceil(math.max(minW, widest + 2 * LOG_PAD))
+    local contentW = frameW - 2 * LOG_PAD
+    for _, r in ipairs(activeRows) do r:SetWidth(contentW) end
+    LScrollFrame:SetWidth(contentW); LListFrame:SetWidth(contentW)
+    local widthChanged = math.abs(LogFrame:GetWidth() - frameW) > 0.5
+    LogFrame:SetWidth(frameW)
 
     local contentH = math.max(1, yOff)
     LListFrame:SetHeight(contentH)
@@ -114,6 +135,9 @@ local function RebuildLogList()
     LogFrame:SetHeight(LOG_HDR_H + visH + 10)
 
     LogFrame.emptyLabel:SetShown(#(NightsFarmtrackerDB.logEntries or {}) == 0)
+
+    -- Docking decides left/right (or below) by the frame's width: redo it
+    if widthChanged and LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
 end
 
 ------------------------------------------------------------------------

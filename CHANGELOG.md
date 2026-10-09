@@ -6,6 +6,7 @@
 
 - /reload pauses the running session instead of continuing it
 - Relog (new login) saves the session to History and starts a fresh one
+- Loot Log: amount sits 6 px after the item name, window is as wide as its widest row
 
 ### Fixed
 
