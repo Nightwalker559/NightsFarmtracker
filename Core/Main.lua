@@ -790,7 +790,9 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         local _, itemID, link, qty, playerName = ...
         if issecretvalue(itemID) or issecretvalue(link) or issecretvalue(qty) or issecretvalue(playerName) then return end
         if not itemID or not link or link == "" then return end
-        if playerName ~= UnitName("player") then return end
+        ns.Log("EncounterLoot", itemID, "qty=", qty, "player=", playerName)
+        -- may arrive as "Name-Realm" for cross-realm players: compare the short name
+        if type(playerName) ~= "string" or playerName:match("^([^%-]+)") ~= UnitName("player") then return end
 
         -- The chat line already counted it
         if ConsumePending(recentChatLoot, itemID) then return end
