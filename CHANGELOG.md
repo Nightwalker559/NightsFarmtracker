@@ -7,6 +7,12 @@
 - /reload pauses the running session instead of continuing it
 - Relog (new login) saves the session to History and starts a fresh one
 
+### Fixed
+
+- Identical loot lines in the same moment (loot-all, herb procs) are no longer counted once
+- Boss/chest loot uses the quantity from the chat line (the encounter event's count can be wrong)
+- Item names containing "x" plus a number can no longer be read as a quantity
+
 ## 1.7.3
 
 ### New

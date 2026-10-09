@@ -562,27 +562,43 @@ end
 ------------------------------------------------------------------------
 EventFrame = CreateFrame("Frame")
 
--- Within-CHAT_MSG_LOOT dedup: prevents the same event from firing twice
-local recentLoot   = {}
-local DEDUP_WINDOW = 0.1  -- seconds
+-- Blizzard sometimes dispatches the very same CHAT_MSG_LOOT line twice for one
+-- pickup. That double has the same lineID (and byte-identical text, which
+-- includes the full link, so differently rolled gear never matches). Two real
+-- pickups - several corpses in one loot-all, herb procs - are separate chat
+-- lines with their own lineID and must both count, so the window is tiny.
+local recentLootLine = {}  -- itemID -> { text, at, lineID }
+local DUP_WINDOW     = 0.02  -- seconds, "this frame or the next"
 
--- Cross-event dedup: prevents double-counting between CHAT_MSG_LOOT and ENCOUNTER_LOOT_RECEIVED
-local recentChatLoot      = {}  -- seen from CHAT_MSG_LOOT
-local recentEncounterLoot = {}  -- seen from ENCOUNTER_LOOT_RECEIVED
+local function IsDuplicateLootLine(itemID, msg, lineID)
+    local now = GetTime()
+    local rec = recentLootLine[itemID]
+    local lastText, lastAt, lastLineID
+    if rec then
+        lastText, lastAt, lastLineID = rec.text, rec.at, rec.lineID
+    else
+        rec = {}
+        recentLootLine[itemID] = rec
+    end
+    rec.text, rec.at, rec.lineID = msg, now, lineID
+    if lastAt and lineID and lastLineID and lineID ~= lastLineID then return false end
+    return lastAt ~= nil and lastText == msg and (now - lastAt) < DUP_WINDOW
+end
+
+-- Cross-event dedup between CHAT_MSG_LOOT and ENCOUNTER_LOOT_RECEIVED. The
+-- encounter event's quantity is unreliable (chests/caches), so only the chat
+-- line counts; the encounter event just waits for it and is the fallback if
+-- no chat line follows.
+local recentChatLoot      = {}  -- counted via CHAT_MSG_LOOT, expires after CROSS_DEDUP_TTL
+local recentEncounterLoot = {}  -- ENCOUNTER_LOOT_RECEIVED waiting for its chat line
 local CROSS_DEDUP_TTL     = 2   -- seconds
+local ENCOUNTER_WAIT      = 0.4 -- seconds to wait for the chat line
 
--- True if the other event source already reported this item (consumes that
--- marker, caller should skip). Otherwise marks it in `seen` for the other
--- source to consume, and expires the mark after CROSS_DEDUP_TTL.
-local function SkipOrMarkLoot(seen, other, itemID)
-    if other[itemID] and other[itemID] > 0 then
-        other[itemID] = other[itemID] - 1
+local function ConsumePending(t, itemID)
+    if t[itemID] and t[itemID] > 0 then
+        t[itemID] = t[itemID] - 1
         return true
     end
-    seen[itemID] = (seen[itemID] or 0) + 1
-    C_Timer.After(CROSS_DEDUP_TTL, function()
-        if seen[itemID] and seen[itemID] > 0 then seen[itemID] = seen[itemID] - 1 end
-    end)
     return false
 end
 
@@ -717,7 +733,8 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "CHAT_MSG_LOOT" and not NightsFarmtrackerDB.paused then
-        local msg, _, _, _, sender, _, _, _, _, _, _, guid = ...
+        local msg, _, _, _, sender, _, _, _, _, _, lineID, guid = ...
+        if type(lineID) ~= "number" or issecretvalue(lineID) then lineID = nil end
         if not msg or issecretvalue(msg) then return end
 
         -- isMe: sender GUID = own GUID (language-independent) OR prefix check
@@ -738,20 +755,24 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         local itemID = tonumber(linkData:match("^item:(%d+)"))
         if not itemID then return end
 
-        local qty      = tonumber(msg:match("x(%d+)")) or 1
+        -- Quantity sits at the very end ("...]|h|rx5."); strip the links first
+        -- so an item name like "Box x2" can't pass for a quantity.
+        local qty      = tonumber(msg:gsub("|H.-|h.-|h", ""):match("x(%d+)%D*$")) or 1
         local fullLink = "|H" .. linkData .. "|h[" .. itemName .. "]|h"
 
-        -- Within-event dedup (itemID:qty key, 0.1s window)
-        local now      = GetTime()
-        local dedupKey = itemID .. ":" .. qty
-        for k, t in pairs(recentLoot) do
-            if (now - t) > DEDUP_WINDOW * 10 then recentLoot[k] = nil end
-        end
-        if recentLoot[dedupKey] and (now - recentLoot[dedupKey]) < DEDUP_WINDOW then return end
-        recentLoot[dedupKey] = now
+        -- Blizzard's double dispatch of one chat line (same lineID/text)
+        if IsDuplicateLootLine(itemID, msg, lineID) then return end
 
-        -- Cross-event dedup against ENCOUNTER_LOOT_RECEIVED
-        if SkipOrMarkLoot(recentChatLoot, recentEncounterLoot, itemID) then return end
+        -- This chat line is the authoritative count. An ENCOUNTER_LOOT_RECEIVED
+        -- that was waiting for it is now satisfied; either way remember it so
+        -- a late encounter event for this item is skipped.
+        ConsumePending(recentEncounterLoot, itemID)
+        recentChatLoot[itemID] = (recentChatLoot[itemID] or 0) + 1
+        C_Timer.After(CROSS_DEDUP_TTL, function()
+            if recentChatLoot[itemID] and recentChatLoot[itemID] > 0 then
+                recentChatLoot[itemID] = recentChatLoot[itemID] - 1
+            end
+        end)
 
         ProcessLoot({{
             itemID      = itemID,
@@ -772,19 +793,28 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         local itemID = tonumber(link:match("item:(%d+)"))
         if not itemID then return end
 
-        -- Cross-event dedup against CHAT_MSG_LOOT
-        if SkipOrMarkLoot(recentEncounterLoot, recentChatLoot, itemID) then return end
+        -- The chat line already counted it
+        if ConsumePending(recentChatLoot, itemID) then return end
 
-        local color    = link:match("|cff(%x%x%x%x%x%x)|H")
-        local itemName = link:match("%[(.-)%]")
-        local fullLink = link:match("(|H.+|h%[.-%]|h)") or link
+        -- This event's quantity is unreliable (chests/caches): wait for the
+        -- chat line, which carries the real one. Only if none shows up count
+        -- it from here so the item isn't lost.
+        recentEncounterLoot[itemID] = 1
+        C_Timer.After(ENCOUNTER_WAIT, function()
+            if not ConsumePending(recentEncounterLoot, itemID) then return end
+            if NightsFarmtrackerDB.paused then return end
 
-        ProcessLoot({{
-            itemID      = itemID,
-            qty         = tonumber(qty) or 1,
-            link        = fullLink,
-            itemName    = itemName,
-            linkQuality = LINK_QUALITY[color and color:lower()],
-        }})
+            local color    = link:match("|cff(%x%x%x%x%x%x)|H")
+            local itemName = link:match("%[(.-)%]")
+            local fullLink = link:match("(|H.+|h%[.-%]|h)") or link
+
+            ProcessLoot({{
+                itemID      = itemID,
+                qty         = tonumber(qty) or 1,
+                link        = fullLink,
+                itemName    = itemName,
+                linkQuality = LINK_QUALITY[color and color:lower()],
+            }})
+        end)
     end
 end)
