@@ -16,6 +16,7 @@ Night's Farmtracker sits in your HUD while you grind and counts everything you l
 - Gear AH Threshold: Equipment only uses its AH price once it reaches a configurable gold amount, below it (or with no AH price) vendor price is shown; a config icon lets you choose which Equipment categories (Equipment, BoE, BoA, Cosmetic) it applies to; optional alert sound for valuable drops
 - Crafting reagent quality tier breakdown (R1/R2/R3) with per-tier AH pricing
 - Session timer with pause/resume; optional fixed session length (timer counts down, session pauses itself at 0)
+- /reload pauses the session; a relog saves it to History and starts fresh
 - Gold per hour / gold per minute rate display; classic (coin icons) or modern (colored text) gold format
 - Direct gold from mob drops tracked separately
 - Loot Log window: chronological, quality-colored entry list, persists per-character across reload

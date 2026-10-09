@@ -653,6 +653,31 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         ns.MaybePromptSessionResetMigration()
 
     elseif event == "PLAYER_ENTERING_WORLD" then
+        -- First PEW after the addon loaded = login or /reload (never a plain
+        -- load screen, we unregister below). PLAYER_LOGOUT can't tell logout
+        -- from reload, so the relog reset is done here at the next login.
+        local isInitialLogin, isReloadingUi = ...
+        local db = NightsFarmtrackerDB
+        if isReloadingUi then
+            -- /reload: keep the session, but pause it
+            if not db.paused then
+                db.paused = true
+                ns.StopTimer()
+                ns.ApplyPauseVisuals()
+            end
+        elseif isInitialLogin then
+            -- Relog: file the old session into History, start clean
+            if (db.totalTime or 0) > 0 or next(db.count) or (db.lootedGold or 0) > 0 then
+                -- Reset closes the Loot Log; a relog shouldn't, so put it back
+                local logShown = db.logWindowShown
+                ns.Reset()
+                if logShown then
+                    db.logWindowShown = true
+                    ns.RestoreLogWindow()
+                end
+            end
+        end
+
         -- ElvUI repositions the minimap; refresh corrects the button position.
         local DBIcon = LibStub and LibStub("LibDBIcon-1.0", true)
         if DBIcon then

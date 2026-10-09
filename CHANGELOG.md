@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.4
+
+### Changed
+
+- /reload pauses the running session instead of continuing it
+- Relog (new login) saves the session to History and starts a fresh one
+
 ## 1.7.3
 
 ### New
