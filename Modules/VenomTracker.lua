@@ -211,20 +211,20 @@ local function ScanVenom()
     end
 end
 
--- Prints all tooltip lines of the equipped item to chat, used to debug a
--- locale keyword mismatch.
+-- Shows all tooltip lines of the equipped item in the debug log window,
+-- used to debug a locale keyword mismatch.
 function ns.DumpVenomTooltip()
     local slot = FindItemSlot()
-    if not slot then
-        print("|cff30b0c0Night's Farmtracker:|r Coiled Huntress not equipped.")
+    local tooltipData = slot and C_TooltipInfo.GetInventoryItem("player", slot)
+    if not tooltipData then
+        ns.DebugVenomTooltip(nil)
         return
     end
-    local tooltipData = C_TooltipInfo.GetInventoryItem("player", slot)
-    if not tooltipData then return end
-    print("|cff30b0c0Night's Farmtracker|r venom tooltip dump:")
+    local lines = {}
     for i, line in ipairs(tooltipData.lines) do
-        print(i .. ": " .. (line.leftText or ""))
+        lines[i] = line.leftText or ""
     end
+    ns.DebugVenomTooltip(lines)
 end
 
 ------------------------------------------------------------------------

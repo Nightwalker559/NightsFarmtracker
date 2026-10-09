@@ -78,8 +78,8 @@ Works with [Auctionator](https://www.curseforge.com/wow/addons/auctionator), Ori
 | `/nft hud rotate` | Toggle minimap rotation of the HUD |
 | `/nft venom` | Toggle Venom Tracker overlay (if enabled) |
 | `/nft bait` | Toggle Fishing Lure Bar (if enabled) |
-| `/nft debug` | Toggle debug output |
-| `/nft venomdump` | Print Venom Tracker's raw tooltip lines to chat (debug) |
+| `/nft debug` | Toggle the live debug trace and open the debug log window (copyable, no chat output) |
+| `/nft venomdump` | Show Venom Tracker's raw tooltip lines in the debug log window |
 | `/nft test` | Show the current session's tracked items (debug) |
 | `/nft itemdb` | Show the item-audit catalog status (debug) |
 | `/nft monthdump [itemID]` | Dump the current month's aggregate, optionally one item's variants (debug) |

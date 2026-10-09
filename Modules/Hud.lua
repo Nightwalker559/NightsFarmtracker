@@ -262,9 +262,7 @@ local function MoveSurroundings()
     pcall(scan, UIParent, 1)
     pcall(scan, ElvUIParent, 1)
     pcall(scan, MinimapCluster, 2)
-    if ns.debugMode then
-        Msg(string.format("HUD: frame scan took %.1f ms", debugprofilestop() - started))
-    end
+    ns.Log(string.format("HUD: frame scan took %.1f ms", debugprofilestop() - started))
 end
 
 local function RestoreSurroundings()

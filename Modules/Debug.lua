@@ -1,18 +1,120 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Debug
--- All the diagnostic "/nft ..." dump commands (test, itemdb, monthdump,
--- sessionsdump) live here, building their output into a Buffer instead
--- of spamming individual print() lines, then showing it all at once in
--- a copyable window (see ns.CreateCopyTextWindow/ns.ShowCopyText in
--- Core/Core.lua) - easier to read and to paste into a bug
--- report than a wall of chat messages.
+-- The debug log and its live window, plus all diagnostic "/nft ..." dump
+-- commands (test, itemdb, monthdump, sessionsdump, venomdump). Everything
+-- goes into the log window (see ns.CreateCopyTextWindow/ns.ShowCopyText
+-- in Core/Core.lua) instead of chat - easier to read and to paste into a
+-- bug report than a wall of chat messages.
 ------------------------------------------------------------------------
 local _, ns = ...
 
 ------------------------------------------------------------------------
--- Buffer helper - :Add(fmt, ...) works like print()/string.format (a
--- plain string is added as-is, extra args run it through string.format),
--- :Text() joins everything with newlines for the copy window.
+-- Debug log - one in-memory ring buffer for everything diagnostic: the
+-- live ns.Log() trace (while /nft debug is on) and the output of the dump
+-- commands. Nothing goes to chat; the window below shows the log live.
+------------------------------------------------------------------------
+local LOG_MAX      = 2000   -- lines kept, oldest drop off
+local REFRESH_STEP = 0.2    -- seconds between window refreshes while lines arrive
+
+local logLines = {}
+local logFirst, logLast = 1, 0
+local DebugFrame
+local dirty, stickPending = false, false
+
+local function Stamp()
+    return string.format("%s.%03d", date("%H:%M:%S"), (GetTime() % 1) * 1000)
+end
+
+-- Appends one line (any number of values, joined by spaces).
+function ns.DebugLogAdd(...)
+    local n = select("#", ...)
+    local line
+    if n == 1 then
+        line = tostring((...))
+    else
+        local parts = {}
+        for i = 1, n do parts[i] = tostring((select(i, ...))) end
+        line = table.concat(parts, " ")
+    end
+    logLast = logLast + 1
+    logLines[logLast] = Stamp() .. "  " .. line
+    if logLast - logFirst + 1 > LOG_MAX then
+        logLines[logFirst] = nil
+        logFirst = logFirst + 1
+    end
+    dirty = true
+end
+
+local function LogText()
+    return table.concat(logLines, "\n", logFirst, logLast)
+end
+
+local function ClearLog()
+    logLines = {}
+    logFirst, logLast = 1, 0
+    dirty = true
+end
+
+-- Window refresh: only while shown and while the EditBox has no focus, so
+-- selecting text for Ctrl+C is never wiped by an incoming line. Follows the
+-- newest line when the view was already scrolled to the end.
+local function RefreshWindow(frame)
+    local sf = frame.scrollFrame
+    local wasAtEnd = sf:GetVerticalScroll() >= sf:GetVerticalScrollRange() - 2
+    frame.box:SetText(LogText())
+    sf:UpdateScrollChildRect()
+    dirty = false
+    stickPending = wasAtEnd
+end
+
+local function CreateDebugWindow()
+    local frame = ns.CreateCopyTextWindow("NightsFarmtrackerDebugWnd", ns.L["debug_title"])
+
+    local clearBtn = CreateFrame("Button", nil, frame)
+    clearBtn:SetSize(60, 16)
+    clearBtn:SetPoint("TOPRIGHT", -ns.PAD - 100, -(ns.WINDOW_HDR_H + 6))
+    local clearText = clearBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    clearText:SetAllPoints(); clearText:SetJustifyH("RIGHT")
+    clearText:SetTextColor(unpack(ns.COL_ACCENT))
+    clearText:SetText(ns.L["debug_clear"])
+    clearBtn:SetScript("OnEnter", function() clearText:SetTextColor(1, 1, 1) end)
+    clearBtn:SetScript("OnLeave", function() clearText:SetTextColor(unpack(ns.COL_ACCENT)) end)
+    clearBtn:SetScript("OnClick", function()
+        ClearLog()
+        frame.box:ClearFocus()
+    end)
+
+    local elapsed = 0
+    frame:SetScript("OnUpdate", function(self, dt)
+        if stickPending then
+            stickPending = false
+            self.scrollFrame:UpdateScrollChildRect()
+            self.scrollFrame:SetVerticalScroll(self.scrollFrame:GetVerticalScrollRange())
+        end
+        if not dirty or self.box:HasFocus() then return end
+        elapsed = elapsed + dt
+        if elapsed < REFRESH_STEP then return end
+        elapsed = 0
+        RefreshWindow(self)
+    end)
+    return frame
+end
+
+-- Opens (or refreshes) the live debug window.
+function ns.ShowDebugLog()
+    if not DebugFrame then
+        DebugFrame = CreateDebugWindow()
+        ns.DebugFrame = DebugFrame
+    end
+    ns.ShowCopyText(DebugFrame, LogText(), true)
+    dirty = false
+    stickPending = true
+end
+
+------------------------------------------------------------------------
+-- Dump commands collect lines in a Buffer, then log them as one block and
+-- open the window. :Add(fmt, ...) works like print()/string.format (a
+-- plain string is added as-is, extra args run it through string.format).
 ------------------------------------------------------------------------
 local Buffer = {}
 Buffer.__index = Buffer
@@ -29,21 +131,28 @@ function Buffer:Add(fmt, ...)
     end
 end
 
-function Buffer:Text()
-    return table.concat(self.lines, "\n")
+local function ShowDebug(buf)
+    for _, line in ipairs(buf.lines) do ns.DebugLogAdd(line) end
+    ns.ShowDebugLog()
 end
 
-------------------------------------------------------------------------
--- Debug window - built from the shared copy-text-window helper.
-------------------------------------------------------------------------
-local DebugFrame
+-- /nft debug - toggles the live trace and opens the window.
+function ns.ToggleDebugMode()
+    ns.debugMode = not ns.debugMode
+    ns.DebugLogAdd("-- debug trace " .. (ns.debugMode and "ON" or "OFF") .. " --")
+    ns.ShowDebugLog()
+end
 
-local function ShowDebug(buf)
-    if not DebugFrame then
-        DebugFrame = ns.CreateCopyTextWindow("NightsFarmtrackerDebugWnd", ns.L["debug_title"])
-        ns.DebugFrame = DebugFrame
+-- /nft venomdump - tooltip lines of the equipped venom item (nil = none).
+function ns.DebugVenomTooltip(lines)
+    local buf = NewBuffer()
+    if not lines then
+        buf:Add("venomdump: Coiled Huntress not equipped / no tooltip data.")
+    else
+        buf:Add("venom tooltip dump:")
+        for i, text in ipairs(lines) do buf:Add("  %d: %s", i, text) end
     end
-    ns.ShowCopyText(DebugFrame, buf:Text())
+    ShowDebug(buf)
 end
 
 ------------------------------------------------------------------------

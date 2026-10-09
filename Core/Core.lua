@@ -249,7 +249,8 @@ ns.ApplyColorTheme(NightsFarmtrackerDB and NightsFarmtrackerDB.colorTheme)
 -- Debug
 ------------------------------------------------------------------------
 ns.debugMode = false
-function ns.Log(...) if ns.debugMode then print("|cff44aaaa[NFT]:|r", ...) end end
+-- Live trace goes to the debug log window (Modules/Debug.lua), not chat.
+function ns.Log(...) if ns.debugMode then ns.DebugLogAdd(...) end end
 
 ------------------------------------------------------------------------
 -- Item tooltips for looted items shown in our own history/log frames.
@@ -1816,11 +1817,12 @@ end
 
 -- Fills a window built by ns.CreateCopyTextWindow with `text` and shows
 -- it (docked next to Settings if open, else centered), pre-selected for
--- an immediate Ctrl+C.
-function ns.ShowCopyText(frame, text)
+-- an immediate Ctrl+C. `live` (the debug log): no focus/selection grab, so
+-- the window can keep refreshing; the caller handles scrolling.
+function ns.ShowCopyText(frame, text, live)
     frame.box:SetText(text)
     frame.scrollFrame:UpdateScrollChildRect()
-    frame.scrollFrame:SetVerticalScroll(0)
+    if not live then frame.scrollFrame:SetVerticalScroll(0) end
     frame:ClearAllPoints()
     if ns.SettingsFrame and ns.SettingsFrame:IsShown() then
         ns.DockFrame(frame, ns.SettingsFrame, "left")
@@ -1828,7 +1830,9 @@ function ns.ShowCopyText(frame, text)
         frame:SetPoint("CENTER")
     end
     frame:Show()
-    frame.box:SetFocus()
-    frame.box:HighlightText()
+    if not live then
+        frame.box:SetFocus()
+        frame.box:HighlightText()
+    end
     ns.RefreshWindowChain("left")
 end

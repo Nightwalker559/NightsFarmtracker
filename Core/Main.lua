@@ -528,8 +528,7 @@ SlashCmdList["FARMTRACK"] = function(msg)
     if cmd == "" then
         ns.ToggleMainFrame()
     elseif cmd == "debug" then
-        ns.debugMode = not ns.debugMode
-        print("|cff30b0c0Night's Farmtracker:|r Debug " .. (ns.debugMode and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
+        ns.ToggleDebugMode()
     elseif cmd == "filter" then
         ns.ToggleFilterWindow()
     elseif cmd == "venom" then
