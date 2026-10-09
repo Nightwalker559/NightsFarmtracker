@@ -136,11 +136,16 @@ local function ShowDebug(buf)
     ns.ShowDebugLog()
 end
 
--- /nft debug - toggles the live trace and opens the window.
+-- /nft debug - ON opens the live window, OFF closes it (the log keeps the
+-- "OFF" line and everything before it for the next time it is opened).
 function ns.ToggleDebugMode()
     ns.debugMode = not ns.debugMode
     ns.DebugLogAdd("-- debug trace " .. (ns.debugMode and "ON" or "OFF") .. " --")
-    ns.ShowDebugLog()
+    if ns.debugMode then
+        ns.ShowDebugLog()
+    elseif DebugFrame then
+        DebugFrame:Hide()
+    end
 end
 
 -- /nft venomdump - tooltip lines of the equipped venom item (nil = none).
