@@ -10,7 +10,7 @@
 ### Fixed
 
 - Identical loot lines in the same moment (loot-all, herb procs) are no longer counted once
-- Boss/chest loot uses the quantity from the chat line (the encounter event's count can be wrong)
+- Boss loot event was read with the wrong arguments and never counted; now a fallback if the chat line is missing
 - Item names containing "x" plus a number can no longer be read as a quantity
 
 ## 1.7.3

@@ -784,21 +784,19 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "ENCOUNTER_LOOT_RECEIVED" and not NightsFarmtrackerDB.paused then
         -- Fires for encounter loot (boss drops etc.), locale-independent
-        -- Args: encounterID, encounterName, difficultyID, groupSize, itemLink, quantity, playerName
-        local _, _, _, _, link, qty, playerName = ...
-        if issecretvalue(link) or issecretvalue(qty) or issecretvalue(playerName) then return end
-        if not link or link == "" then return end
+        -- Args: encounterID, itemID, itemLink, quantity, playerName, className
+        -- (Blizzard's API docs call the last two itemName/fileName, but
+        -- BossBannerToast.lua reads them as player name and class file name)
+        local _, itemID, link, qty, playerName = ...
+        if issecretvalue(itemID) or issecretvalue(link) or issecretvalue(qty) or issecretvalue(playerName) then return end
+        if not itemID or not link or link == "" then return end
         if playerName ~= UnitName("player") then return end
-
-        local itemID = tonumber(link:match("item:(%d+)"))
-        if not itemID then return end
 
         -- The chat line already counted it
         if ConsumePending(recentChatLoot, itemID) then return end
 
-        -- This event's quantity is unreliable (chests/caches): wait for the
-        -- chat line, which carries the real one. Only if none shows up count
-        -- it from here so the item isn't lost.
+        -- The chat line is the authoritative count: wait for it. Only if none
+        -- shows up count it from here so the item isn't lost.
         recentEncounterLoot[itemID] = 1
         C_Timer.After(ENCOUNTER_WAIT, function()
             if not ConsumePending(recentEncounterLoot, itemID) then return end
