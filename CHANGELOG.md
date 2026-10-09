@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Debug mode (`/nft debug`) no longer prints to chat: it opens a live debug log window with Select All / Clear; switching debug off closes it
+- Debug mode (`/nft debug`) no longer prints to chat: it opens a live debug log window with Select All / Clear; switching debug off or the close button closes it, Esc does not
 - `/nft venomdump`, `/nft test`, `/nft itemdb`, `/nft monthdump`, `/nft sessionsdump` write into the same debug log window
 
 ## 1.7.4

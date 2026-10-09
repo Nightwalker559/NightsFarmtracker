@@ -70,6 +70,13 @@ end
 local function CreateDebugWindow()
     local frame = ns.CreateCopyTextWindow("NightsFarmtrackerDebugWnd", ns.L["debug_title"])
 
+    -- Esc must not close the log: CreateWindowFrame registered it as a
+    -- "special frame", so take it out again. Only /nft debug (off) or the
+    -- close button hide it.
+    for i = #UISpecialFrames, 1, -1 do
+        if UISpecialFrames[i] == "NightsFarmtrackerDebugWnd" then table.remove(UISpecialFrames, i) end
+    end
+
     local clearBtn = CreateFrame("Button", nil, frame)
     clearBtn:SetSize(60, 16)
     clearBtn:SetPoint("TOPRIGHT", -ns.PAD - 100, -(ns.WINDOW_HDR_H + 6))
