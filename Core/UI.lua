@@ -23,8 +23,6 @@ local BTN_BAR_H  = 26
 local HDR_TOTAL  = ns.WINDOW_HDR_H  -- same header height as every other window
 local SCROLL_TOP = HDR_TOTAL + 1
 local COLLAPSED_H = HDR_TOTAL + 1 + FOOTER_H
--- Visible list height at which the main window stops growing and scrolls.
-local MAX_LIST_H  = ns.MAX_WINDOW_H - SCROLL_TOP - 1 - FOOTER_H
 
 ------------------------------------------------------------------------
 -- State
@@ -317,7 +315,7 @@ end
 -- Expand / Collapse
 ------------------------------------------------------------------------
 local function ExpandedHeight()
-    return SCROLL_TOP + 1 + math.min(totalH, MAX_LIST_H) + FOOTER_H
+    return SCROLL_TOP + 1 + ns.VisibleListHeight(totalH, SCROLL_TOP + 1, FOOTER_H) + FOOTER_H
 end
 
 ------------------------------------------------------------------------
@@ -1226,14 +1224,13 @@ local function ToggleHelpWindow()
         fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
         fs:SetSpacing(2)
         fs:SetText(BuildHelpText())
-        local textH = math.ceil(fs:GetStringHeight())
-        child:SetHeight(textH)
-        local visH = math.min(textH, ns.HELP_MAX_H - hdrH - 8 - 8)
-        scroll:SetHeight(visH)
-        local OnWheel = ns.MakeWheelHandler(scroll, child, 24)
+        ns.FitScrollWindow({
+            window = HelpFrame, scroll = scroll, list = child,
+            hdrH = hdrH + 8, ftrH = 8, contentH = math.ceil(fs:GetStringHeight()),
+            maxTotal = ns.HELP_MAX_H,
+        })
         scroll:EnableMouseWheel(true)
-        scroll:SetScript("OnMouseWheel", OnWheel)
-        HelpFrame:SetHeight(hdrH + 8 + visH + 8)
+        scroll:SetScript("OnMouseWheel", ns.MakeWheelHandler(scroll, child, 24))
     end
     HelpFrame:SetShown(not HelpFrame:IsShown())
 end

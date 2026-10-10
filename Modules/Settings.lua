@@ -58,7 +58,6 @@ local S_W          = 320
 local S_PAD        = 14
 local S_HDR_H      = ns.WINDOW_HDR_H
 local S_FTR_H       = 26   -- footer strip height (Reset to Default button)
-local S_MAX_VIS    = ns.MAX_WINDOW_H - S_HDR_H - S_FTR_H   -- window caps at ns.MAX_WINDOW_H, content scrolls
 local S_SCROLL_STEP = 22
 
 ------------------------------------------------------------------------
@@ -1739,13 +1738,12 @@ function ns.RebuildSettingsContent()
     -- Resize scroll area and outer frame
     -- ----------------------------------------------------------------
     local contentH = math.abs(y) + 8
-    SListFrame:SetHeight(contentH)
-    local visH = math.min(contentH, S_MAX_VIS)
-    SScrollFrame:SetHeight(visH)
+    local visH = ns.FitScrollWindow({
+        window = SF, scroll = SScrollFrame, list = SListFrame,
+        hdrH = S_HDR_H, ftrH = S_FTR_H, contentH = contentH,
+    })
     SSidebar:SetHeight(visH)
-    SF:SetHeight(S_HDR_H + visH + S_FTR_H)
-    local maxS = math.max(0, contentH - visH)
-    SScrollFrame:SetVerticalScroll(math.min(prevScroll, maxS))
+    SScrollFrame:SetVerticalScroll(math.min(prevScroll, math.max(0, contentH - visH)))
 end
 
 ------------------------------------------------------------------------

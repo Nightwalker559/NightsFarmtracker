@@ -15,7 +15,6 @@ local H_FTR_H  = 28
 local DAY_H    = ns.CAT_ROW_H
 local MONTH_H  = ns.CAT_ROW_H
 local SESS_H   = 38
-local MAX_VIS_H = ns.MAX_WINDOW_H - H_HDR_H - H_FTR_H   -- window caps at ns.MAX_WINDOW_H, list scrolls
 
 ------------------------------------------------------------------------
 -- Layout — detail window (matches main frame width)
@@ -27,7 +26,6 @@ local DET_FTR_H  = 30
 local DET_CONT_W = ns.CONTENT_W
 local DET_CAT_H  = ns.CAT_ROW_H
 local DET_ROW_H  = ns.ROW_H
-local DET_MAX_H  = ns.MAX_WINDOW_H - DET_HDR_H - DET_FTR_H
 
 ------------------------------------------------------------------------
 -- Session save
@@ -1639,11 +1637,11 @@ local function RebuildDetailContent(session)
         end  -- if #cat.items > 0
     end
 
-    local contentH = math.max(1, yOff)
-    DListFrame:SetHeight(contentH); DScrollFrame:SetVerticalScroll(0)
-    local visH = math.min(contentH, DET_MAX_H)
-    DScrollFrame:SetHeight(visH)
-    DetailFrame:SetHeight(DET_HDR_H + visH + DET_FTR_H)
+    DScrollFrame:SetVerticalScroll(0)
+    ns.FitScrollWindow({
+        window = DetailFrame, scroll = DScrollFrame, list = DListFrame,
+        hdrH = DET_HDR_H, ftrH = DET_FTR_H, contentH = yOff,
+    })
     DetailFrame.footLabel:SetText((totalItems==1 and string.format(ns.L["item_singular"],totalItems) or string.format(ns.L["item_plural"],totalItems)))
 end
 
@@ -1838,12 +1836,11 @@ function ns.RebuildHistory()
             end
         end
     end
-    local contentH=math.max(1,yOffset)
-    HListFrame:SetHeight(contentH)
-    local maxS=math.max(0,contentH-HScrollFrame:GetHeight())
-    HScrollFrame:SetVerticalScroll(math.min(HScrollFrame:GetVerticalScroll(),maxS))
-    local visH=yOffset==0 and 44 or math.min(contentH,MAX_VIS_H)
-    HistFrame:SetHeight(H_HDR_H+visH+H_FTR_H)
+    ns.FitScrollWindow({
+        window=HistFrame, scroll=HScrollFrame, list=HListFrame, anchored=true,
+        hdrH=H_HDR_H, ftrH=H_FTR_H, contentH=yOffset,
+        minH=yOffset==0 and 44 or nil,   -- empty: room for the "no sessions" label
+    })
     -- nTotal already counted above while grouping by day
     if nTotal==0 then
         HistFrame.countLabel:SetText("")

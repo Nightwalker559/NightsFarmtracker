@@ -1454,6 +1454,42 @@ function ns.MakeWheelHandler(scroll, child, step)
 end
 
 ------------------------------------------------------------------------
+-- Window height rule shared by every list window: header + list + footer
+-- grows with the content up to ns.MAX_WINDOW_H in total, then the list
+-- scrolls.
+--
+-- ns.VisibleListHeight(contentH, hdrH, ftrH [, maxTotal]) -> visible list
+-- height (pure calculation, for windows that size themselves).
+--
+-- ns.FitScrollWindow(cfg) sizes a whole window and returns visH:
+--   window, scroll    frames (scroll = the ScrollFrame inside the window)
+--   list              scroll child, gets the content height (optional)
+--   hdrH, ftrH        space above/below the list inside the window
+--   contentH          full height of the list content
+--   minH              minimum visible list height (optional)
+--   maxTotal          total window cap, default ns.MAX_WINDOW_H (optional)
+--   anchored          true if the scroll frame is anchored top AND bottom
+--                     to the window, so only the window height is set
+-- The scroll offset is clamped so shrinking content never leaves it
+-- scrolled past the end.
+------------------------------------------------------------------------
+function ns.VisibleListHeight(contentH, hdrH, ftrH, maxTotal)
+    local maxVis = (maxTotal or ns.MAX_WINDOW_H) - hdrH - ftrH
+    return math.min(math.max(1, contentH), maxVis)
+end
+
+function ns.FitScrollWindow(cfg)
+    local contentH = math.max(1, cfg.contentH)
+    local visH = ns.VisibleListHeight(contentH, cfg.hdrH, cfg.ftrH, cfg.maxTotal)
+    if cfg.minH then visH = math.max(cfg.minH, visH) end
+    if cfg.list then cfg.list:SetHeight(contentH) end
+    if not cfg.anchored then cfg.scroll:SetHeight(visH) end
+    cfg.window:SetHeight(cfg.hdrH + visH + cfg.ftrH)
+    cfg.scroll:SetVerticalScroll(math.min(cfg.scroll:GetVerticalScroll(), math.max(0, contentH - visH)))
+    return visH
+end
+
+------------------------------------------------------------------------
 -- Scroll frame + list frame pair for the Vendor-Only Filter / Blacklist
 -- item lists: mouse-wheel scrolling in row steps, item drops accepted on
 -- the list area too. Caller sizes/positions the scroll frame (see
@@ -1713,13 +1749,11 @@ function ns.RebuildDropItemList(cfg)
     cfg.scrollFrame:ClearAllPoints()
     cfg.scrollFrame:SetPoint("TOPLEFT", cfg.padX, -cfg.bodyTop)
 
-    local contentH = math.max(1, yOff + (count == 0 and cfg.minVisH or 0))
-    cfg.listFrame:SetHeight(contentH)
-    local visH = math.min(contentH, ns.MAX_WINDOW_H - cfg.bodyTop - cfg.ftrH)
-    cfg.scrollFrame:SetHeight(visH)
-    cfg.window:SetHeight(cfg.bodyTop + visH + cfg.ftrH)
-    -- A collapse/remove can shrink the content under the current scroll offset
-    cfg.scrollFrame:SetVerticalScroll(math.min(cfg.scrollFrame:GetVerticalScroll(), math.max(0, contentH - visH)))
+    ns.FitScrollWindow({
+        window = cfg.window, scroll = cfg.scrollFrame, list = cfg.listFrame,
+        hdrH = cfg.bodyTop, ftrH = cfg.ftrH,
+        contentH = yOff + (count == 0 and cfg.minVisH or 0),
+    })
 
     cfg.emptyLabel:ClearAllPoints()
     cfg.emptyLabel:SetPoint("TOP", cfg.listFrame, "TOP", 0, -(yOff + 14))
