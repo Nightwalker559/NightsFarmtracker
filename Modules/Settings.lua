@@ -242,6 +242,7 @@ local tsmCustomEB
 local themeDropdown
 local gearThresholdEB
 local sessionLengthEB
+local maxHeightEB
 local profileDropdown
 local profileButtons
 local deleteProfileRow
@@ -515,6 +516,52 @@ local function MakeSessionLengthEB(parent, yOff)
     local unitLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     unitLbl:SetPoint("LEFT", frame, "RIGHT", 6, 0)
     unitLbl:SetText(ns.L["minutes_suffix"])
+    unitLbl:SetTextColor(0.6,0.6,0.6)
+    local baseShow, baseHide = frame.Show, frame.Hide
+    frame.Show = function(self) baseShow(self); unitLbl:Show() end
+    frame.Hide = function(self) baseHide(self); unitLbl:Hide() end
+
+    frame.eb = eb
+    return frame
+end
+
+------------------------------------------------------------------------
+-- Helper: EditBox for the maximum window height (px, numeric only). Applied
+-- when the field loses focus / Enter is pressed, not per keystroke - typing
+-- "5" on the way to "500" must not resize every open window to the minimum.
+-- Empty or 0 falls back to the default; values are clamped to the allowed range.
+------------------------------------------------------------------------
+local function MakeMaxHeightEB(parent, yOff)
+    local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    frame:SetSize(60, 24)
+    frame:SetPoint("TOPLEFT", S_PAD, yOff)
+    ns.StyleBackdropBox(frame, {0.05,0.08,0.09,1})
+
+    local eb = CreateFrame("EditBox", nil, frame)
+    eb:SetSize(48, 18)
+    eb:SetPoint("LEFT", 6, 0)
+    eb:SetAutoFocus(false)
+    eb:SetNumeric(true)
+    eb:SetMaxLetters(4)
+    eb:SetFontObject(GameFontNormalSmall)
+    eb:SetTextColor(0.85, 0.85, 0.85)
+    HookEditBoxFocus(frame, eb)
+    eb:HookScript("OnEditFocusLost", function(self)
+        local v = tonumber(self:GetText())
+        if not v or v <= 0 then v = ns.DEFAULT_MAX_WINDOW_H end
+        v = math.max(ns.MIN_MAX_WINDOW_H, math.min(ns.MAX_MAX_WINDOW_H, v))
+        self:SetText(tostring(v))
+        if NightsFarmtrackerDB.maxWindowHeight ~= v then
+            NightsFarmtrackerDB.maxWindowHeight = v
+            ns.ApplyWindowHeightSetting()
+        end
+    end)
+
+    -- Suffix label lives on the outer list (see MakeGearThresholdEB), so
+    -- keep its visibility in sync with the reused frame explicitly.
+    local unitLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    unitLbl:SetPoint("LEFT", frame, "RIGHT", 6, 0)
+    unitLbl:SetText(ns.L["px_suffix"])
     unitLbl:SetTextColor(0.6,0.6,0.6)
     local baseShow, baseHide = frame.Show, frame.Hide
     frame.Show = function(self) baseShow(self); unitLbl:Show() end
@@ -1365,6 +1412,24 @@ function ns.RebuildSettingsContent()
         local lenMin = tonumber(db.sessionLength) or 0
         sessionLengthEB.eb:SetText(lenMin > 0 and tostring(lenMin) or "")
         track(sessionLengthEB, "other")
+        y = y - 40
+
+        -- Max window height: windows grow up to this, then their lists scroll
+        local heightHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
+        heightHint:SetPoint("TOPLEFT", S_PAD, y)
+        heightHint:SetTextColor(0.5,0.5,0.5)
+        heightHint:SetText(string.format(ns.L["max_window_height_hint"],
+            ns.DEFAULT_MAX_WINDOW_H, ns.MIN_MAX_WINDOW_H, ns.MAX_MAX_WINDOW_H))
+        y = y - math.ceil(heightHint:GetStringHeight()) - 6
+
+        if not maxHeightEB then
+            maxHeightEB = MakeMaxHeightEB(SListFrame, y)
+        else
+            maxHeightEB:SetPoint("TOPLEFT", S_PAD, y)
+            maxHeightEB:Show()
+        end
+        maxHeightEB.eb:SetText(tostring(ns.GetMaxWindowH()))
+        track(maxHeightEB, "other")
         y = y - 40
 
         local function getGoldDisplay() return db.goldDisplayMode=="modern" and "modern" or "classic" end

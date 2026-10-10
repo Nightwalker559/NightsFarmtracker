@@ -24,7 +24,7 @@ local B_FTR_H   = 26            -- footer strip height (Clear All button)
 -- The whole body (category section, drop zone, item list) lives in one scroll
 -- area that starts flush against the window's title separator (1px below it,
 -- like History/Main HUD); everything inside is positioned relative to its top.
--- The window grows with the content up to ns.MAX_WINDOW_H, then scrolls.
+-- The window grows with the content up to ns.GetMaxWindowH(), then scrolls.
 local BODY_TOP    = B_HDR_H
 -- Category checkbox section - row count varies, recomputed on every rebuild.
 local CAT_SEC_TOP = 0

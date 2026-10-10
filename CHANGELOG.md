@@ -12,8 +12,9 @@
 
 - Theme settings moved into their own Settings section "Colors"
 - Main window, History, Detail, Loot Log, Vendor Filter, Blacklist and Settings grow up to 360 px, then scroll
+- Max window height is adjustable (Settings → Display, 200–1000 px, default 360)
 - Vendor Filter and Blacklist: categories, drop zone and item list scroll together
-- Help window grows up to 400 px, then scrolls
+- Help window grows up to 40 px more than that (400 by default), then scrolls
 
 ### Fixed
 

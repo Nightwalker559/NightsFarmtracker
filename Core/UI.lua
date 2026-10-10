@@ -1210,7 +1210,7 @@ local function ToggleHelpWindow()
         local sep = HelpFrame:CreateTexture(nil, "ARTWORK")
         sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
         sep:SetPoint("TOPLEFT", ns.PAD, -(hdrH - 1)); sep:SetPoint("TOPRIGHT", -ns.PAD, -(hdrH - 1))
-        -- The text scrolls once the window reaches ns.HELP_MAX_H
+        -- The text scrolls once the window reaches ns.GetMaxHelpH()
         local textW  = W - 2 * ns.PAD
         local scroll = CreateFrame("ScrollFrame", nil, HelpFrame)
         scroll:SetPoint("TOPLEFT", ns.PAD, -(hdrH + 8))
@@ -1224,15 +1224,24 @@ local function ToggleHelpWindow()
         fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
         fs:SetSpacing(2)
         fs:SetText(BuildHelpText())
-        ns.FitScrollWindow({
-            window = HelpFrame, scroll = scroll, list = child,
-            hdrH = hdrH + 8, ftrH = 8, contentH = math.ceil(fs:GetStringHeight()),
-            maxTotal = ns.HELP_MAX_H,
-        })
+        local textH = math.ceil(fs:GetStringHeight())
+        HelpFrame.fit = function()
+            ns.FitScrollWindow({
+                window = HelpFrame, scroll = scroll, list = child,
+                hdrH = hdrH + 8, ftrH = 8, contentH = textH,
+                maxTotal = ns.GetMaxHelpH(),
+            })
+        end
+        HelpFrame.fit()
         scroll:EnableMouseWheel(true)
         scroll:SetScript("OnMouseWheel", ns.MakeWheelHandler(scroll, child, 24))
     end
     HelpFrame:SetShown(not HelpFrame:IsShown())
+end
+
+-- Re-fit the (already built) Help window after the max window height changed
+function ns.RefitHelpWindow()
+    if HelpFrame and HelpFrame.fit then HelpFrame.fit() end
 end
 
 btnHelp:SetScript("OnClick", ToggleHelpWindow)

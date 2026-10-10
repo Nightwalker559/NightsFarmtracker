@@ -75,9 +75,35 @@ ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
 ns.MAX_ROWS    = 8
 ns.SCROLL_STEP = ns.ROW_H
 -- Maximum total window height (header + list + footer) of the main window and
--- every list window; longer content scrolls. The Help window has its own cap.
-ns.MAX_WINDOW_H = 360
-ns.HELP_MAX_H   = 400
+-- every list window; longer content scrolls. User setting db.maxWindowHeight
+-- (Settings -> Display), read through ns.GetMaxWindowH(). The Help window is
+-- a bit taller (see ns.GetMaxHelpH).
+ns.DEFAULT_MAX_WINDOW_H = 360
+ns.MIN_MAX_WINDOW_H     = 200
+ns.MAX_MAX_WINDOW_H     = 1000
+ns.HELP_EXTRA_H         = 40
+
+function ns.GetMaxWindowH()
+    local v = tonumber(NightsFarmtrackerDB and NightsFarmtrackerDB.maxWindowHeight)
+    if not v or v <= 0 then return ns.DEFAULT_MAX_WINDOW_H end
+    return math.max(ns.MIN_MAX_WINDOW_H, math.min(ns.MAX_MAX_WINDOW_H, v))
+end
+
+function ns.GetMaxHelpH()
+    return ns.GetMaxWindowH() + ns.HELP_EXTRA_H
+end
+
+-- Re-lays out every window that is currently open after the setting
+-- changed. (The Detail window picks the new height up the next time it opens.)
+function ns.ApplyWindowHeightSetting()
+    if ns.RefreshHUD then ns.RefreshHUD() end
+    if ns.HistFrame and ns.HistFrame:IsShown() and ns.RebuildHistory then ns.RebuildHistory() end
+    if ns.FilterFrame and ns.FilterFrame:IsShown() and ns.RebuildFilterList then ns.RebuildFilterList() end
+    if ns.BlacklistFrame and ns.BlacklistFrame:IsShown() and ns.RebuildBlacklistList then ns.RebuildBlacklistList() end
+    if ns.LogFrame and ns.LogFrame:IsShown() and ns.RebuildLogList then ns.RebuildLogList() end
+    if ns.RefitHelpWindow then ns.RefitHelpWindow() end
+    if ns.SettingsFrame and ns.SettingsFrame:IsShown() and ns.RebuildSettingsContent then ns.RebuildSettingsContent() end
+end
 
 -- Font sizes (odd values render blurry at some UI scales, so we stick to
 -- even numbers). Used via SetFontHeight() everywhere instead of scattered
@@ -730,6 +756,7 @@ ns.PROFILE_KEYS = {
     splitTradeGoods=true, splitGearByBinding=true, ahSource=true,
     gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
     tsmCustomSource=true, colorTheme=true, customAccent=true, headerGradient=true,
+    maxWindowHeight=true,
     venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
@@ -757,6 +784,7 @@ local function NewProfileDefaults()
         tsmCustomSource       = "",
         colorTheme            = "default",
         headerGradient        = false,
+        maxWindowHeight       = ns.DEFAULT_MAX_WINDOW_H,
         venomTrackerEnabled   = false,
         baitFrameEnabled      = false,
         mergeJunkEntries      = false,
@@ -937,6 +965,7 @@ function ns.InitDB()
     if db.tsmCustomSource == nil then db.tsmCustomSource = ""         end
     if db.colorTheme      == nil then db.colorTheme      = "default"  end
     if db.headerGradient  == nil then db.headerGradient  = false      end
+    if db.maxWindowHeight == nil then db.maxWindowHeight = ns.DEFAULT_MAX_WINDOW_H end
     if db.venomTrackerEnabled == nil then db.venomTrackerEnabled = false end
     if db.hudEnabled          == nil then db.hudEnabled          = false end
     if db.showPriceSource     == nil then db.showPriceSource     = false end
@@ -1455,7 +1484,7 @@ end
 
 ------------------------------------------------------------------------
 -- Window height rule shared by every list window: header + list + footer
--- grows with the content up to ns.MAX_WINDOW_H in total, then the list
+-- grows with the content up to ns.GetMaxWindowH() in total, then the list
 -- scrolls.
 --
 -- ns.VisibleListHeight(contentH, hdrH, ftrH [, maxTotal]) -> visible list
@@ -1467,14 +1496,14 @@ end
 --   hdrH, ftrH        space above/below the list inside the window
 --   contentH          full height of the list content
 --   minH              minimum visible list height (optional)
---   maxTotal          total window cap, default ns.MAX_WINDOW_H (optional)
+--   maxTotal          total window cap, default ns.GetMaxWindowH() (optional)
 --   anchored          true if the scroll frame is anchored top AND bottom
 --                     to the window, so only the window height is set
 -- The scroll offset is clamped so shrinking content never leaves it
 -- scrolled past the end.
 ------------------------------------------------------------------------
 function ns.VisibleListHeight(contentH, hdrH, ftrH, maxTotal)
-    local maxVis = (maxTotal or ns.MAX_WINDOW_H) - hdrH - ftrH
+    local maxVis = (maxTotal or ns.GetMaxWindowH()) - hdrH - ftrH
     return math.min(math.max(1, contentH), maxVis)
 end
 
@@ -1624,7 +1653,7 @@ end
 -- the "list empty" label), items (itemID -> {name,icon,
 -- quality, expansionID} table), onShiftRemove(itemID) (passed straight to
 -- ns.CreateDropListItemRow for newly-created rows).
--- The window grows with its content up to ns.MAX_WINDOW_H, then scrolls.
+-- The window grows with its content up to ns.GetMaxWindowH(), then scrolls.
 --
 -- Items are grouped under one collapsible header per expansion (newest
 -- first, items without known expansion last). Extra cfg fields for that:

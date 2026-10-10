@@ -138,6 +138,7 @@ local function RebuildLogList()
     -- Docking decides left/right (or below) by the frame's width: redo it
     if widthChanged and LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
 end
+ns.RebuildLogList = RebuildLogList  -- re-layout after the max window height setting changed
 
 ------------------------------------------------------------------------
 -- Public API - logging
