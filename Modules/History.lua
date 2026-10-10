@@ -679,7 +679,7 @@ local detRowPool    = {}
 local detCatPool    = {}
 local detCollapsed  = {}
 local currentDetailSession = nil
-local historyTotals = nil -- {items, looted, months = {{label, gold}, ...}} over all saved months, shown in the History title hover
+local historyTotals = nil -- {items, looted} gold over all saved months, shown in the History title hover
 local detailStats = nil   -- {kinds = distinct item rows, qty = total amount} of currentDetailSession, shown in the header hover
 
 local function AcquireDetRow()
@@ -1750,13 +1750,12 @@ function ns.RebuildHistory()
         end
     end
 
-    -- Totals over all months for the header hover (newest month first)
-    local tot = { items=0, looted=0, months={} }
+    -- Totals over all months for the title hover
+    local tot = { items=0, looted=0 }
     for _,mKey in ipairs(monthOrder) do
         local m=months[mKey]
         tot.items=tot.items+m.totalGold
         tot.looted=tot.looted+(m.lootedGold or 0)
-        tot.months[#tot.months+1]={label=m.label, gold=m.totalGold+(m.lootedGold or 0)}
     end
     historyTotals = tot
 
@@ -1903,21 +1902,9 @@ local function EnsureHistFrame()
     titleHit:SetScript("OnDragStop",  function() HistFrame:StopMovingOrSizing() end)
     titleHit:SetScript("OnEnter", function(self)
         local t = historyTotals
-        if not t or #t.months == 0 then return end
+        if not t then return end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine(ns.L["history_total_title"], unpack(ns.COL_ACCENT))
-        local MAX_MONTH_LINES = 12
-        for i, m in ipairs(t.months) do
-            if i > MAX_MONTH_LINES then
-                local olderGold = 0
-                for j = i, #t.months do olderGold = olderGold + t.months[j].gold end
-                GameTooltip:AddDoubleLine(string.format(ns.L["history_older_months"], #t.months - MAX_MONTH_LINES),
-                    ns.FormatGold(olderGold), 0.6,0.6,0.6, 1,1,1)
-                break
-            end
-            GameTooltip:AddDoubleLine(m.label, ns.FormatGold(m.gold), 0.75,0.75,0.75, 1,1,1)
-        end
-        GameTooltip:AddLine(" ")
         GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(t.items), 0.75,0.75,0.75, 1,1,1)
         GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(t.looted), 0.75,0.75,0.75, 1,1,1)
         GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(t.items + t.looted), 0.75,0.75,0.75, unpack(ns.COL_GOLD))

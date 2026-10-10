@@ -11,7 +11,7 @@
 ### Changed
 
 - Theme settings moved into their own Settings section "Colors"
-- Session History: hovering the title shows the gold of every saved month and the combined total
+- Session History: hovering the title shows Items, Direct and Total gold of all saved months combined
 - Main window, History, Detail, Loot Log, Vendor Filter, Blacklist and Settings grow up to 360 px, then scroll
 - Max window height is adjustable (Settings → Display, 200–1000 px, default 360)
 - Vendor Filter and Blacklist: categories, drop zone and item list scroll together
