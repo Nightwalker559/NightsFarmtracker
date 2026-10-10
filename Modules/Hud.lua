@@ -78,6 +78,7 @@ end
 ns.HUD_RING_MIN, ns.HUD_RING_MAX = RING_MIN, RING_MAX
 
 local Ring, ringLines, ringLabel
+local RING_DEFAULT_COLOR = { 1, 0.85, 0.2, 0.95 }  -- r, g, b, opacity
 local ringLastRadius
 
 local function HudRingOn()    return NightsFarmtrackerDB and NightsFarmtrackerDB.hudRing == true end
@@ -89,6 +90,18 @@ local function ViewRadius()
 end
 
 -- The stored radius, capped to what the minimap currently shows.
+-- Profile value hudRingColor = { r, g, b, opacity }; anything malformed falls
+-- back to the default.
+local function RingColor()
+    local c = NightsFarmtrackerDB and NightsFarmtrackerDB.hudRingColor
+    local out = {}
+    for i = 1, 4 do
+        local v = type(c) == "table" and tonumber(c[i])
+        out[i] = v and math.min(1, math.max(0, v)) or RING_DEFAULT_COLOR[i]
+    end
+    return unpack(out)
+end
+
 local function RingYards()
     local yards, view = HudRingYards(), ViewRadius()
     if view then yards = math.min(yards, math.floor(view)) end
@@ -105,7 +118,7 @@ local function EnsureRing()
     for i = 1, RING_SEGMENTS do
         local line = Ring:CreateLine(nil, "OVERLAY")
         line:SetThickness(2)
-        line:SetColorTexture(1, 0.85, 0.2, 0.95)
+        line:SetColorTexture(RingColor())
         ringLines[i] = line
     end
     ringLabel = Ring:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -561,6 +574,18 @@ end
 
 function ns.GetHudRingYards()
     return HudRingYards()
+end
+
+-- Settings color picker: colour and opacity of the ring lines.
+function ns.SetHudRingColor(r, g, b, a)
+    NightsFarmtrackerDB.hudRingColor = { r, g, b, a }
+    if not ringLines then return end
+    r, g, b, a = RingColor()
+    for _, line in ipairs(ringLines) do line:SetColorTexture(r, g, b, a) end
+end
+
+function ns.GetHudRingColor()
+    return RingColor()
 end
 
 -- Keys change the ring behind the open Settings window's back; it listens

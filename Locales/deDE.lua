@@ -243,6 +243,7 @@ L["hud_binding_ring_bigger"]  = "Minimap-HUD-Reichweitenring: größer (+5 Yard)
 L["hud_binding_ring_smaller"] = "Minimap-HUD-Reichweitenring: kleiner (-5 Yard)"
 L["hud_ring"]                 = "Reichweitenring um deinen Charakter (zeigt die Entfernung in Yard)"
 L["hud_ring_radius"]          = "Reichweitenring-Radius: %d Yard"
+L["hud_ring_color"]           = "Ringfarbe und Deckkraft"
 L["hud_combat"]               = "Das Minimap-HUD kann nicht im Kampf geöffnet werden."
 L["hud_combat_close"]         = "Das Minimap-HUD wird nach dem Kampf geschlossen."
 L["hud_error"]                = "Minimap-HUD fehlgeschlagen und zurückgesetzt: %s"

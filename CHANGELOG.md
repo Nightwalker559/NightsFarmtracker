@@ -4,7 +4,7 @@
 
 ### New
 
-- Minimap HUD: range ring around the character with an adjustable radius in yards (Settings checkbox and radius slider, `/nft hud ring`, key bindings for toggle, larger and smaller), to check from which distance nodes appear on the minimap
+- Minimap HUD: range ring around the character with an adjustable radius in yards (Settings checkbox, radius slider and color/opacity picker, `/nft hud ring`, key bindings for toggle, larger and smaller), to check from which distance nodes appear on the minimap
 
 ### Changed
 

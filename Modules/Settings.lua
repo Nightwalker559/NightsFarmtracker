@@ -243,6 +243,7 @@ local tsmCustomEB
 local themeDropdown
 local gearThresholdEB
 local hudRingSlider
+local hudRingColorBtn
 local sessionLengthEB
 local profileDropdown
 local profileButtons
@@ -417,6 +418,56 @@ function ns.ToggleGearThresholdConfig(anchor)
     pop:ClearAllPoints()
     pop:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
     pop:Show()
+end
+
+------------------------------------------------------------------------
+-- Helper: colour + opacity button for the Minimap HUD range ring - opens
+-- Blizzard's colour picker (with its opacity slider). Single persistent
+-- instance like hudRingSlider; the swatch shows the current colour.
+------------------------------------------------------------------------
+local function MakeHudRingColorButton(parent)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(S_W - S_PAD*2, 22)
+
+    local box = CreateFrame("Frame", nil, btn, "BackdropTemplate")
+    box:SetSize(22, 16)
+    box:SetPoint("LEFT", 0, 0)
+    ns.StyleBackdropBox(box)
+    local swatch = box:CreateTexture(nil, "ARTWORK")
+    swatch:SetPoint("TOPLEFT", 1, -1); swatch:SetPoint("BOTTOMRIGHT", -1, 1)
+
+    local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lbl:SetPoint("LEFT", box, "RIGHT", 8, 0)
+    lbl:SetTextColor(0.85, 0.85, 0.85)
+    lbl:SetText(ns.L["hud_ring_color"])
+
+    function btn:Refresh()
+        local r, g, b, a = ns.GetHudRingColor()
+        swatch:SetColorTexture(r, g, b, a)
+    end
+
+    btn:SetScript("OnEnter", function() lbl:SetTextColor(1, 0.82, 0) end)
+    btn:SetScript("OnLeave", function() lbl:SetTextColor(0.85, 0.85, 0.85) end)
+    btn:SetScript("OnClick", function()
+        local r, g, b, a = ns.GetHudRingColor()
+        local function apply()
+            local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+            ns.SetHudRingColor(nr, ng, nb, ColorPickerFrame:GetColorAlpha())
+            btn:Refresh()
+        end
+        ColorPickerFrame:SetupColorPickerAndShow({
+            r = r, g = g, b = b, opacity = a, hasOpacity = true,
+            swatchFunc  = apply,
+            opacityFunc = apply,
+            cancelFunc  = function(prev)
+                ns.SetHudRingColor(prev.r, prev.g, prev.b, prev.a)
+                btn:Refresh()
+            end,
+        })
+    end)
+
+    btn.isHudRingColor = true
+    return btn
 end
 
 ------------------------------------------------------------------------
@@ -1524,6 +1575,15 @@ function ns.RebuildSettingsContent()
         hudRingSlider.slider:SetValue(ns.GetHudRingYards())
         track(hudRingSlider, "other")
         y = y - 48
+
+        if not hudRingColorBtn then
+            hudRingColorBtn = MakeHudRingColorButton(SListFrame)
+        end
+        hudRingColorBtn:SetPoint("TOPLEFT", S_PAD, y)
+        hudRingColorBtn:Show()
+        hudRingColorBtn:Refresh()
+        track(hudRingColorBtn, "other")
+        y = y - 32
 
         local hudHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
         hudHint:SetPoint("TOPLEFT", S_PAD, y)
