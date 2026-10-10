@@ -242,6 +242,7 @@ local tsmDropdown
 local tsmCustomEB
 local themeDropdown
 local gearThresholdEB
+local hudRingSlider
 local sessionLengthEB
 local profileDropdown
 local profileButtons
@@ -416,6 +417,44 @@ function ns.ToggleGearThresholdConfig(anchor)
     pop:ClearAllPoints()
     pop:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
     pop:Show()
+end
+
+------------------------------------------------------------------------
+-- Helper: slider for the Minimap HUD range ring radius (yards). Single
+-- persistent instance like gearThresholdEB; the label above shows the value.
+------------------------------------------------------------------------
+local function MakeHudRingSlider(parent)
+    local frame = CreateFrame("Frame", nil, parent)
+    frame:SetSize(S_W - S_PAD*2, 40)
+
+    local lbl = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lbl:SetPoint("TOPLEFT", 0, 0)
+    lbl:SetTextColor(0.85, 0.85, 0.85)
+
+    local sl = CreateFrame("Slider", nil, frame)
+    sl:SetOrientation("HORIZONTAL")
+    sl:SetPoint("TOPLEFT", 0, -22)
+    sl:SetSize(S_W - S_PAD*2 - 12, 14)
+    sl:SetMinMaxValues(ns.HUD_RING_MIN, ns.HUD_RING_MAX)
+    sl:SetValueStep(5)
+    sl:SetObeyStepOnDrag(true)
+
+    local bar = sl:CreateTexture(nil, "BACKGROUND")
+    bar:SetPoint("LEFT"); bar:SetPoint("RIGHT"); bar:SetHeight(4)
+    bar:SetColorTexture(0.05, 0.08, 0.09, 1)
+    local thumb = sl:CreateTexture(nil, "OVERLAY")
+    thumb:SetSize(8, 14)
+    thumb:SetColorTexture(unpack(ns.COL_ACCENT))
+    sl:SetThumbTexture(thumb)
+
+    sl:SetScript("OnValueChanged", function(_, value, userInput)
+        value = math.floor(value + 0.5)
+        lbl:SetText(string.format(ns.L["hud_ring_radius"], value))
+        if userInput then ns.SetHudRingYards(value) end
+    end)
+
+    frame.slider = sl
+    return frame
 end
 
 ------------------------------------------------------------------------
@@ -1477,6 +1516,15 @@ function ns.RebuildSettingsContent()
             function(v) ns.SetHudRing(v) end)
         y = y - 38
 
+        if not hudRingSlider then
+            hudRingSlider = MakeHudRingSlider(SListFrame)
+        end
+        hudRingSlider:SetPoint("TOPLEFT", S_PAD, y)
+        hudRingSlider:Show()
+        hudRingSlider.slider:SetValue(ns.GetHudRingYards())
+        track(hudRingSlider, "other")
+        y = y - 48
+
         local hudHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
         hudHint:SetPoint("TOPLEFT", S_PAD, y)
         hudHint:SetTextColor(0.5,0.5,0.5)
@@ -1626,5 +1674,13 @@ function ns.ToggleSettings()
         ns.RebuildSettingsContent()
         SF:Show()
         ns.RefreshWindowChain("left")
+    end
+end
+
+-- The ring checkbox/slider are stale when the HUD key bindings change the
+-- ring while Settings is open (see ns.HudRingStep / ns.ToggleHudRing).
+function ns.OnHudRingChanged()
+    if ns.SettingsFrame and ns.SettingsFrame:IsShown() then
+        ns.RebuildSettingsContent()
     end
 end

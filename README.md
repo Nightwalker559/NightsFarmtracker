@@ -57,7 +57,7 @@ Notes:
 - Mouse clicks pass through to the 3D world; the HUD cannot be opened in combat (a close request in combat is carried out after it).
 - Minimap rotation follows the HUD setting (on by default) while the HUD is open and is restored to your own setting afterwards.
 - Tuning: `/nft hud size <20-100>` (percent of the screen height), `/nft hud scale <1-2.5>` (size of the symbols), `/nft hud alpha <0-100>` (opacity of the map background — 0 hides the map and keeps pins and blips), `/nft hud rotate` (toggle rotation).
-- **Range ring** (Settings → Minimap HUD → range ring): a circle around your character (the centre of the HUD) labelled with its radius in yards, to see exactly from which distance nodes appear on the minimap. Resize it with the keys **range ring larger / smaller** (5 yards per press, under Keybindings → Night's Farmtracker) or `/nft hud ring <yards>`; `/nft hud ring` or the toggle key switches it on and off. The radius is capped to what the minimap currently shows (it differs indoors and outdoors).
+- **Range ring** (Settings → Minimap HUD → range ring): a circle around your character (the centre of the HUD) labelled with its radius in yards, to see exactly from which distance nodes appear on the minimap. Set the radius with the slider below the checkbox (5 to 250 yards) or with the keys **range ring larger / smaller** (5 yards per press, under Keybindings → Night's Farmtracker); `/nft hud ring` or the toggle key switches it on and off. The radius is capped to what the minimap currently shows (it differs indoors and outdoors).
 
 ---
 
@@ -77,7 +77,7 @@ Works with [Auctionator](https://www.curseforge.com/wow/addons/auctionator), Ori
 | `/nft hud` | Toggle the Minimap HUD (if enabled) |
 | `/nft hud size\|scale\|alpha <n>` | Adjust the Minimap HUD |
 | `/nft hud rotate` | Toggle minimap rotation of the HUD |
-| `/nft hud ring [yards]` | Toggle the HUD range ring, or set its radius in yards |
+| `/nft hud ring` | Toggle the HUD range ring |
 | `/nft venom` | Toggle Venom Tracker overlay (if enabled) |
 | `/nft bait` | Toggle Fishing Lure Bar (if enabled) |
 | `/nft debug` | Toggle the live debug trace and open the debug log window (copyable, no chat output) |

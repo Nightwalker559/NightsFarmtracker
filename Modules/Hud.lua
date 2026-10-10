@@ -67,13 +67,15 @@ local function HudRotate() return not NightsFarmtrackerDB or NightsFarmtrackerDB
 local RING_SEGMENTS   = 96
 local RING_STEP       = 5       -- yards per key press
 local RING_MIN        = 5
-local RING_MAX        = 500
+local RING_MAX        = 250
 local RING_CHECK_STEP = 0.5     -- seconds between view-radius checks
 local RING_COS, RING_SIN = {}, {}
 for i = 1, RING_SEGMENTS + 1 do
     local a = (i - 1) / RING_SEGMENTS * 2 * math.pi
     RING_COS[i], RING_SIN[i] = math.cos(a), math.sin(a)
 end
+
+ns.HUD_RING_MIN, ns.HUD_RING_MAX = RING_MIN, RING_MAX
 
 local Ring, ringLines, ringLabel
 local ringLastRadius
@@ -551,8 +553,26 @@ function ns.SetHudRing(on)
     UpdateRing()
 end
 
+-- Settings slider (radius in yards; the slider keeps its own state).
+function ns.SetHudRingYards(yards)
+    NightsFarmtrackerDB.hudRingYards = math.min(RING_MAX, math.max(RING_MIN, yards))
+    UpdateRing()
+end
+
+function ns.GetHudRingYards()
+    return HudRingYards()
+end
+
+-- Keys change the ring behind the open Settings window's back; it listens
+-- here to refresh its checkbox and slider.
+local function RingChangedByKey()
+    UpdateRing()
+    if ns.OnHudRingChanged then ns.OnHudRingChanged() end
+end
+
 function ns.ToggleHudRing()
-    ns.SetHudRing(not HudRingOn())
+    NightsFarmtrackerDB.hudRing = not HudRingOn()
+    RingChangedByKey()
 end
 
 -- Key bindings: grow/shrink the ring by one step (also switches it on).
@@ -563,10 +583,10 @@ function ns.HudRingStep(delta)
     local db = NightsFarmtrackerDB
     db.hudRingYards = math.min(RING_MAX, math.max(RING_MIN, RingYards() + delta))
     db.hudRing = true
-    UpdateRing()
+    RingChangedByKey()
 end
 
--- /nft hud [size <20-100> | scale <1-2.5> | alpha <0-100> | rotate | ring [yards]]
+-- /nft hud [size <20-100> | scale <1-2.5> | alpha <0-100> | rotate | ring]
 function ns.HudSlash(arg)
     local sub, val = (arg or ""):lower():match("^%s*(%S*)%s*(%S*)")
     local num = tonumber(val)
@@ -584,12 +604,7 @@ function ns.HudSlash(arg)
     elseif sub == "rotate" then
         db.hudRotate = not HudRotate()
     elseif sub == "ring" then
-        if num then
-            db.hudRingYards = math.min(RING_MAX, math.max(RING_MIN, num))
-            db.hudRing = true
-        else
-            db.hudRing = not HudRingOn()
-        end
+        db.hudRing = not HudRingOn()
     else
         Msg(L["hud_usage"])
         return
