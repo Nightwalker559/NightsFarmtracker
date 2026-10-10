@@ -10,7 +10,8 @@ local LOG_W       = ns.FRAME_W
 local LOG_PAD     = ns.PAD
 local LOG_HDR_H   = ns.WINDOW_HDR_H
 local ROW_H       = ns.ROW_H
-local MAX_VIS_H   = 8 * ROW_H
+local LOG_FTR_H   = 10
+local MAX_VIS_H   = ns.MAX_WINDOW_H - LOG_HDR_H - LOG_FTR_H   -- window caps at ns.MAX_WINDOW_H, list scrolls
 local MIN_VIS_H   = 30
 local MAX_ENTRIES = 100  -- in-memory cap, oldest entries drop off
 
@@ -132,7 +133,7 @@ local function RebuildLogList()
     LListFrame:SetHeight(contentH)
     local visH = math.max(MIN_VIS_H, math.min(contentH, MAX_VIS_H))
     LScrollFrame:SetHeight(visH)
-    LogFrame:SetHeight(LOG_HDR_H + visH + 10)
+    LogFrame:SetHeight(LOG_HDR_H + visH + LOG_FTR_H)
 
     LogFrame.emptyLabel:SetShown(#(NightsFarmtrackerDB.logEntries or {}) == 0)
 

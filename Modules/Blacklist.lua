@@ -17,13 +17,17 @@ local B_W       = ns.FRAME_W
 local B_PAD     = ns.PAD
 local B_HDR_H   = ns.WINDOW_HDR_H
 local ROW_H     = ns.ROW_H
-local MAX_VIS_H = 8 * ROW_H
-local MIN_VIS_H = 30
+local MIN_VIS_H = 30             -- room for the "list empty" label
 local DZ_H      = 34            -- permanent drop-zone height
 local B_FTR_H   = 26            -- footer strip height (Clear All button)
 
+-- The whole body (category section, drop zone, item list) lives in one scroll
+-- area that starts flush against the window's title separator (1px below it,
+-- like History/Main HUD); everything inside is positioned relative to its top.
+-- The window grows with the content up to ns.MAX_WINDOW_H, then scrolls.
+local BODY_TOP    = B_HDR_H
 -- Category checkbox section - row count varies, recomputed on every rebuild.
-local CAT_SEC_TOP = B_HDR_H  -- flush against the window's title separator (1px below it, like History/Main HUD)
+local CAT_SEC_TOP = 0
 
 local BlacklistFrame, BScrollFrame, BListFrame
 
@@ -54,14 +58,14 @@ local function RebuildCategorySection()
     for i, name in ipairs(names) do entries[i] = { key = name, label = name } end
 
     local secEnd = ns.RebuildCheckboxSection(
-        BlacklistFrame, BlacklistFrame.catHeader, catRowPool, activeCatRows,
-        B_PAD, CAT_SEC_TOP, ns.L["blacklist_categories_title"],
+        BListFrame, BlacklistFrame.catHeader, catRowPool, activeCatRows,
+        0, CAT_SEC_TOP, ns.L["blacklist_categories_title"],
         NightsFarmtrackerDB.blacklistCategoriesCollapsed, entries,
         ns.IsBlacklistCategoryEnabled, ns.SetBlacklistCategory, ns.RefreshHUD)
 
     BlacklistFrame.catSep:ClearAllPoints()
-    BlacklistFrame.catSep:SetPoint("TOPLEFT",  B_PAD, -secEnd)
-    BlacklistFrame.catSep:SetPoint("TOPRIGHT", -B_PAD, -secEnd)
+    BlacklistFrame.catSep:SetPoint("TOPLEFT",  0, -secEnd)
+    BlacklistFrame.catSep:SetPoint("TOPRIGHT", 0, -secEnd)
 
     return secEnd + 4 + 1 + 4  -- dzTop
 end
@@ -95,22 +99,22 @@ function ns.RebuildBlacklistList()
     local dzTop = RebuildCategorySection()
 
     BlacklistFrame.DropZone:ClearAllPoints()
-    BlacklistFrame.DropZone:SetPoint("TOPLEFT",  B_PAD, -dzTop)
-    BlacklistFrame.DropZone:SetPoint("TOPRIGHT", -B_PAD, -dzTop)
+    BlacklistFrame.DropZone:SetPoint("TOPLEFT",  0, -dzTop)
+    BlacklistFrame.DropZone:SetPoint("TOPRIGHT", 0, -dzTop)
 
     local dzSepTop = dzTop + DZ_H + 4
     BlacklistFrame.dzSep:ClearAllPoints()
-    BlacklistFrame.dzSep:SetPoint("TOPLEFT",  B_PAD, -dzSepTop)
-    BlacklistFrame.dzSep:SetPoint("TOPRIGHT", -B_PAD, -dzSepTop)
+    BlacklistFrame.dzSep:SetPoint("TOPLEFT",  0, -dzSepTop)
+    BlacklistFrame.dzSep:SetPoint("TOPRIGHT", 0, -dzSepTop)
 
-    local listTop = dzSepTop + 1 + 4
+    local itemsTop = dzSepTop + 1 + 4
 
     ns.RebuildDropItemList({
         window = BlacklistFrame, listFrame = BListFrame, scrollFrame = BScrollFrame,
         emptyLabel = BlacklistFrame.emptyLabel,
         pool = rowPool, rows = activeRows,
-        padX = B_PAD, listTop = listTop, ftrH = B_FTR_H,
-        minVisH = MIN_VIS_H, maxVisH = MAX_VIS_H,
+        padX = B_PAD, bodyTop = BODY_TOP, itemsTop = itemsTop, ftrH = B_FTR_H,
+        minVisH = MIN_VIS_H,
         items = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.blacklist,
         onShiftRemove = function(itemID)
             ns.RemoveBlacklist(itemID)
@@ -156,9 +160,14 @@ local function EnsureBlacklistFrame()
     hSep:SetColorTexture(unpack(ns.COL_BORDER))
     hSep:SetPoint("TOPLEFT", B_PAD, -(B_HDR_H-1)); hSep:SetPoint("TOPRIGHT", -B_PAD, -(B_HDR_H-1))
 
+    -- The scroll area holds the whole body, so it has to exist before the
+    -- widgets that live inside it.
+    BScrollFrame, BListFrame = ns.CreateDropListScroll(BlacklistFrame, HandleDrop)
+    BScrollFrame:SetPoint("TOPLEFT", B_PAD, -BODY_TOP)
+
     -- Category checkbox section header - clickable to collapse/expand.
-    local catHeader = ns.CreateSectionHeader(BlacklistFrame, ns.CONTENT_W)
-    catHeader:SetPoint("TOPLEFT", B_PAD, -CAT_SEC_TOP)
+    local catHeader = ns.CreateSectionHeader(BListFrame, ns.CONTENT_W)
+    catHeader:SetPoint("TOPLEFT", 0, -CAT_SEC_TOP)
     catHeader:SetScript("OnMouseUp", function()
         NightsFarmtrackerDB.blacklistCategoriesCollapsed = not NightsFarmtrackerDB.blacklistCategoriesCollapsed
         ns.RebuildBlacklistList()
@@ -172,22 +181,20 @@ local function EnsureBlacklistFrame()
     catHeader:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BlacklistFrame.catHeader = catHeader
 
-    local catSep = BlacklistFrame:CreateTexture(nil,"ARTWORK"); catSep:SetHeight(1)
+    local catSep = BListFrame:CreateTexture(nil,"ARTWORK"); catSep:SetHeight(1)
     catSep:SetColorTexture(unpack(ns.COL_BORDER))
     BlacklistFrame.catSep = catSep
 
     -- Permanent drop zone: always visible target, dashed border, drop here
-    local DropZone = ns.CreateDropZone(BlacklistFrame, DZ_H, HandleDrop)
+    local DropZone = ns.CreateDropZone(BListFrame, DZ_H, HandleDrop)
     BlacklistFrame.DropZone = DropZone
 
     -- Separator below drop zone
-    local dzSep = BlacklistFrame:CreateTexture(nil,"ARTWORK"); dzSep:SetHeight(1)
+    local dzSep = BListFrame:CreateTexture(nil,"ARTWORK"); dzSep:SetHeight(1)
     dzSep:SetColorTexture(unpack(ns.COL_BORDER))
     BlacklistFrame.dzSep = dzSep
 
-    BScrollFrame, BListFrame = ns.CreateDropListScroll(BlacklistFrame, HandleDrop)
-
-    BlacklistFrame.emptyLabel = BlacklistFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    BlacklistFrame.emptyLabel = BListFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     BlacklistFrame.emptyLabel:SetJustifyH("CENTER")
     BlacklistFrame.emptyLabel:SetTextColor(0.55,0.55,0.55)
     BlacklistFrame.emptyLabel:SetText(ns.L["blacklist_list_empty"])

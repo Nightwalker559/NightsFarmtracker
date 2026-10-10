@@ -74,6 +74,10 @@ ns.RANK_ICON_H = 20   -- height of the R1/R2/R3 atlas markup
 ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
 ns.MAX_ROWS    = 8
 ns.SCROLL_STEP = ns.ROW_H
+-- Maximum total window height (header + list + footer) of the main window and
+-- every list window; longer content scrolls. The Help window has its own cap.
+ns.MAX_WINDOW_H = 360
+ns.HELP_MAX_H   = 400
 
 -- Font sizes (odd values render blurry at some UI scales, so we stick to
 -- even numbers). Used via SetFontHeight() everywhere instead of scattered
@@ -1578,9 +1582,13 @@ end
 --
 -- cfg fields: window, listFrame, scrollFrame, emptyLabel (frames/widgets),
 -- pool, rows (this list's own row pool + active-rows table), padX,
--- listTop, ftrH, minVisH, maxVisH (layout), items (itemID -> {name,icon,
+-- bodyTop (window Y where the scroll area starts), itemsTop (Y inside
+-- listFrame where the item rows start - the category sections and drop zone
+-- above them live in the same scroll area), ftrH, minVisH (room reserved for
+-- the "list empty" label), items (itemID -> {name,icon,
 -- quality, expansionID} table), onShiftRemove(itemID) (passed straight to
 -- ns.CreateDropListItemRow for newly-created rows).
+-- The window grows with its content up to ns.MAX_WINDOW_H, then scrolls.
 --
 -- Items are grouped under one collapsible header per expansion (newest
 -- first, items without known expansion last). Extra cfg fields for that:
@@ -1664,7 +1672,7 @@ function ns.RebuildDropItemList(cfg)
         return a > b
     end)
 
-    local yOff = 0
+    local yOff = cfg.itemsTop
     for _, exp in ipairs(order) do
         local list = groups[exp]
         table.sort(list, function(a, b) return (a.name or "") < (b.name or "") end)
@@ -1703,16 +1711,18 @@ function ns.RebuildDropItemList(cfg)
     end
 
     cfg.scrollFrame:ClearAllPoints()
-    cfg.scrollFrame:SetPoint("TOPLEFT", cfg.padX, -cfg.listTop)
+    cfg.scrollFrame:SetPoint("TOPLEFT", cfg.padX, -cfg.bodyTop)
 
-    local contentH = math.max(1, yOff)
+    local contentH = math.max(1, yOff + (count == 0 and cfg.minVisH or 0))
     cfg.listFrame:SetHeight(contentH)
-    local visH = math.max(cfg.minVisH, math.min(contentH, cfg.maxVisH))
+    local visH = math.min(contentH, ns.MAX_WINDOW_H - cfg.bodyTop - cfg.ftrH)
     cfg.scrollFrame:SetHeight(visH)
-    cfg.window:SetHeight(cfg.listTop + visH + cfg.ftrH)
+    cfg.window:SetHeight(cfg.bodyTop + visH + cfg.ftrH)
+    -- A collapse/remove can shrink the content under the current scroll offset
+    cfg.scrollFrame:SetVerticalScroll(math.min(cfg.scrollFrame:GetVerticalScroll(), math.max(0, contentH - visH)))
 
     cfg.emptyLabel:ClearAllPoints()
-    cfg.emptyLabel:SetPoint("TOP", cfg.window, "TOP", 0, -(cfg.listTop + 14))
+    cfg.emptyLabel:SetPoint("TOP", cfg.listFrame, "TOP", 0, -(yOff + 14))
     cfg.emptyLabel:SetShown(count == 0)
 end
 

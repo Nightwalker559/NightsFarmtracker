@@ -15,7 +15,7 @@ local H_FTR_H  = 28
 local DAY_H    = ns.CAT_ROW_H
 local MONTH_H  = ns.CAT_ROW_H
 local SESS_H   = 38
-local MAX_VIS_H = 10 * SESS_H
+local MAX_VIS_H = ns.MAX_WINDOW_H - H_HDR_H - H_FTR_H   -- window caps at ns.MAX_WINDOW_H, list scrolls
 
 ------------------------------------------------------------------------
 -- Layout — detail window (matches main frame width)
@@ -27,7 +27,7 @@ local DET_FTR_H  = 30
 local DET_CONT_W = ns.CONTENT_W
 local DET_CAT_H  = ns.CAT_ROW_H
 local DET_ROW_H  = ns.ROW_H
-local DET_MAX_H  = ns.MAX_ROWS * DET_ROW_H
+local DET_MAX_H  = ns.MAX_WINDOW_H - DET_HDR_H - DET_FTR_H
 
 ------------------------------------------------------------------------
 -- Session save

@@ -13,7 +13,6 @@ local CAT_ROW_H   = ns.CAT_ROW_H
 local CAT_INDENT  = ns.CAT_INDENT
 local ICON_SIZE   = ns.ICON_SIZE
 local CONTENT_W   = ns.CONTENT_W
-local MAX_ROWS    = ns.MAX_ROWS
 local SCROLL_STEP = ns.SCROLL_STEP
 
 local ART     = ns.ART
@@ -24,6 +23,8 @@ local BTN_BAR_H  = 26
 local HDR_TOTAL  = ns.WINDOW_HDR_H  -- same header height as every other window
 local SCROLL_TOP = HDR_TOTAL + 1
 local COLLAPSED_H = HDR_TOTAL + 1 + FOOTER_H
+-- Visible list height at which the main window stops growing and scrolls.
+local MAX_LIST_H  = ns.MAX_WINDOW_H - SCROLL_TOP - 1 - FOOTER_H
 
 ------------------------------------------------------------------------
 -- State
@@ -316,7 +317,7 @@ end
 -- Expand / Collapse
 ------------------------------------------------------------------------
 local function ExpandedHeight()
-    return SCROLL_TOP + 1 + math.min(totalH, MAX_ROWS * ROW_H) + FOOTER_H
+    return SCROLL_TOP + 1 + math.min(totalH, MAX_LIST_H) + FOOTER_H
 end
 
 ------------------------------------------------------------------------
@@ -1211,13 +1212,28 @@ local function ToggleHelpWindow()
         local sep = HelpFrame:CreateTexture(nil, "ARTWORK")
         sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
         sep:SetPoint("TOPLEFT", ns.PAD, -(hdrH - 1)); sep:SetPoint("TOPRIGHT", -ns.PAD, -(hdrH - 1))
-        local fs = HelpFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        fs:SetPoint("TOPLEFT", ns.PAD, -(hdrH + 8))
-        fs:SetWidth(W - 2 * ns.PAD)
+        -- The text scrolls once the window reaches ns.HELP_MAX_H
+        local textW  = W - 2 * ns.PAD
+        local scroll = CreateFrame("ScrollFrame", nil, HelpFrame)
+        scroll:SetPoint("TOPLEFT", ns.PAD, -(hdrH + 8))
+        scroll:SetWidth(textW)
+        local child = CreateFrame("Frame", nil, scroll)
+        child:SetWidth(textW)
+        scroll:SetScrollChild(child)
+        local fs = child:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("TOPLEFT")
+        fs:SetWidth(textW)
         fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
         fs:SetSpacing(2)
         fs:SetText(BuildHelpText())
-        HelpFrame:SetHeight(hdrH + 8 + math.ceil(fs:GetStringHeight()) + 8)
+        local textH = math.ceil(fs:GetStringHeight())
+        child:SetHeight(textH)
+        local visH = math.min(textH, ns.HELP_MAX_H - hdrH - 8 - 8)
+        scroll:SetHeight(visH)
+        local OnWheel = ns.MakeWheelHandler(scroll, child, 24)
+        scroll:EnableMouseWheel(true)
+        scroll:SetScript("OnMouseWheel", OnWheel)
+        HelpFrame:SetHeight(hdrH + 8 + visH + 8)
     end
     HelpFrame:SetShown(not HelpFrame:IsShown())
 end

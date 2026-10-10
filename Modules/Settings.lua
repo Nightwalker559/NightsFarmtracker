@@ -57,9 +57,9 @@ local SSidebar     -- category nav sidebar (doesn't scroll)
 local S_W          = 320
 local S_PAD        = 14
 local S_HDR_H      = ns.WINDOW_HDR_H
-local S_MAX_VIS    = 380   -- max visible scroll area height
-local S_SCROLL_STEP = 22
 local S_FTR_H       = 26   -- footer strip height (Reset to Default button)
+local S_MAX_VIS    = ns.MAX_WINDOW_H - S_HDR_H - S_FTR_H   -- window caps at ns.MAX_WINDOW_H, content scrolls
+local S_SCROLL_STEP = 22
 
 ------------------------------------------------------------------------
 -- Radio button row — pooled (built once, reconfigured on reuse) so
