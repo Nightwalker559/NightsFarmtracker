@@ -12,6 +12,10 @@
 
 - Theme settings moved into their own Settings section "Colors"
 
+### Fixed
+
+- Row tooltips (e.g. History month summary) stayed visible after closing the window
+
 - Debug mode (`/nft debug`) no longer prints to chat: it opens a live debug log window with Select All / Clear; switching debug off or the close button closes it, Esc does not
 - `/nft venomdump`, `/nft test`, `/nft itemdb`, `/nft monthdump`, `/nft sessionsdump` write into the same debug log window
 

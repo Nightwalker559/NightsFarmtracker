@@ -41,6 +41,7 @@ local MainFrame = CreateFrame("Frame","NightsFarmtrackerMain",UIParent,"Backdrop
 MainFrame:SetSize(FRAME_W, COLLAPSED_H)
 MainFrame:SetPoint("TOP", UIParent, "TOP", 0, -150)
 MainFrame:Hide()
+MainFrame:HookScript("OnHide", function(self) ns.HideTooltipOf(self) end)
 -- Same strata as every other window of the addon.
 MainFrame:SetFrameStrata("MEDIUM")
 MainFrame:SetMovable(true); MainFrame:EnableMouse(true); MainFrame:SetClampedToScreen(true)

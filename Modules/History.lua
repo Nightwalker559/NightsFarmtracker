@@ -818,6 +818,7 @@ local function EnsureDetailFrame()
     DetailFrame:SetScript("OnDragStop", function(s) s:StopMovingOrSizing() end)
     ns.ApplyFrameStyle(DetailFrame); DetailFrame:Hide()
     ns.DetailFrame = DetailFrame  -- exposed so Settings can close it when it opens
+    DetailFrame:HookScript("OnHide", function(self) ns.HideTooltipOf(self) end)
     table.insert(UISpecialFrames,"NightsFarmtrackerDetailWnd")
 
     -- Header: single line "Date  ·  Duration  ·  Total Gold"
@@ -1864,7 +1865,8 @@ local function EnsureHistFrame()
     if HListFrame then return end
     HistFrame = ns.CreateWindowFrame("NightsFarmtrackerHistoryWnd", ns.L["session_history"], {width = H_W})
     ns.HistFrame = HistFrame  -- exposed so Settings can dock next to it in the left-side chain
-    HistFrame:SetScript("OnHide",function()
+    HistFrame:SetScript("OnHide",function(self)
+        ns.HideTooltipOf(self)  -- explicit: don't rely on the shell's hook surviving SetScript
         if DetailFrame then DetailFrame:Hide() end
         ns.RefreshWindowChain("left")
     end)

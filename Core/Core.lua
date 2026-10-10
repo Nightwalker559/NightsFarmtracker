@@ -1728,11 +1728,24 @@ end
 -- opts (all optional): width, pad (default ns.PAD), titleColor (default
 -- ns.COL_GOLD), titleY (default -10).
 ------------------------------------------------------------------------
+-- Hides GameTooltip if it belongs to `frame` or one of its children. A frame
+-- that is hidden while the mouse is over one of its rows never gets that
+-- row's OnLeave, so the tooltip would otherwise linger after closing.
+function ns.HideTooltipOf(frame)
+    if not GameTooltip:IsShown() then return end
+    local owner = GameTooltip:GetOwner()
+    while owner do
+        if owner == frame then GameTooltip:Hide(); return end
+        owner = owner:GetParent()
+    end
+end
+
 function ns.CreateWindowFrame(name, title, opts)
     opts = opts or {}
     local pad = opts.pad or ns.PAD
 
     local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+    frame:HookScript("OnHide", function(self) ns.HideTooltipOf(self) end)
     if opts.width then frame:SetWidth(opts.width) end
     frame:SetFrameStrata("MEDIUM")
     frame:SetClampedToScreen(true)
