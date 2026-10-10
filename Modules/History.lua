@@ -22,7 +22,7 @@ local SESS_H   = 38
 local DET_W      = ns.FRAME_W          -- same as main frame
 local DET_PAD    = ns.PAD
 local DET_HDR_H  = ns.WINDOW_HDR_H
-local DET_FTR_H  = 30
+local DET_FTR_H  = 10   -- just padding: the item counts live in the header hover
 local DET_CONT_W = ns.CONTENT_W
 local DET_CAT_H  = ns.CAT_ROW_H
 local DET_ROW_H  = ns.ROW_H
@@ -679,6 +679,7 @@ local detRowPool    = {}
 local detCatPool    = {}
 local detCollapsed  = {}
 local currentDetailSession = nil
+local detailStats = nil   -- {kinds = distinct item rows, qty = total amount} of currentDetailSession, shown in the header hover
 
 local function AcquireDetRow()
     local r = table.remove(detRowPool)
@@ -845,6 +846,10 @@ local function EnsureDetailFrame()
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine(ns.L["gold_overview"], unpack(ns.COL_ACCENT))
         GameTooltip:AddDoubleLine(ns.L["detail_duration"], ns.FormatTime(session.duration), 0.75,0.75,0.75, 1,1,1)
+        if detailStats then
+            GameTooltip:AddDoubleLine(ns.L["detail_item_kinds"], BreakUpLargeNumbers(detailStats.kinds), 0.75,0.75,0.75, 1,1,1)
+            GameTooltip:AddDoubleLine(ns.L["detail_item_qty"], BreakUpLargeNumbers(detailStats.qty), 0.75,0.75,0.75, 1,1,1)
+        end
         if total > 0 then
             GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(itemGold), 0.75,0.75,0.75, 1,1,1)
             GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(lg), 0.75,0.75,0.75, 1,1,1)
@@ -877,12 +882,6 @@ local function EnsureDetailFrame()
     DScrollFrame:SetScript("OnMouseWheel",OnWheel)
     DListFrame:EnableMouseWheel(true); DListFrame:SetScript("OnMouseWheel",OnWheel)
 
-    local fSep = DetailFrame:CreateTexture(nil,"ARTWORK"); fSep:SetHeight(1)
-    fSep:SetColorTexture(unpack(ns.COL_BORDER))
-    fSep:SetPoint("BOTTOMLEFT",DET_PAD,DET_FTR_H-2); fSep:SetPoint("BOTTOMRIGHT",-DET_PAD,DET_FTR_H-2)
-
-    DetailFrame.footLabel = DetailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    DetailFrame.footLabel:SetPoint("BOTTOMLEFT",DET_PAD,10); DetailFrame.footLabel:SetTextColor(0.38,0.38,0.38)
 end
 
 -- Category/item builder used by the Detail window.
@@ -1569,7 +1568,18 @@ local function RebuildDetailContent(session)
 
     local cats, catOrder = BuildSessionCategories(session)
 
-    local yOff = 0; local totalItems = 0
+    -- Item counts for the header hover; counted over all categories, so
+    -- collapsing one doesn't change them.
+    local kinds, qty = 0, 0
+    for _, catName in ipairs(catOrder) do
+        for _, entry in ipairs(cats[catName].items) do
+            kinds = kinds + 1
+            qty = qty + (tonumber(entry.isRank and entry.tc or entry.isGearVariant and entry.gv.amount or entry.d.amount) or 0)
+        end
+    end
+    detailStats = { kinds = kinds, qty = qty }
+
+    local yOff = 0
     for _, catName in ipairs(catOrder) do
         local cat = cats[catName]
         if #cat.items > 0 then
@@ -1586,7 +1596,6 @@ local function RebuildDetailContent(session)
 
         if not isCollapsed then
         for _, entry in ipairs(cat.items) do
-            totalItems = totalItems + 1
             local ir = AcquireDetRow(); ir:SetWidth(DET_CONT_W); ir:SetPoint("TOPLEFT",0,-yOff)
             ir.sep:SetShown(yOff > 0)
             -- Indent icon like in the main frame
@@ -1642,7 +1651,6 @@ local function RebuildDetailContent(session)
         window = DetailFrame, scroll = DScrollFrame, list = DListFrame,
         hdrH = DET_HDR_H, ftrH = DET_FTR_H, contentH = yOff,
     })
-    DetailFrame.footLabel:SetText((totalItems==1 and string.format(ns.L["item_singular"],totalItems) or string.format(ns.L["item_plural"],totalItems)))
 end
 
 -- Builds a virtual, non-persisted session that merges every real session

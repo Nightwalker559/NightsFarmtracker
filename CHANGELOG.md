@@ -15,6 +15,7 @@
 - Max window height is adjustable (Settings → Display, 200–1000 px, default 360)
 - Vendor Filter and Blacklist: categories, drop zone and item list scroll together
 - Help window grows up to 40 px more than that (400 by default), then scrolls
+- Session Detail: item count moved from the footer into the header hover, now with different items and total quantity; footer shrunk to padding
 
 ### Fixed
 
