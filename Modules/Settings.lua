@@ -1471,6 +1471,12 @@ function ns.RebuildSettingsContent()
             function(v) ns.SetHudEnabled(v) end)
         y = y - 38
 
+        local ringRow = track(AcquireCheckbox(SListFrame), "checkbox")
+        ConfigureCheckbox(ringRow, ns.L["hud_ring"], y,
+            function() return db.hudRing == true end,
+            function(v) ns.SetHudRing(v) end)
+        y = y - 38
+
         local hudHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
         hudHint:SetPoint("TOPLEFT", S_PAD, y)
         hudHint:SetTextColor(0.5,0.5,0.5)

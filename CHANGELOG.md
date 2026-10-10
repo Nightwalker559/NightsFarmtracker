@@ -2,6 +2,10 @@
 
 ## 1.7.5
 
+### New
+
+- Minimap HUD: range ring around the character with an adjustable radius in yards (Settings checkbox, `/nft hud ring [yards]`, key bindings for toggle, larger and smaller), to check from which distance nodes appear on the minimap
+
 ### Changed
 
 - Debug mode (`/nft debug`) no longer prints to chat: it opens a live debug log window with Select All / Clear; switching debug off or the close button closes it, Esc does not

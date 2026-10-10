@@ -644,6 +644,7 @@ ns.PROFILE_KEYS = {
     tsmCustomSource=true, colorTheme=true, venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
+    hudRing=true, hudRingYards=true,
     showPriceSource=true,
 }
 
