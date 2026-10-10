@@ -644,7 +644,6 @@ ns.PROFILE_KEYS = {
     tsmCustomSource=true, colorTheme=true, venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
-    hudRing=true, hudRingYards=true, hudRingColor=true,
     showPriceSource=true,
 }
 
@@ -724,12 +723,10 @@ function ns.CopyProfile(name, sourceName)
     local src = profiles[sourceName] or ActiveProfileTable()
     local copy = {}
     for k, v in pairs(src) do copy[k] = v end
-    -- table-valued settings are copied so the two profiles don't share them
-    for _, key in ipairs({ "gearThresholdOff", "hudRingColor" }) do
-        if type(src[key]) == "table" then
-            copy[key] = {}
-            for k, v in pairs(src[key]) do copy[key][k] = v end
-        end
+    -- gearThresholdOff is a table - copy it so the two profiles don't share it
+    if type(src.gearThresholdOff) == "table" then
+        copy.gearThresholdOff = {}
+        for k, v in pairs(src.gearThresholdOff) do copy.gearThresholdOff[k] = v end
     end
     profiles[name] = copy
     return true

@@ -5,13 +5,4 @@
 	<Binding name="NFT_TOGGLE_HUD" category="BINDING_HEADER_NIGHTSFARMTRACKER">
 		NightsFarmtracker_ToggleHud()
 	</Binding>
-	<Binding name="NFT_HUD_RING_TOGGLE" category="BINDING_HEADER_NIGHTSFARMTRACKER">
-		NightsFarmtracker_ToggleHudRing()
-	</Binding>
-	<Binding name="NFT_HUD_RING_BIGGER" category="BINDING_HEADER_NIGHTSFARMTRACKER">
-		NightsFarmtracker_HudRingBigger()
-	</Binding>
-	<Binding name="NFT_HUD_RING_SMALLER" category="BINDING_HEADER_NIGHTSFARMTRACKER">
-		NightsFarmtracker_HudRingSmaller()
-	</Binding>
 </Bindings>

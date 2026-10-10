@@ -56,93 +56,6 @@ local function HudAlpha()  return Num("hudAlpha", 0,   0,   1)   end  -- map bac
 local function HudRotate() return not NightsFarmtrackerDB or NightsFarmtrackerDB.hudRotate ~= false end
 
 ------------------------------------------------------------------------
--- Range ring: a circle around the character (= HUD centre) with an
--- adjustable radius in yards, to read off at which distance nodes show up
--- on the minimap. The minimap's view radius in yards
--- (C_Minimap.GetViewRadius, what HereBeDragons/GatherMate use for their
--- pins too) maps to half the Minimap width, so yards -> pixels is a plain
--- ratio. The view radius changes indoors/outdoors, so a slow check redraws
--- the ring when it does.
--- Drawn as one anti-aliased ring texture tinted via SetVertexColor (Line
--- objects have no anti-aliasing and looked jagged). Media/HudRing.png is a
--- white ring on a transparent square, centred; the middle of its line sits
--- at RING_TEX_RADIUS of the half texture width, so the texture is scaled
--- until that line has the wanted radius. The line's thickness scales with
--- the ring, like in FarmHud's ring texture.
-------------------------------------------------------------------------
-local RING_STEP       = 5       -- yards per key press
-local RING_MIN        = 5
-local RING_MAX        = 250
-local RING_CHECK_STEP = 0.5     -- seconds between view-radius checks
-local RING_TEXTURE    = "HudRing.png"
-local RING_TEX_RADIUS = 0.97    -- centre line of the ring / half texture width
-
-ns.HUD_RING_MIN, ns.HUD_RING_MAX = RING_MIN, RING_MAX
-
-local Ring, ringTex, ringLabel
-local RING_DEFAULT_COLOR = { 1, 0.85, 0.2, 0.95 }  -- r, g, b, opacity
-local ringLastRadius
-
-local function HudRingOn()    return NightsFarmtrackerDB and NightsFarmtrackerDB.hudRing == true end
-local function HudRingYards()  return Num("hudRingYards", 50, RING_MIN, RING_MAX) end
-
-local function ViewRadius()
-    local ok, r = pcall(C_Minimap.GetViewRadius)
-    if ok and type(r) == "number" and r > 0 then return r end
-end
-
--- The stored radius, capped to what the minimap currently shows.
--- Profile value hudRingColor = { r, g, b, opacity }; anything malformed falls
--- back to the default.
-local function RingColor()
-    local c = NightsFarmtrackerDB and NightsFarmtrackerDB.hudRingColor
-    local out = {}
-    for i = 1, 4 do
-        local v = type(c) == "table" and tonumber(c[i])
-        out[i] = v and math.min(1, math.max(0, v)) or RING_DEFAULT_COLOR[i]
-    end
-    return unpack(out)
-end
-
-local function RingYards()
-    local yards, view = HudRingYards(), ViewRadius()
-    if view then yards = math.min(yards, math.floor(view)) end
-    return yards
-end
-
-local function EnsureRing()
-    if Ring then return end
-    Ring = CreateFrame("Frame", nil, Hud)
-    Ring:SetSize(1, 1)
-    Ring:SetPoint("CENTER")
-    Ring:SetFrameLevel(50)          -- above the pins (Cluster, level 1)
-    ringTex = Ring:CreateTexture(nil, "OVERLAY")
-    ringTex:SetTexture(ns.ART .. RING_TEXTURE, "CLAMP", "CLAMP", "TRILINEAR")
-    ringTex:SetPoint("CENTER")
-    ringLabel = Ring:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-end
-
-local function UpdateRing()
-    local view = Hud and Hud:IsShown() and HudRingOn() and ViewRadius()
-    ringLastRadius = view or nil
-    if not view then
-        if Ring then Ring:Hide() end
-        return
-    end
-    EnsureRing()
-    local yards = RingYards()
-    local r = (Hud:GetWidth() / 2) * (yards / view)     -- centre-line radius in UI units
-    local side = 2 * r / RING_TEX_RADIUS                 -- texture edge length that puts the ring line at radius r
-    ringTex:SetSize(side, side)
-    ringTex:SetVertexColor(RingColor())
-
-    ringLabel:ClearAllPoints()
-    ringLabel:SetPoint("BOTTOM", Ring, "CENTER", 0, r + 4)
-    ringLabel:SetText(string.format("%d yd", yards))
-    Ring:Show()
-end
-
-------------------------------------------------------------------------
 -- Anchor helpers
 ------------------------------------------------------------------------
 -- Re-points every anchor of obj that targets `from` to `to`.
@@ -195,7 +108,6 @@ local function Layout()
     Minimap:SetSize(inner, inner)
     Cluster:SetScale(scale)
     Cluster:SetSize(inner, inner)
-    UpdateRing()
 end
 
 local function ApplyRotation()
@@ -219,16 +131,6 @@ local function EnsureFrames()
     Hud:SetFrameLevel(2)
     Hud:SetPoint("CENTER", WorldFrame, "CENTER")  -- follows the user's viewport
     Hud:Hide()
-
-    -- Indoors/outdoors changes the minimap view radius in yards; redraw the
-    -- range ring when it does.
-    local elapsed = 0
-    Hud:SetScript("OnUpdate", function(_, dt)
-        elapsed = elapsed + dt
-        if elapsed < RING_CHECK_STEP then return end
-        elapsed = 0
-        if HudRingOn() and ViewRadius() ~= ringLastRadius then UpdateRing() end
-    end)
 
     -- Stand-in "minimap" for pins and Routes lines. Needs the zoom calls a
     -- Minimap object offers.
@@ -558,56 +460,7 @@ function ns.SetHudEnabled(enabled)
     end
 end
 
--- Range ring: on/off (Settings checkbox, key binding, /nft hud ring).
-function ns.SetHudRing(on)
-    NightsFarmtrackerDB.hudRing = on and true or false
-    UpdateRing()
-end
-
--- Settings slider (radius in yards; the slider keeps its own state).
-function ns.SetHudRingYards(yards)
-    NightsFarmtrackerDB.hudRingYards = math.min(RING_MAX, math.max(RING_MIN, yards))
-    UpdateRing()
-end
-
-function ns.GetHudRingYards()
-    return HudRingYards()
-end
-
--- Settings color picker: colour and opacity of the ring lines.
-function ns.SetHudRingColor(r, g, b, a)
-    NightsFarmtrackerDB.hudRingColor = { r, g, b, a }
-    if ringTex then ringTex:SetVertexColor(RingColor()) end
-end
-
-function ns.GetHudRingColor()
-    return RingColor()
-end
-
--- Keys change the ring behind the open Settings window's back; it listens
--- here to refresh its checkbox and slider.
-local function RingChangedByKey()
-    UpdateRing()
-    if ns.OnHudRingChanged then ns.OnHudRingChanged() end
-end
-
-function ns.ToggleHudRing()
-    NightsFarmtrackerDB.hudRing = not HudRingOn()
-    RingChangedByKey()
-end
-
--- Key bindings: grow/shrink the ring by one step (also switches it on).
--- Steps from the radius actually shown, so it reacts at once even when the
--- stored value is above what the minimap currently displays.
-function ns.HudRingStep(delta)
-    if not Enabled() then return end
-    local db = NightsFarmtrackerDB
-    db.hudRingYards = math.min(RING_MAX, math.max(RING_MIN, RingYards() + delta))
-    db.hudRing = true
-    RingChangedByKey()
-end
-
--- /nft hud [size <20-100> | scale <1-2.5> | alpha <0-100> | rotate | ring]
+-- /nft hud [size <20-100> | scale <1-2.5> | alpha <0-100> | rotate]
 function ns.HudSlash(arg)
     local sub, val = (arg or ""):lower():match("^%s*(%S*)%s*(%S*)")
     local num = tonumber(val)
@@ -624,8 +477,6 @@ function ns.HudSlash(arg)
         db.hudAlpha = math.min(100, math.max(0, num)) / 100
     elseif sub == "rotate" then
         db.hudRotate = not HudRotate()
-    elseif sub == "ring" then
-        db.hudRing = not HudRingOn()
     else
         Msg(L["hud_usage"])
         return
@@ -641,8 +492,7 @@ function ns.HudSlash(arg)
     end
     Msg(string.format(L["hud_values"],
         math.floor(HudSize() * 100 + 0.5), HudScale(), math.floor(HudAlpha() * 100 + 0.5),
-        HudRotate() and L["on"] or L["off"],
-        HudRingOn() and L["on"] or L["off"], HudRingYards()))
+        HudRotate() and L["on"] or L["off"]))
 end
 
 -- Global entry points for Bindings.xml
@@ -650,23 +500,8 @@ function NightsFarmtracker_ToggleHud()
     ns.ToggleHud()
 end
 
-function NightsFarmtracker_ToggleHudRing()
-    ns.ToggleHudRing()
-end
-
-function NightsFarmtracker_HudRingBigger()
-    ns.HudRingStep(RING_STEP)
-end
-
-function NightsFarmtracker_HudRingSmaller()
-    ns.HudRingStep(-RING_STEP)
-end
-
 BINDING_HEADER_NIGHTSFARMTRACKER = "Night's Farmtracker"
-BINDING_NAME_NFT_TOGGLE_HUD       = L["hud_binding"]
-BINDING_NAME_NFT_HUD_RING_TOGGLE  = L["hud_binding_ring"]
-BINDING_NAME_NFT_HUD_RING_BIGGER  = L["hud_binding_ring_bigger"]
-BINDING_NAME_NFT_HUD_RING_SMALLER = L["hud_binding_ring_smaller"]
+BINDING_NAME_NFT_TOGGLE_HUD      = L["hud_binding"]
 
 ------------------------------------------------------------------------
 -- Events
