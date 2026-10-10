@@ -1454,11 +1454,13 @@ end
 ------------------------------------------------------------------------
 function ns.CreateClearAllButton(parent, pad, hasDataFn, popupName)
     local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(70, 18)
     btn:SetPoint("BOTTOMRIGHT", -pad, 6)
     local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    lbl:SetAllPoints(); lbl:SetJustifyH("RIGHT"); lbl:SetText(ns.L["clear_all"])
+    lbl:SetJustifyH("RIGHT"); lbl:SetText(ns.L["clear_all"])
     lbl:SetTextColor(0.50,0.22,0.22)
+    -- Width follows the text: a fixed 70 px cut "Alles löschen" off ("Alles lösch...")
+    btn:SetSize(math.max(70, math.ceil(lbl:GetStringWidth()) + 4), 18)
+    lbl:SetAllPoints()
     btn:SetScript("OnClick", function()
         if not hasDataFn() then return end
         StaticPopup_Show(popupName)
