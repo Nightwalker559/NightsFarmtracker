@@ -679,6 +679,7 @@ local detRowPool    = {}
 local detCatPool    = {}
 local detCollapsed  = {}
 local currentDetailSession = nil
+local historyTotals = nil -- {items, looted, months = {{label, gold}, ...}} over all saved months, shown in the History title hover
 local detailStats = nil   -- {kinds = distinct item rows, qty = total amount} of currentDetailSession, shown in the header hover
 
 local function AcquireDetRow()
@@ -1749,6 +1750,16 @@ function ns.RebuildHistory()
         end
     end
 
+    -- Totals over all months for the header hover (newest month first)
+    local tot = { items=0, looted=0, months={} }
+    for _,mKey in ipairs(monthOrder) do
+        local m=months[mKey]
+        tot.items=tot.items+m.totalGold
+        tot.looted=tot.looted+(m.lootedGold or 0)
+        tot.months[#tot.months+1]={label=m.label, gold=m.totalGold+(m.lootedGold or 0)}
+    end
+    historyTotals = tot
+
     local accDB=NightsFarmtrackerAccountDB
     accDB.collapsedMonths=accDB.collapsedMonths or {}
 
@@ -1879,6 +1890,40 @@ local function EnsureHistFrame()
     local hSep=HistFrame:CreateTexture(nil,"ARTWORK"); hSep:SetHeight(1)
     hSep:SetColorTexture(unpack(ns.COL_BORDER))
     hSep:SetPoint("TOPLEFT",H_PAD,-(H_HDR_H-1)); hSep:SetPoint("TOPRIGHT",-H_PAD,-(H_HDR_H-1))
+
+    -- Hover on the title: gold of all saved months added up. The right edge
+    -- stops short of the close button so the hitbox doesn't swallow its click.
+    local titleHit = CreateFrame("Frame", nil, HistFrame)
+    titleHit:SetPoint("TOPLEFT", HistFrame.titleFS, "TOPLEFT", 0, 4)
+    titleHit:SetPoint("BOTTOMRIGHT", HistFrame.titleFS, "BOTTOMRIGHT", -24, -4)
+    titleHit:EnableMouse(true)
+    -- The title is the window's drag handle: pass dragging through to the window
+    titleHit:RegisterForDrag("LeftButton")
+    titleHit:SetScript("OnDragStart", function() HistFrame:StartMoving() end)
+    titleHit:SetScript("OnDragStop",  function() HistFrame:StopMovingOrSizing() end)
+    titleHit:SetScript("OnEnter", function(self)
+        local t = historyTotals
+        if not t or #t.months == 0 then return end
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(ns.L["history_total_title"], unpack(ns.COL_ACCENT))
+        local MAX_MONTH_LINES = 12
+        for i, m in ipairs(t.months) do
+            if i > MAX_MONTH_LINES then
+                local olderGold = 0
+                for j = i, #t.months do olderGold = olderGold + t.months[j].gold end
+                GameTooltip:AddDoubleLine(string.format(ns.L["history_older_months"], #t.months - MAX_MONTH_LINES),
+                    ns.FormatGold(olderGold), 0.6,0.6,0.6, 1,1,1)
+                break
+            end
+            GameTooltip:AddDoubleLine(m.label, ns.FormatGold(m.gold), 0.75,0.75,0.75, 1,1,1)
+        end
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(t.items), 0.75,0.75,0.75, 1,1,1)
+        GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(t.looted), 0.75,0.75,0.75, 1,1,1)
+        GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(t.items + t.looted), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+        GameTooltip:Show()
+    end)
+    titleHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     HScrollFrame=CreateFrame("ScrollFrame",nil,HistFrame)
     HScrollFrame:SetPoint("TOPLEFT",H_PAD,-H_HDR_H); HScrollFrame:SetPoint("BOTTOMRIGHT",-H_PAD,H_FTR_H)
