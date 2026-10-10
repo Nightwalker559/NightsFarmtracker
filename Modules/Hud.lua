@@ -64,7 +64,7 @@ local function HudRotate() return not NightsFarmtrackerDB or NightsFarmtrackerDB
 -- ratio. The view radius changes indoors/outdoors, so a slow check redraws
 -- the ring when it does.
 -- Drawn as one anti-aliased ring texture tinted via SetVertexColor (Line
--- objects have no anti-aliasing and looked jagged). Media/HudRing.tga is a
+-- objects have no anti-aliasing and looked jagged). Media/HudRing.png is a
 -- white ring on a transparent square, centred; the middle of its line sits
 -- at RING_TEX_RADIUS of the half texture width, so the texture is scaled
 -- until that line has the wanted radius. The line's thickness scales with
@@ -74,7 +74,7 @@ local RING_STEP       = 5       -- yards per key press
 local RING_MIN        = 5
 local RING_MAX        = 250
 local RING_CHECK_STEP = 0.5     -- seconds between view-radius checks
-local RING_TEXTURE    = "HudRing.tga"
+local RING_TEXTURE    = "HudRing.png"
 local RING_TEX_RADIUS = 0.97    -- centre line of the ring / half texture width
 
 ns.HUD_RING_MIN, ns.HUD_RING_MAX = RING_MIN, RING_MAX
