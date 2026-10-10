@@ -98,7 +98,7 @@ Locales/                 enUS.lua (base), deDE.lua (overrides)
 Core/                    Core, PriceHelper, ItemHelper, Repairs, UI, Main
 Modules/                 History, Export, Debug, Log, Settings, Filter, Blacklist,
                          VenomTracker, BaitFrame, Lockout, Hud
-Media/                   icons, sounds and the HUD range ring textures (HudRing1-4.tga)
+Media/                   icons, sounds and the HUD range ring textures (HudRing1-5.tga)
 ```
 
 To add a language, create `Locales/<locale>.lua` like `deDE.lua` and list it in the TOC after `enUS.lua`.
