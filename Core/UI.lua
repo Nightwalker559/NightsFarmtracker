@@ -453,8 +453,10 @@ local function AcquireRow()
 
     row.catBg = row:CreateTexture(nil,"BACKGROUND")
     row.catBg:SetAllPoints()
-    row.catBg:SetColorTexture(unpack(ns.COL_CAT_BG))
-    row.catBg:SetAlpha(0)
+    ns.PaintCatBg(row.catBg)
+    -- Show/Hide rather than SetAlpha: a gradient texture doesn't reliably
+    -- honor region alpha, so item rows would still draw the header gradient.
+    row.catBg:Hide()
 
     row:EnableMouse(true); row:EnableMouseWheel(true)
     row:SetScript("OnMouseWheel", OnWheel)
@@ -586,7 +588,7 @@ local function ReleaseRow(row)
     row:Hide(); row:ClearAllPoints()
     row.itemName=nil; row.itemLink=nil; row.itemID=nil; row.baseItemID=nil
     row.isCategoryHeader=nil; row.categoryName=nil; row.isJunkMerged=nil
-    row.catBg:SetAlpha(0)
+    row.catBg:Hide()
     row.catTopSep:Hide(); row.catBottomSep:Hide()
     row.sep:Show()
     row:SetSize(CONTENT_W, ROW_H)
@@ -791,7 +793,7 @@ local function BuildHUD()
         hdr.icon:Hide(); hdr.iconBorder:Hide()
         hdr.countText:SetText("")
         hdr.isCategoryHeader=true; hdr.categoryName=catName
-        hdr.catBg:SetAlpha(1)
+        hdr.catBg:Show()
         hdr.catTopSep:Show(); hdr.catBottomSep:Show()
         hdr.sep:Hide()
         hdr.nameText:ClearAllPoints()

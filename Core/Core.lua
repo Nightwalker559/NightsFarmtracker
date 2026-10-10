@@ -212,18 +212,102 @@ ns.COLOR_THEMES = {
 ns.COLOR_THEME_ORDER = {
     "default", "void", "silvermoon", "fel", "frost", "bloodmoon",
     "molten", "emerald", "arcane", "bronze", "plague", "nether", "argent",
+    "custom",
 }
 ns.COL_GOLD = {1.00, 0.82, 0.00}
+
+-- Custom theme: the user picks one accent color, the other three are derived
+-- from it. The built-in themes all follow the same recipe (one hue, fixed
+-- saturation/brightness ramp), so the derived set looks like the presets.
+local function RGBtoHSV(r, g, b)
+    local mx, mn = math.max(r, g, b), math.min(r, g, b)
+    local d = mx - mn
+    local h = 0
+    if d > 0 then
+        if mx == r then     h = ((g - b) / d) % 6
+        elseif mx == g then h = (b - r) / d + 2
+        else                h = (r - g) / d + 4 end
+        h = h / 6
+    end
+    return h, (mx == 0) and 0 or d / mx, mx
+end
+
+local function HSVtoRGB(h, s, v)
+    local i = math.floor(h * 6)
+    local f = h * 6 - i
+    local p, q, t = v * (1 - s), v * (1 - f * s), v * (1 - (1 - f) * s)
+    i = i % 6
+    if i == 0 then return v, t, p
+    elseif i == 1 then return q, v, p
+    elseif i == 2 then return p, v, t
+    elseif i == 3 then return p, q, v
+    elseif i == 4 then return t, p, v
+    else return v, p, q end
+end
+
+-- Accent brightness floor: it is used as text color on dark panels.
+local CUSTOM_MIN_VALUE = 0.55
+
+function ns.DeriveCustomTheme(r, g, b)
+    local h, s, v = RGBtoHSV(r, g, b)
+    if v < CUSTOM_MIN_VALUE then v = CUSTOM_MIN_VALUE end
+    -- Saturation follows the accent's (pale accent -> pale panels), scaled
+    -- per element to match the presets.
+    local function shade(satFactor, val, alpha)
+        local rr, gg, bb = HSVtoRGB(h, math.min(1, s * satFactor), val)
+        return {rr, gg, bb, alpha}
+    end
+    local ar, ag, ab = HSVtoRGB(h, s, v)
+    return {
+        bg     = shade(0.70, 0.10, 0.92),
+        border = shade(0.85, 0.42, 0.85),
+        catBg  = shade(0.78, 0.17, 0.80),
+        accent = {ar, ag, ab},
+    }
+end
+
+do
+    local t = ns.DeriveCustomTheme(0.30, 0.75, 0.85)
+    t.name, t.labelKey, t.descKey = "Custom", "theme_custom", "theme_custom_desc"
+    ns.COLOR_THEMES.custom = t
+end
+
+-- Header gradient colors (optional, see ns.PaintCatBg): left edge tinted
+-- towards the accent, fading out to the right.
+function ns.CatGradient(theme)
+    local cb, ac = theme.catBg, theme.accent
+    return {cb[1] + (ac[1] - cb[1]) * 0.22, cb[2] + (ac[2] - cb[2]) * 0.22,
+            cb[3] + (ac[3] - cb[3]) * 0.22, 0.90},
+           {cb[1], cb[2], cb[3], 0.25}
+end
 
 -- Applies a theme's colors to ns.COL_BG/BORDER/CAT_BG/ACCENT. Elements
 -- already drawn with the old colors are not retroactively recolored -
 -- a UI reload is required for a theme change to fully apply everywhere.
 function ns.ApplyColorTheme(themeKey)
     local theme = ns.COLOR_THEMES[themeKey] or ns.COLOR_THEMES.default
+    local acc = NightsFarmtrackerDB and NightsFarmtrackerDB.customAccent
+    if themeKey == "custom" and type(acc) == "table" and acc[1] and acc[2] and acc[3] then
+        theme = ns.DeriveCustomTheme(acc[1], acc[2], acc[3])
+    end
     ns.COL_BG     = theme.bg
     ns.COL_BORDER = theme.border
     ns.COL_CAT_BG = theme.catBg
     ns.COL_ACCENT = theme.accent
+    ns.COL_CAT_GRAD_L, ns.COL_CAT_GRAD_R = ns.CatGradient(theme)
+end
+
+-- Paints a header/category background texture: flat COL_CAT_BG, or a
+-- left-to-right gradient when the "Header gradient" option is on.
+function ns.PaintCatBg(tex)
+    local db = NightsFarmtrackerDB
+    if db and db.headerGradient then
+        tex:SetColorTexture(1, 1, 1, 1)
+        tex:SetGradient("HORIZONTAL",
+            CreateColor(unpack(ns.COL_CAT_GRAD_L)), CreateColor(unpack(ns.COL_CAT_GRAD_R)))
+    else
+        tex:SetColorTexture(unpack(ns.COL_CAT_BG))
+    end
 end
 
 -- Shared backdrop used throughout Settings/Blacklist/Filter for small
@@ -641,7 +725,8 @@ ns.PROFILE_KEYS = {
     vendorFilterEnabled=true, blacklistEnabled=true, mergeDaily=true,
     splitTradeGoods=true, splitGearByBinding=true, ahSource=true,
     gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
-    tsmCustomSource=true, colorTheme=true, venomTrackerEnabled=true,
+    tsmCustomSource=true, colorTheme=true, customAccent=true, headerGradient=true,
+    venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
     showPriceSource=true,
@@ -667,6 +752,7 @@ local function NewProfileDefaults()
         tsmPriceSource        = "DBMarket",
         tsmCustomSource       = "",
         colorTheme            = "default",
+        headerGradient        = false,
         venomTrackerEnabled   = false,
         baitFrameEnabled      = false,
         mergeJunkEntries      = false,
@@ -846,6 +932,7 @@ function ns.InitDB()
     if db.tsmPriceSource  == nil then db.tsmPriceSource  = "DBMarket" end
     if db.tsmCustomSource == nil then db.tsmCustomSource = ""         end
     if db.colorTheme      == nil then db.colorTheme      = "default"  end
+    if db.headerGradient  == nil then db.headerGradient  = false      end
     if db.venomTrackerEnabled == nil then db.venomTrackerEnabled = false end
     if db.hudEnabled          == nil then db.hudEnabled          = false end
     if db.showPriceSource     == nil then db.showPriceSource     = false end
@@ -1195,7 +1282,7 @@ function ns.CreateSectionHeader(parent, width)
 
     local bg = header:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(unpack(ns.COL_CAT_BG))
+    ns.PaintCatBg(bg)
     header.bg = bg
 
     local topSep = header:CreateTexture(nil, "ARTWORK"); topSep:SetHeight(1)

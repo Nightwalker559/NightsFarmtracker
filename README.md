@@ -28,7 +28,7 @@ Night's Farmtracker sits in your HUD while you grind and counts everything you l
 - Shift+Right-click to exclude items or categories from tracking
 - Info button: short hover tooltip, click for the full help window (shortcuts and commands)
 - Minimap button, draggable and repositionable
-- 13 selectable color themes
+- 13 selectable color themes plus a custom color (Settings → Colors), with preview and optional header gradient
 - Profiles (Settings → Profiles): settings live in switchable profiles instead of being tied to one character — create, copy, rename and delete profiles, switch anytime
 - English and German localization
 

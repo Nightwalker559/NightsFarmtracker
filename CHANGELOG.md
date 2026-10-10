@@ -2,7 +2,15 @@
 
 ## 1.7.5
 
+### New
+
+- Custom color theme: pick one color, the rest of the theme is derived from it, with live preview
+- Preview and color chips for every theme in the theme list
+- Optional gradient on section headers (Settings → Colors)
+
 ### Changed
+
+- Theme settings moved into their own Settings section "Colors"
 
 - Debug mode (`/nft debug`) no longer prints to chat: it opens a live debug log window with Select All / Clear; switching debug off or the close button closes it, Esc does not
 - `/nft venomdump`, `/nft test`, `/nft itemdb`, `/nft monthdump`, `/nft sessionsdump` write into the same debug log window
