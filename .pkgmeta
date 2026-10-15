@@ -1,0 +1,15 @@
+package-as: NightsFarmtracker
+
+move-folders:
+  NightsFarmtracker/NightsFarmtracker: NightsFarmtracker
+
+ignore:
+  - .github/*
+  - .gitattributes
+  - .gitignore
+  - LICENSE.md
+  - README.md
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
