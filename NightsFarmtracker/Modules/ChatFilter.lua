@@ -63,9 +63,35 @@ local function Filter(_, event, msg)
     return hide
 end
 
+-- The exact channel of the proc line is not documented, so besides the
+-- list above every other game-generated channel from ChatTypeInfo is
+-- covered too. Player chat is left alone (people must never be censored).
+local PLAYER_CHAT = {
+    SAY = true, YELL = true, EMOTE = true, TEXT_EMOTE = true, WHISPER = true,
+    WHISPER_INFORM = true, PARTY = true, PARTY_LEADER = true, RAID = true,
+    RAID_LEADER = true, RAID_WARNING = true, INSTANCE_CHAT = true,
+    INSTANCE_CHAT_LEADER = true, GUILD = true, OFFICER = true, CHANNEL = true,
+    BN_WHISPER = true, BN_WHISPER_INFORM = true, BN_INLINE_TOAST_BROADCAST = true,
+    COMMUNITIES_CHANNEL = true, AFK = true, DND = true, IGNORED = true,
+}
+local seen = {}
+local function Register(addFilter, event)
+    if not seen[event] then
+        seen[event] = true
+        addFilter(event, Filter)
+    end
+end
+
 local addFilter = (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter) or ChatFrame_AddMessageEventFilter
 if addFilter then
-    for _, event in ipairs(EVENTS) do addFilter(event, Filter) end
+    for _, event in ipairs(EVENTS) do Register(addFilter, event) end
+    if type(ChatTypeInfo) == "table" then
+        for key in pairs(ChatTypeInfo) do
+            if type(key) == "string" and not PLAYER_CHAT[key] and not key:find("^CHANNEL") then
+                Register(addFilter, "CHAT_MSG_" .. key)
+            end
+        end
+    end
 end
 
 ------------------------------------------------------------------------
