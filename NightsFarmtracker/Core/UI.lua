@@ -349,7 +349,6 @@ local function ApplyMainWidth()
     contentW = w - PAD * 2
     ListFrame:SetWidth(contentW)
     GoldFrame:SetWidth(w)
-    goldBtn:SetWidth(netOn and (contentW / 2 - 30) or 140)
     if InCombatLockdown() and ns.BaitDependsOnMainFrame and ns.BaitDependsOnMainFrame() then
         pendingHeightUpdate = true
         return
@@ -430,17 +429,9 @@ heightWatcher:SetScript("OnEvent", function()
     end
 end)
 
-local function UpdateSummary(itemGoldTotal, itemNetTotal)
-    local looted = NightsFarmtrackerDB.lootedGold or 0
-    cachedGold = (itemGoldTotal or 0) + looted
-    local net = math.floor((itemNetTotal or itemGoldTotal or 0) + looted)
-    local text = cachedGold > 0 and ns.FormatGold(cachedGold) or ""
-    -- Net value: what the session would bring after the AH cut (items sold to
-    -- a vendor carry none), in brackets behind the total.
-    if NightsFarmtrackerDB.showNetPrice and cachedGold > 0 then
-        text = text .. " (" .. ns.FormatGold(net) .. ")"
-    end
-    MainFrame.totalGoldText:SetText(text)
+local function UpdateSummary(itemGoldTotal)
+    cachedGold = (itemGoldTotal or 0) + (NightsFarmtrackerDB.lootedGold or 0)
+    MainFrame.totalGoldText:SetText(cachedGold > 0 and ns.FormatGold(cachedGold) or "")
     ns.UpdateGoldRate()
     ns.UpdateGoldFrame()
 end
@@ -723,7 +714,6 @@ local function BuildHUD()
     local db     = NightsFarmtrackerDB
     local cats   = {}
     local grandTotal = 0
-    local netTotal   = 0
 
     for itemID, data in pairs(db.count) do
         if data.classID == ns.QUEST_CLASS then
@@ -735,7 +725,7 @@ local function BuildHUD()
             db.count[itemID] = nil
         else
             local cat = ns.CategoryName(data)
-            if not cats[cat] then cats[cat]={items={},totalGold=0,netGold=0,classID=data.classID} end
+            if not cats[cat] then cats[cat]={items={},totalGold=0,classID=data.classID} end
             local c         = cats[cat]
             local vendorRaw = ns.VendorTotal(data)
             local ahRaw     = ns.AHTotal(data)
@@ -745,11 +735,6 @@ local function BuildHUD()
             c.items[#c.items+1] = {name=data.name,itemID=itemID,data=data,gold=gold,vendor=vendor,ah=ah}
             c.totalGold   = c.totalGold   + gold
             grandTotal    = grandTotal    + gold
-            -- Worth more than the vendor price = priced from the AH, which
-            -- takes its cut; vendor-priced items are paid out in full.
-            local net     = gold > vendor and gold * (1 - ns.AH_CUT) or gold
-            netTotal      = netTotal + net
-            c.netGold     = c.netGold + net
         end
     end
 
@@ -864,10 +849,7 @@ local function BuildHUD()
         hdr.goldText:SetFontHeight(ns.FONT_NORMAL)
 
         hdr.goldText:SetText(cat.totalGold > 0 and ns.FormatGold(cat.totalGold) or "")
-        hdr.netText:SetPoint("RIGHT", hdr, "RIGHT", -4 - hdrSrcW, 0)
-        if hdrNetW > 0 and cat.netGold < cat.totalGold - 0.5 then
-            hdr.netText:SetText("(" .. ns.FormatGold(math.floor(cat.netGold)) .. ")")
-        end
+
         yOffset = yOffset + CAT_ROW_H
 
         if not isCollapsed then
@@ -1011,7 +993,7 @@ local function BuildHUD()
     local maxScroll = math.max(0, totalH - ScrollFrame:GetHeight())
     ScrollFrame:SetVerticalScroll(math.min(savedScroll, maxScroll))
     UpdateFrameHeight()
-    UpdateSummary(grandTotal, netTotal)
+    UpdateSummary(grandTotal)
 
     if ns.FilterFrame and ns.FilterFrame:IsShown() then
         ns.RebuildFilterList()

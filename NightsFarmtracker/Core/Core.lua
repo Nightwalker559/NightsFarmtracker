@@ -77,11 +77,11 @@ ns.ICON_SIZE   = 30
 ns.RANK_ICON_W = 20   -- width of the R1/R2/R3 atlas markup (CreateAtlasMarkup)
 ns.RANK_ICON_H = 20   -- height of the R1/R2/R3 atlas markup
 ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
--- "Show net value" setting: the main window is this much wider and the footer
--- shows the value after the Auction House cut in brackets (footer, category
--- headers and every AH-priced item row).
-ns.NET_EXTRA_W = 145
-ns.NET_COL_W   = 105   -- width of the per-row net column inside it
+-- "Show net value" setting: the main window is this much wider and the rows
+-- shows the value after the Auction House cut in brackets behind every
+-- AH-priced item row.
+ns.NET_COL_W   = 105   -- width of the per-row net column
+ns.NET_EXTRA_W = ns.NET_COL_W
 ns.AH_CUT      = 0.05
 ns.SCROLL_STEP = ns.ROW_H
 -- Maximum total window height (header + list + footer) of the main window and
