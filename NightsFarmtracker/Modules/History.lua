@@ -399,6 +399,92 @@ function ns.MergeDaySessions(dayKey)
 end
 
 ------------------------------------------------------------------------
+-- Re-prices a saved session whose AH prices went missing at save time (the
+-- relog save ran before the price addon answered - fixed in 1.7.6, but
+-- sessions filed earlier stay without AH values). Only fills what is
+-- missing: variants/items with no frozen AH value get the CURRENT AH price,
+-- everything already priced, vendor-only and BoP/non-AH items are left
+-- alone, so it is safe to run twice. Returns repaired item count, items that
+-- still have no AH price, and the gold added to the session.
+------------------------------------------------------------------------
+function ns.RepairSessionAHPrices(session)
+    local db = NightsFarmtrackerDB
+    if not session or not session.items or db.ahSource == "none" or not ns.HasAnyAH() then
+        return 0, 0, 0
+    end
+    local fixed, missing, gained = 0, 0, 0
+    for _, d in pairs(session.items) do
+        if not (d.isBoP or d.canAH == false or ns.IsForceVendor(d.itemID)
+                or ns.IsForceVendorCategory(d) or ns.IsForceVendorExpansion(d)) then
+            local addedAH, addedAmount, vendorPart = 0, 0, 0
+            if d.variants then
+                for _, gv in pairs(d.variants) do
+                    if (gv.ahTotal or 0) == 0 and (gv.amount or 0) > 0 then
+                        local ap = ns.GetAHPriceForID(gv.priceItemID or d.itemID, gv.itemLink)
+                        if ap then
+                            gv.ahTotal  = ap * gv.amount
+                            gv.ahAmount = gv.amount
+                            addedAH     = addedAH + gv.ahTotal
+                            addedAmount = addedAmount + gv.amount
+                            vendorPart  = vendorPart + (ns.VariantSellPrice(gv, d) or 0) * gv.amount
+                        end
+                    end
+                end
+            elseif (d.ahTotal or 0) == 0 and (d.amount or 0) > 0 then
+                local ap = ns.GetAHPriceForID(d.itemID, d.itemLink)
+                if ap then
+                    addedAH     = ap * d.amount
+                    addedAmount = d.amount
+                    vendorPart  = (d.vendorTotal or 0)
+                end
+            end
+            if addedAH > 0 then
+                d.ahTotal = (d.ahTotal or 0) + addedAH
+                -- History value rule: max(AH, vendor) over the repaired units
+                -- (they were counted at vendor value, or 0, until now).
+                local gain = math.max(addedAH, vendorPart) - vendorPart
+                if d.histValue ~= nil then d.histValue = d.histValue + gain end
+                if addedAH >= vendorPart then
+                    if d.ahAmount ~= nil then d.ahAmount = d.ahAmount + addedAmount end
+                    if d.ahValue  ~= nil then d.ahValue  = d.ahValue  + addedAH end
+                end
+                session.totalAH   = (session.totalAH   or 0) + addedAH
+                session.totalGold = (session.totalGold or 0) + gain
+                gained = gained + gain
+                fixed  = fixed + 1
+            elseif (d.ahTotal or 0) == 0 then
+                missing = missing + 1
+            end
+        end
+    end
+    return fixed, missing, gained
+end
+
+-- Newest saved session = newest day key's first entry (ISO keys sort as
+-- plain strings). Run via /nft repairprices.
+function ns.RepairLastSessionPrices()
+    local L = ns.L
+    local sessions = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions
+    local latestKey
+    for k in pairs(sessions or {}) do
+        if type(k) == "string" and (not latestKey or k > latestKey) then latestKey = k end
+    end
+    local session = latestKey and sessions[latestKey] and sessions[latestKey][1]
+    if not session then
+        print("|cff30b0c0Night's Farmtracker:|r " .. L["repair_prices_nosession"])
+        return
+    end
+    if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then
+        print("|cff30b0c0Night's Farmtracker:|r " .. L["repair_prices_noah"])
+        return
+    end
+    local fixed, missing, gained = ns.RepairSessionAHPrices(session)
+    print("|cff30b0c0Night's Farmtracker:|r " .. L["repair_prices_done"]:format(
+        latestKey, fixed, ns.FormatGold(gained), missing))
+    if fixed > 0 and ns.RebuildHistory then ns.RebuildHistory() end
+end
+
+------------------------------------------------------------------------
 -- Returns a timestamp for the last calendar day of month "YYYY-MM" (noon,
 -- to stay clear of any DST edge cases). Uses the day=0 trick: day 0 of
 -- month m+1 normalizes to the last day of month m.

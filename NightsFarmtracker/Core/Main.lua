@@ -551,8 +551,10 @@ SlashCmdList["FARMTRACK"] = function(msg)
         ns.DebugMonthDump(targetID)
     elseif cmd == "sessionsdump" then
         ns.DebugSessionsDump()
+    elseif cmd == "repairprices" then
+        ns.RepairLastSessionPrices()
     else
-        print("|cff30b0c0Night's Farmtracker:|r /nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump")
+        print("|cff30b0c0Night's Farmtracker:|r /nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump · /nft repairprices")
     end
 end
 

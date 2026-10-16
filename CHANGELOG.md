@@ -2,6 +2,10 @@
 
 ## 1.7.6
 
+### New
+
+- `/nft repairprices`: re-prices the newest saved session that was filed without AH prices (e.g. after a disconnect, before 1.7.6) using the current AH prices. Only fills in what is missing, safe to run twice
+
 ### Fixed
 
 - After a disconnect/relog the old session was filed into History without its AH prices: the price addon (Auctionator/TSM/Oribos) doesn't answer yet at that point. The last known AH price of every item is now kept with the session and used as fallback when the source is not ready
