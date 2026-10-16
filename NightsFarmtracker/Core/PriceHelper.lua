@@ -214,7 +214,17 @@ function ns.GetAHPriceForID(itemID, itemLink)
     local cached = CachedPrice(key)
     if cached then return cached end
 
-    local src = NightsFarmtrackerDB.ahSource or "auto"
+    local db  = NightsFarmtrackerDB
+    local src = db.ahSource or "auto"
+    -- Item data not loaded yet (cold cache right after login): the link is
+    -- not canonical and Auctionator can only answer with a rougher item-ID
+    -- price. Prefer the exact price remembered from before, if there is one.
+    local exact = not itemLink or C_Item.GetItemInfo(itemLink) ~= nil
+    local pkey  = StablePriceKey(itemID, itemLink)
+    if not exact and pkey and src ~= "none" and db.ahLast and db.ahLast[pkey] then
+        return db.ahLast[pkey]
+    end
+
     local p
     if src == "auctionator" then p = ns.GetAuctionatorPrice(itemID, itemLink)
     elseif src == "tsm"     then p = ns.GetTSMPrice(itemID)
@@ -223,13 +233,14 @@ function ns.GetAHPriceForID(itemID, itemLink)
         p = ns.GetAuctionatorPrice(itemID, itemLink) or ns.GetOribosPrice(itemID, itemLink) or ns.GetTSMPrice(itemID)
     end
 
-    local db = NightsFarmtrackerDB
-    local pkey = StablePriceKey(itemID, itemLink)
     if p then
-        ns.priceCache[key] = { price = p, time = GetTime() }
-        if pkey and src ~= "none" then
-            db.ahLast = db.ahLast or {}
-            db.ahLast[pkey] = p
+        -- An inexact answer is neither cached nor remembered
+        if exact then
+            ns.priceCache[key] = { price = p, time = GetTime() }
+            if pkey and src ~= "none" then
+                db.ahLast = db.ahLast or {}
+                db.ahLast[pkey] = p
+            end
         end
     elseif pkey and src ~= "none" and db.ahLast then
         -- Source has no answer right now (not loaded yet after login):

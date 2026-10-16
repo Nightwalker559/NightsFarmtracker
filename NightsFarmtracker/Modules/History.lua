@@ -399,65 +399,79 @@ function ns.MergeDaySessions(dayKey)
 end
 
 ------------------------------------------------------------------------
--- Re-prices a saved session whose AH prices went missing at save time (the
--- relog save ran before the price addon answered - fixed in 1.7.6, but
--- sessions filed earlier stay without AH values). Only fills what is
--- missing: variants/items with no frozen AH value get the CURRENT AH price,
--- everything already priced, vendor-only and BoP/non-AH items are left
--- alone, so it is safe to run twice. Returns repaired item count, items that
--- still have no AH price, and the gold added to the session.
+-- Re-prices a saved session whose AH prices are wrong or missing. The relog
+-- save runs at the very first PLAYER_ENTERING_WORLD, when the AH addon may
+-- not answer yet and the item cache is still cold (links not canonical, so
+-- Auctionator falls back to a rougher item-ID price) - fixed in 1.7.6, but
+-- sessions filed earlier keep those values. Every AH-priced item/variant
+-- gets the CURRENT price for its exact link. Vendor-only items (BoP, not
+-- AH-able, Vendor-Only filters, Junk) are left alone, and so is anything
+-- whose item data isn't loaded yet (skipped, a second run picks it up).
+-- Idempotent while the AH data doesn't change. Returns: re-priced item
+-- count, items still without AH price, skipped items, gold change.
 ------------------------------------------------------------------------
+local function LinkCached(link)
+    return link == nil or C_Item.GetItemInfo(link) ~= nil
+end
+
 function ns.RepairSessionAHPrices(session)
     local db = NightsFarmtrackerDB
     if not session or not session.items or db.ahSource == "none" or not ns.HasAnyAH() then
-        return 0, 0, 0
+        return 0, 0, 0, 0
     end
-    local fixed, missing, gained = 0, 0, 0
+    local fixed, missing, skipped, gained = 0, 0, 0, 0
     for _, d in pairs(session.items) do
         if not (d.isBoP or d.canAH == false or ns.IsForceVendor(d.itemID)
                 or ns.IsForceVendorCategory(d) or ns.IsForceVendorExpansion(d)) then
-            local addedAH, addedAmount, vendorPart = 0, 0, 0
+            local oldAH, newAH, changed, skip = d.ahTotal or 0, 0, false, false
             if d.variants then
                 for _, gv in pairs(d.variants) do
-                    if (gv.ahTotal or 0) == 0 and (gv.amount or 0) > 0 then
-                        local ap = ns.GetAHPriceForID(gv.priceItemID or d.itemID, gv.itemLink)
-                        if ap then
-                            gv.ahTotal  = ap * gv.amount
-                            gv.ahAmount = gv.amount
-                            addedAH     = addedAH + gv.ahTotal
-                            addedAmount = addedAmount + gv.amount
-                            vendorPart  = vendorPart + (ns.VariantSellPrice(gv, d) or 0) * gv.amount
+                    if (gv.amount or 0) > 0 then
+                        if not LinkCached(gv.itemLink) then
+                            skip = true
+                        else
+                            local ap = ns.GetAHPriceForID(gv.priceItemID or d.itemID, gv.itemLink)
+                            local total = ap and ap * gv.amount or (gv.ahTotal or 0)
+                            if total ~= (gv.ahTotal or 0) then changed = true end
+                            gv.ahTotal  = total
+                            gv.ahAmount = total > 0 and gv.amount or 0
                         end
                     end
+                    newAH = newAH + (gv.ahTotal or 0)
                 end
-            elseif (d.ahTotal or 0) == 0 and (d.amount or 0) > 0 then
-                local ap = ns.GetAHPriceForID(d.itemID, d.itemLink)
-                if ap then
-                    addedAH     = ap * d.amount
-                    addedAmount = d.amount
-                    vendorPart  = (d.vendorTotal or 0)
+            elseif (d.amount or 0) > 0 then
+                if not LinkCached(d.itemLink) then
+                    skip = true
+                else
+                    local ap = ns.GetAHPriceForID(d.itemID, d.itemLink)
+                    newAH = ap and ap * d.amount or oldAH
                 end
             end
-            if addedAH > 0 then
-                d.ahTotal = (d.ahTotal or 0) + addedAH
-                -- History value rule: max(AH, vendor) over the repaired units
-                -- (they were counted at vendor value, or 0, until now).
-                local gain = math.max(addedAH, vendorPart) - vendorPart
-                if d.histValue ~= nil then d.histValue = d.histValue + gain end
-                if addedAH >= vendorPart then
-                    if d.ahAmount ~= nil then d.ahAmount = d.ahAmount + addedAmount end
-                    if d.ahValue  ~= nil then d.ahValue  = d.ahValue  + addedAH end
+            if skip then skipped = skipped + 1 end
+            if newAH ~= oldAH then changed = true end
+            if changed then
+                d.ahTotal = newAH > 0 and newAH or nil
+                -- History value rule (as at save time): max(AH, vendor)
+                local vendor  = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
+                local oldHist = d.histValue
+                if oldHist == nil then
+                    oldHist = (oldAH > 0 and vendor) and math.max(oldAH, vendor) or (oldAH > 0 and oldAH) or vendor or 0
                 end
-                session.totalAH   = (session.totalAH   or 0) + addedAH
-                session.totalGold = (session.totalGold or 0) + gain
-                gained = gained + gain
+                local newHist = (newAH > 0 and vendor) and math.max(newAH, vendor) or (newAH > 0 and newAH) or vendor or 0
+                local ahWins  = newAH > 0 and (vendor == nil or newAH >= vendor)
+                if d.histValue ~= nil then d.histValue = newHist end
+                if d.ahAmount  ~= nil then d.ahAmount  = ahWins and (d.amount or 0) or 0 end
+                if d.ahValue   ~= nil then d.ahValue   = ahWins and newAH or 0 end
+                session.totalAH   = (session.totalAH   or 0) + newAH - oldAH
+                session.totalGold = (session.totalGold or 0) + newHist - oldHist
+                gained = gained + newHist - oldHist
                 fixed  = fixed + 1
-            elseif (d.ahTotal or 0) == 0 then
+            elseif newAH == 0 and not skip then
                 missing = missing + 1
             end
         end
     end
-    return fixed, missing, gained
+    return fixed, missing, skipped, gained
 end
 
 -- Newest saved session = newest day key's first entry (ISO keys sort as
@@ -478,9 +492,9 @@ function ns.RepairLastSessionPrices()
         print("|cff30b0c0Night's Farmtracker:|r " .. L["repair_prices_noah"])
         return
     end
-    local fixed, missing, gained = ns.RepairSessionAHPrices(session)
+    local fixed, missing, skipped, gained = ns.RepairSessionAHPrices(session)
     print("|cff30b0c0Night's Farmtracker:|r " .. L["repair_prices_done"]:format(
-        latestKey, fixed, ns.FormatGold(gained), missing))
+        latestKey, fixed, (gained < 0 and "-" or "+") .. ns.FormatGold(math.abs(gained)), missing, skipped))
     if fixed > 0 and ns.RebuildHistory then ns.RebuildHistory() end
 end
 
