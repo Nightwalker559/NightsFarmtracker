@@ -2,6 +2,7 @@
 ## Title: Night's Farmtracker
 ## Notes: Tracks items gathered while farming
 ## Author: Nightwalker559
+## X-Curse-Project-ID: 1576135
 ## Version: 1.7.6
 ## SavedVariables: NightsFarmtrackerAccountDB
 ## SavedVariablesPerCharacter: NightsFarmtrackerDB
