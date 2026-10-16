@@ -453,7 +453,8 @@ function ns.RepairSessionAHPrices(session)
     for _, d in pairs(session.items) do
         if not (d.isBoP or d.canAH == false or ns.IsForceVendor(d.itemID)
                 or ns.IsForceVendorCategory(d) or ns.IsForceVendorExpansion(d)) then
-            local oldAH, newAH, changed, skip = d.ahTotal or 0, 0, false, false
+            local oldAH, newAH, changed, skip, cut = d.ahTotal or 0, 0, false, false, false
+            local gear = ns.IsGearThresholdApplicable(d)
             if d.variants then
                 for _, gv in pairs(d.variants) do
                     if (gv.amount or 0) > 0 then
@@ -462,6 +463,11 @@ function ns.RepairSessionAHPrices(session)
                         else
                             local ap = ns.GetAHPriceForID(gv.priceItemID or d.itemID, gv.itemLink)
                             local total = ap and ap * gv.amount or (gv.ahTotal or 0)
+                            -- Gear AH Threshold: a variant below it is vendor-priced
+                            -- (frozen like a Vendor-Only item), per variant as in ns.GearVariantItemValue
+                            if gear and total > 0 and ns.IsGearThresholdVendorOnly(d, total) then
+                                total, cut = 0, true
+                            end
                             if total ~= (gv.ahTotal or 0) then changed = true end
                             gv.ahTotal  = total
                             gv.ahAmount = total > 0 and gv.amount or 0
@@ -475,21 +481,33 @@ function ns.RepairSessionAHPrices(session)
                 else
                     local ap = ns.GetAHPriceForID(d.itemID, d.itemLink)
                     newAH = ap and ap * d.amount or oldAH
+                    if gear and newAH > 0 and ns.IsGearThresholdVendorOnly(d, newAH) then
+                        newAH, cut = 0, true
+                    end
                 end
             end
             if skip then skipped = skipped + 1 end
             if newAH ~= oldAH then changed = true end
             if changed then
                 d.ahTotal = newAH > 0 and newAH or nil
-                -- History value rule (as at save time): max(AH, vendor)
-                local vendor  = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
-                local newHist = (newAH > 0 and vendor) and math.max(newAH, vendor) or (newAH > 0 and newAH) or vendor or 0
-                local ahWins  = newAH > 0 and (vendor == nil or newAH >= vendor)
-                if d.histValue ~= nil then d.histValue = newHist end
-                if d.ahAmount  ~= nil then d.ahAmount  = ahWins and (d.amount or 0) or 0 end
-                if d.ahValue   ~= nil then d.ahValue   = ahWins and newAH or 0 end
+                if d.variants then
+                    local n, v = 0, 0
+                    for _, gv in pairs(d.variants) do
+                        n = n + (gv.ahAmount or 0)
+                        v = v + (gv.ahTotal or 0)
+                    end
+                    if d.ahAmount ~= nil then d.ahAmount = n end
+                    if d.ahValue  ~= nil then d.ahValue  = v end
+                else
+                    local vendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
+                    local ahWins = newAH > 0 and (vendor == nil or newAH >= vendor)
+                    if d.ahAmount ~= nil then d.ahAmount = ahWins and (d.amount or 0) or 0 end
+                    if d.ahValue  ~= nil then d.ahValue  = ahWins and newAH or 0 end
+                end
+                -- History value rule: max(AH, vendor), vendor where the threshold cut the AH price
+                if d.histValue ~= nil then d.histValue = FrozenItemValue(d) end
                 fixed = fixed + 1
-            elseif newAH == 0 and not skip then
+            elseif newAH == 0 and not skip and not cut then
                 missing = missing + 1
             end
         end
