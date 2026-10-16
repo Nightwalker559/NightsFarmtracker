@@ -3,7 +3,7 @@
 ## Notes: Tracks items gathered while farming
 ## Author: Nightwalker559
 ## X-Curse-Project-ID: 1576135
-## Version: 1.7.8
+## Version: 1.7.7
 ## SavedVariables: NightsFarmtrackerAccountDB
 ## SavedVariablesPerCharacter: NightsFarmtrackerDB
 ## IconTexture: Interface\AddOns\NightsFarmtracker\Media\Icon
@@ -31,7 +31,6 @@ Modules\Blacklist.lua
 Modules\VenomTracker.lua
 Modules\BaitFrame.lua
 Modules\Lockout.lua
-Modules\ChatFilter.lua
 Modules\Hud.lua
 
 # Events, loot processing, slash commands (loads last)

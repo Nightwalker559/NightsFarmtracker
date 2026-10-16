@@ -532,8 +532,6 @@ SlashCmdList["FARMTRACK"] = function(msg)
         ns.ToggleBaitFrame()
     elseif cmd == "hud" then
         ns.HudSlash((msg or ""):match("^%s*%S*%s*(.*)$"))
-    elseif cmd == "chatfilter" then
-        ns.ChatFilterSlash((msg or ""):match("^%s*%S*%s*(.*)$"))
     elseif cmd == "export" then
         ns.ToggleExportWindow()
     elseif cmd == "test" then
@@ -549,7 +547,7 @@ SlashCmdList["FARMTRACK"] = function(msg)
     elseif cmd == "repairprices" then
         ns.RepairLastSessionPrices()
     else
-        ns.Print("/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft chatfilter · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump · /nft repairprices")
+        ns.Print("/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump · /nft repairprices")
     end
 end
 
