@@ -34,8 +34,9 @@ jobs:
           else
             heading="## ${tag}"
           fi
+          # (CRLF stripped first: .gitattributes checks the file out with CRLF.)
           # From the heading to the next "---" line or the next "## " heading, whichever comes first.
-          awk -v h="$heading" '$0 == h {on=1; print; next} on && (/^---/ || /^## /) {exit} on' CHANGELOG.md > CHANGELOG.cut
+          tr -d '' < CHANGELOG.md | awk -v h="$heading" '$0 == h {on=1; print; next} on && (/^---/ || /^## /) {exit} on' > CHANGELOG.cut
           if [ ! -s CHANGELOG.cut ]; then
             echo "::error::No section '$heading' in CHANGELOG.md"
             exit 1
