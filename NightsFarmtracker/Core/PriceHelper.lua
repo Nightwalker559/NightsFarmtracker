@@ -173,6 +173,30 @@ local PRICE_CACHE_TTL = 3600
 
 function ns.ClearPriceCache()
     wipe(ns.priceCache)
+    -- The last-known prices came from the old source/settings too
+    if NightsFarmtrackerDB then NightsFarmtrackerDB.ahLast = nil end
+end
+
+-- Last successfully looked-up AH price per item/roll, kept in the character
+-- SavedVariables (db.ahLast, wiped by ns.Reset once the session is filed).
+-- The price cache above dies with the UI, but the relog save runs at the
+-- very first PLAYER_ENTERING_WORLD, when Auctionator/TSM/Oribos may not
+-- answer yet - without this the whole session was filed with no AH value.
+-- Keyed by item ID + bonus IDs parsed straight from the link (no
+-- GetItemInfo, so a raw and a canonical link of the same drop match, and
+-- it works while the item cache is still cold at login).
+local function StablePriceKey(itemID, itemLink)
+    if type(itemLink) == "string" then
+        local f = { strsplit(":", (itemLink:match("item:([%-%d:]*)") or "")) }
+        local id = tonumber(f[1])
+        if id then
+            local n = tonumber(f[13]) or 0
+            local parts = { id }
+            for i = 1, n do parts[#parts + 1] = f[13 + i] or "" end
+            return table.concat(parts, ":")
+        end
+    end
+    return itemID and tostring(itemID) or nil
 end
 
 local function CachedPrice(key)
@@ -199,7 +223,19 @@ function ns.GetAHPriceForID(itemID, itemLink)
         p = ns.GetAuctionatorPrice(itemID, itemLink) or ns.GetOribosPrice(itemID, itemLink) or ns.GetTSMPrice(itemID)
     end
 
-    if p then ns.priceCache[key] = { price = p, time = GetTime() } end
+    local db = NightsFarmtrackerDB
+    local pkey = StablePriceKey(itemID, itemLink)
+    if p then
+        ns.priceCache[key] = { price = p, time = GetTime() }
+        if pkey and src ~= "none" then
+            db.ahLast = db.ahLast or {}
+            db.ahLast[pkey] = p
+        end
+    elseif pkey and src ~= "none" and db.ahLast then
+        -- Source has no answer right now (not loaded yet after login):
+        -- use the last known price. Not cached, so live lookups keep retrying.
+        p = db.ahLast[pkey]
+    end
     return p
 end
 

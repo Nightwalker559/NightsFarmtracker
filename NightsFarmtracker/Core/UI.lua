@@ -980,6 +980,7 @@ function ns.Reset(skipSave)
     db.count={}; db.collapsed={}; db.excludedNames={}; db.excludedItemIDs={}
     db.totalTime=0; db.qAtlas={}; db.paused=true; db.lootedGold=0
     db.sessionStartTime=nil
+    db.ahLast=nil   -- last-known AH prices belong to the filed session
     ns.ClearLog()
     if ns.LogFrame then ns.LogFrame:Hide() end
     NightsFarmtrackerDB.logWindowShown = false

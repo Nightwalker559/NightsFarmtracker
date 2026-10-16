@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.6
+
+### Fixed
+
+- After a disconnect/relog the old session was filed into History without its AH prices: the price addon (Auctionator/TSM/Oribos) doesn't answer yet at that point. The last known AH price of every item is now kept with the session and used as fallback when the source is not ready
+
 ## 1.7.5
 
 ### New
