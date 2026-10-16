@@ -1,0 +1,50 @@
+# Builds the addon zip and uploads it to CurseForge when a tag is pushed.
+# The tag name is the version (e.g. 1.2.1, no "v"); a tag containing "alpha" or "beta"
+# is uploaded as such, anything else as a release. Needs the repository secret
+# CURSEFORGE (GITHUB_TOKEN is provided by GitHub). The project ID comes from the TOC.
+name: Package and release
+
+on:
+  push:
+    tags:
+      - '**'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_KEY: ${{ secrets.CURSEFORGE }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Changelog of this version only
+        # CurseForge shows CHANGELOG.md; cut it down to the section of the tag
+        # (1.2.1 -> "## 1.2.1", 1.3.0-alpha2 -> "## 1.3.0 (alpha 2)").
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [[ "$tag" =~ ^(.+)-(alpha|beta)([0-9]+)$ ]]; then
+            heading="## ${BASH_REMATCH[1]} (${BASH_REMATCH[2]} ${BASH_REMATCH[3]})"
+          else
+            heading="## ${tag}"
+          fi
+          # From the heading to the next "---" line or the next "## " heading, whichever comes first.
+          awk -v h="$heading" '$0 == h {on=1; print; next} on && (/^---/ || /^## /) {exit} on' CHANGELOG.md > CHANGELOG.cut
+          if [ ! -s CHANGELOG.cut ]; then
+            echo "::error::No section '$heading' in CHANGELOG.md"
+            exit 1
+          fi
+          mv CHANGELOG.cut CHANGELOG.md
+          cat CHANGELOG.md
+
+      - name: Package and release
+        uses: BigWigsMods/packager@v2
+        with:
+          # File name and CurseForge label: NightsFarmtracker_<tag> (e.g. NightsFarmtracker_1.7.6).
+          args: -n "{package-name}_{project-version}:{package-name}_{project-version}"
