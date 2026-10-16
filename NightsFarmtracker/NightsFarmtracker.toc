@@ -31,6 +31,7 @@ Modules\Blacklist.lua
 Modules\VenomTracker.lua
 Modules\BaitFrame.lua
 Modules\Lockout.lua
+Modules\ChatFilter.lua
 Modules\Hud.lua
 
 # Events, loot processing, slash commands (loads last)

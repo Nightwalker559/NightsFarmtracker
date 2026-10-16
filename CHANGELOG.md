@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.8
+
+### Added
+
+- Chat filter: hides chat lines containing a phrase from a list (default: the German "Eure Finesse hilft Euch" gathering proc line). Toggle in Settings, manage with `/nft chatfilter [on|off|list|add <text>|remove <number>]`; loot tracking is unaffected
+
 ## 1.7.7
 
 ### Changed

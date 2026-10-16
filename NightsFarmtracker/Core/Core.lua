@@ -772,7 +772,7 @@ ns.PROFILE_KEYS = {
     venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
-    showPriceSource=true,
+    showPriceSource=true, chatFilterEnabled=true,
 }
 
 ns.DEFAULT_PROFILE = "Default"
@@ -803,6 +803,7 @@ local function NewProfileDefaults()
         instanceLockoutEnabled = false,
         hudEnabled            = false,
         showPriceSource       = false,
+        chatFilterEnabled     = true,
     }
 end
 

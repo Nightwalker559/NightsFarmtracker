@@ -1644,6 +1644,24 @@ function ns.RebuildSettingsContent()
     end)
 
     -- ----------------------------------------------------------------
+    -- Section: Chat filter
+    -- ----------------------------------------------------------------
+    addSection("sec_chatfilter", function(y)
+        y = sectionTitle(y, "sec_chatfilter", 26)
+
+        local chatRow = track(AcquireCheckbox(SListFrame), "checkbox")
+        ConfigureCheckbox(chatRow, ns.L["chatfilter_enabled"], y,
+            function() return db.chatFilterEnabled ~= false end,
+            function(v) db.chatFilterEnabled = v end)
+        y = y - 38
+
+        local chatHint = wrappedHint(y, ns.L["chatfilter_hint"])
+        y = y - math.ceil(chatHint:GetStringHeight()) - 10
+
+        return y
+    end)
+
+    -- ----------------------------------------------------------------
     -- Section: Minimap HUD
     -- ----------------------------------------------------------------
     addSection("sec_hud", function(y)
