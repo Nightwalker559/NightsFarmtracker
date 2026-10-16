@@ -487,6 +487,8 @@ local function ResetRowLayout(row)
     row.goldText:ClearAllPoints()
     row.goldText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.goldText:SetFontHeight(ns.FONT_NORMAL)
+    row.netText:ClearAllPoints()
+    row.netText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
 end
 
 local function AcquireRow()
@@ -610,6 +612,13 @@ local function AcquireRow()
     row.goldText:SetJustifyH("RIGHT")
     row.goldText:SetTextColor(unpack(ns.COL_GOLD))
 
+    -- Net value after the AH cut, in brackets, left of the price-source tag
+    -- (only filled in with the "net total" setting, see ShowGold).
+    row.netText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.netText:SetJustifyH("RIGHT")
+    row.netText:SetTextColor(0.72, 0.72, 0.72)
+    row.netText:SetFontHeight(ns.FONT_NORMAL)
+
     -- Price source tag ("AH" / "V") in its own fixed column at the right
     -- edge, after the gold amount; only filled in by ShowGold when the
     -- setting is on.
@@ -633,6 +642,7 @@ local function ReleaseRow(row)
     ResetRowLayout(row)
     row.icon:Show()
     row.srcText:SetText("")
+    row.netText:SetText("")
     row.rankBadge:SetText("")
     rowPool[#rowPool+1] = row
 end
@@ -669,15 +679,29 @@ local SRC_SHIFT = 24
 local function ShowGold(row, ah, vendor, forceVendor)
     local shown = forceVendor and (vendor or 0) or math.max(ah or 0, vendor or 0)
     row.goldText:SetText(shown > 0 and ns.FormatGold(shown) or "")
-    if NightsFarmtrackerDB.showPriceSource and shown > 0 then
-        local fromAH = not forceVendor and (ah or 0) >= (vendor or 0)
+    local fromAH = shown > 0 and not forceVendor and (ah or 0) >= (vendor or 0)
+    local db     = NightsFarmtrackerDB
+    local srcW   = (db.showPriceSource and shown > 0) and SRC_SHIFT or 0
+    -- Net column: reserved on every priced row so the gold amounts line up,
+    -- filled only where the AH takes its cut (vendor sales pay out in full).
+    local netW   = (db.showNetPrice and shown > 0) and ns.NET_COL_W or 0
+    if srcW > 0 then
         row.srcText:SetText(fromAH and "AH" or "V")
         if fromAH then row.srcText:SetTextColor(0.4, 0.75, 1) else row.srcText:SetTextColor(0.6, 0.6, 0.6) end
-        row.goldText:SetPoint("RIGHT", row, "RIGHT", -4 - SRC_SHIFT, 0)
-        row.nameText:SetPoint("RIGHT", row, "RIGHT", -128 - SRC_SHIFT, 0)
-        row.countText:SetPoint("RIGHT", row, "RIGHT", -90 - SRC_SHIFT, 0)
     else
         row.srcText:SetText("")
+    end
+    if netW > 0 and fromAH then
+        row.netText:SetText("(" .. ns.FormatGold(math.floor(shown * (1 - ns.AH_CUT))) .. ")")
+    else
+        row.netText:SetText("")
+    end
+    if srcW + netW > 0 then
+        local shift = srcW + netW
+        row.netText:SetPoint("RIGHT", row, "RIGHT", -4 - srcW, 0)
+        row.goldText:SetPoint("RIGHT", row, "RIGHT", -4 - shift, 0)
+        row.nameText:SetPoint("RIGHT", row, "RIGHT", -128 - shift, 0)
+        row.countText:SetPoint("RIGHT", row, "RIGHT", -90 - shift, 0)
     end
 end
 
@@ -711,7 +735,7 @@ local function BuildHUD()
             db.count[itemID] = nil
         else
             local cat = ns.CategoryName(data)
-            if not cats[cat] then cats[cat]={items={},totalGold=0,classID=data.classID} end
+            if not cats[cat] then cats[cat]={items={},totalGold=0,netGold=0,classID=data.classID} end
             local c         = cats[cat]
             local vendorRaw = ns.VendorTotal(data)
             local ahRaw     = ns.AHTotal(data)
@@ -723,7 +747,9 @@ local function BuildHUD()
             grandTotal    = grandTotal    + gold
             -- Worth more than the vendor price = priced from the AH, which
             -- takes its cut; vendor-priced items are paid out in full.
-            netTotal      = netTotal + (gold > vendor and gold * (1 - ns.AH_CUT) or gold)
+            local net     = gold > vendor and gold * (1 - ns.AH_CUT) or gold
+            netTotal      = netTotal + net
+            c.netGold     = c.netGold + net
         end
     end
 
@@ -832,10 +858,16 @@ local function BuildHUD()
         hdr.nameText:SetFontHeight(ns.FONT_NORMAL)
         hdr.goldText:ClearAllPoints()
         -- same right edge as the item amounts below (they leave room for the AH/V tag)
-        hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", NightsFarmtrackerDB.showPriceSource and (-4 - SRC_SHIFT) or -4, 0)
+        local hdrSrcW = NightsFarmtrackerDB.showPriceSource and SRC_SHIFT or 0
+        local hdrNetW = NightsFarmtrackerDB.showNetPrice and ns.NET_COL_W or 0
+        hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", -4 - hdrSrcW - hdrNetW, 0)
         hdr.goldText:SetFontHeight(ns.FONT_NORMAL)
 
         hdr.goldText:SetText(cat.totalGold > 0 and ns.FormatGold(cat.totalGold) or "")
+        hdr.netText:SetPoint("RIGHT", hdr, "RIGHT", -4 - hdrSrcW, 0)
+        if hdrNetW > 0 and cat.netGold < cat.totalGold - 0.5 then
+            hdr.netText:SetText("(" .. ns.FormatGold(math.floor(cat.netGold)) .. ")")
+        end
         yOffset = yOffset + CAT_ROW_H
 
         if not isCollapsed then

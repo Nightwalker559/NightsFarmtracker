@@ -4,7 +4,7 @@
 
 ### New
 
-- Setting "Show net total after the 5% AH cut in brackets" (Settings -> Display): the footer shows the session total plus, in brackets, what it brings after the Auction House cut. Items sold to a vendor carry no cut. The main window gets wider while the setting is on
+- Setting "Show net value after the 5% AH cut in brackets" (Settings -> Display): every item sold via the AH shows what it brings after the cut in brackets behind its price, category headers and the footer total show the net sum too. Vendor-priced items carry no cut and get no brackets. The main window gets wider while the setting is on
 
 ## 1.7.7
 
