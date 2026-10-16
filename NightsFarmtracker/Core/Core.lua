@@ -941,7 +941,7 @@ function ns.InitDB()
     if db.sessionLength == nil then db.sessionLength = 0                       end
     if db.minimapPos    == nil then db.minimapPos    = 225                     end
     if db.minimapHidden == nil then db.minimapHidden = false                   end
-    -- LibDBIcon sub-table (migrates legacy keys on first load)
+    -- Minimap button sub-table: minimapPos, hide, showInCompartment (migrates legacy keys on first load)
     if db.minimap == nil then
         db.minimap = { minimapPos = db.minimapPos, hide = db.minimapHidden }
     end

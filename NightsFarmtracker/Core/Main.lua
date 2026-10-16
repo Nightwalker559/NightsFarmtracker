@@ -654,7 +654,6 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "PLAYER_LOGIN" then
         if not NightsFarmtrackerDB.paused then ns.StartTimer() end
-        ns.SetMinimapVisible(not (NightsFarmtrackerDB.minimap and NightsFarmtrackerDB.minimap.hide))
         ns.SetExpanded(NightsFarmtrackerDB.expanded)
         ns.RefreshLeftButtons()
         ns.RestoreLogWindow()
@@ -696,10 +695,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
         -- ElvUI repositions the minimap; refresh corrects the button position.
-        local DBIcon = LibStub and LibStub("LibDBIcon-1.0", true)
-        if DBIcon then
-            RunNextFrame(function() DBIcon:Refresh("NightsFarmtracker") end)
-        end
+        RunNextFrame(ns.RefreshMinimapButton)
         -- Some ElvUI/WindTools setups also re-anchor unrelated addon frames
         -- after entering the world (observed: our "TOP" anchor silently
         -- becomes "RIGHT", reintroducing the symmetric collapse/expand bug).
