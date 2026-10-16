@@ -414,12 +414,42 @@ local function LinkCached(link)
     return link == nil or C_Item.GetItemInfo(link) ~= nil
 end
 
+-- Session-total value of one saved item, the way SaveCurrentSession's
+-- ns.ItemValue call saw it: vendor-only items at vendor price, gear per
+-- variant with the Gear AH Threshold (below it = vendor price), the rest
+-- max(AH, vendor). Same rules as ns.ItemValue, but on the frozen AH values
+-- instead of live lookups. (The per-item histValue deliberately ignores
+-- the threshold, see BuildSessionCategories - only session.totalGold uses it.)
+local function FrozenItemValue(d)
+    local vendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
+    if d.isBoP or d.canAH == false or ns.IsForceVendor(d.itemID)
+       or ns.IsForceVendorCategory(d) or ns.IsForceVendorExpansion(d) then
+        return vendor or ns.VendorTotal(d) or 0
+    end
+    if d.variants and ns.IsGear(d) then
+        local total = 0
+        for _, gv in pairs(d.variants) do
+            local sp = ns.VariantSellPrice(gv, d)
+            local v  = (sp and sp > 0 and gv.amount) and sp * gv.amount or nil
+            local a  = (gv.ahTotal or 0) > 0 and gv.ahTotal or nil
+            if ns.IsGearThresholdVendorOnly(d, a) then total = total + (v or a or 0)
+            elseif a and v then total = total + math.max(a, v)
+            else total = total + (a or v or 0) end
+        end
+        return total
+    end
+    local a = (d.ahTotal or 0) > 0 and d.ahTotal or nil
+    if ns.IsGearThresholdVendorOnly(d, a) then return vendor or a or 0 end
+    if a and vendor then return math.max(a, vendor) end
+    return a or vendor or 0
+end
+
 function ns.RepairSessionAHPrices(session)
     local db = NightsFarmtrackerDB
     if not session or not session.items or db.ahSource == "none" or not ns.HasAnyAH() then
         return 0, 0, 0, 0
     end
-    local fixed, missing, skipped, gained = 0, 0, 0, 0
+    local fixed, missing, skipped = 0, 0, 0
     for _, d in pairs(session.items) do
         if not (d.isBoP or d.canAH == false or ns.IsForceVendor(d.itemID)
                 or ns.IsForceVendorCategory(d) or ns.IsForceVendorExpansion(d)) then
@@ -453,25 +483,28 @@ function ns.RepairSessionAHPrices(session)
                 d.ahTotal = newAH > 0 and newAH or nil
                 -- History value rule (as at save time): max(AH, vendor)
                 local vendor  = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
-                local oldHist = d.histValue
-                if oldHist == nil then
-                    oldHist = (oldAH > 0 and vendor) and math.max(oldAH, vendor) or (oldAH > 0 and oldAH) or vendor or 0
-                end
                 local newHist = (newAH > 0 and vendor) and math.max(newAH, vendor) or (newAH > 0 and newAH) or vendor or 0
                 local ahWins  = newAH > 0 and (vendor == nil or newAH >= vendor)
                 if d.histValue ~= nil then d.histValue = newHist end
                 if d.ahAmount  ~= nil then d.ahAmount  = ahWins and (d.amount or 0) or 0 end
                 if d.ahValue   ~= nil then d.ahValue   = ahWins and newAH or 0 end
-                session.totalAH   = (session.totalAH   or 0) + newAH - oldAH
-                session.totalGold = (session.totalGold or 0) + newHist - oldHist
-                gained = gained + newHist - oldHist
-                fixed  = fixed + 1
+                fixed = fixed + 1
             elseif newAH == 0 and not skip then
                 missing = missing + 1
             end
         end
     end
-    return fixed, missing, skipped, gained
+    -- Session totals from the (now corrected) items. Done as a full sum, not
+    -- as deltas, so the Gear AH Threshold stays in (see FrozenItemValue) and
+    -- an earlier partial repair can't leave the total out of step.
+    local oldTotal = session.totalGold or 0
+    local totalGold, totalAH = 0, 0
+    for _, d in pairs(session.items) do
+        totalGold = totalGold + FrozenItemValue(d)
+        totalAH   = totalAH + ((d.ahTotal or 0) > 0 and d.ahTotal or 0)
+    end
+    session.totalGold, session.totalAH = totalGold, totalAH
+    return fixed, missing, skipped, totalGold - oldTotal
 end
 
 -- Newest saved session = newest day key's first entry (ISO keys sort as
@@ -495,7 +528,7 @@ function ns.RepairLastSessionPrices()
     local fixed, missing, skipped, gained = ns.RepairSessionAHPrices(session)
     print("|cff30b0c0Night's Farmtracker:|r " .. L["repair_prices_done"]:format(
         latestKey, fixed, (gained < 0 and "-" or "+") .. ns.FormatGold(math.abs(gained)), missing, skipped))
-    if fixed > 0 and ns.RebuildHistory then ns.RebuildHistory() end
+    if ns.RebuildHistory then ns.RebuildHistory() end
 end
 
 ------------------------------------------------------------------------

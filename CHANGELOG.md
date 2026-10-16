@@ -4,7 +4,7 @@
 
 ### New
 
-- `/nft repairprices`: re-prices the newest saved session with the current AH prices of each item's exact link (fixes sessions filed with missing or rough AH prices after a relog/disconnect, before 1.7.6). Vendor-only items are left alone, items whose data isn't loaded yet are skipped (run it again), safe to run twice
+- `/nft repairprices`: re-prices the newest saved session with the current AH prices of each item's exact link (fixes sessions filed with missing or rough AH prices after a relog/disconnect, before 1.7.6). Vendor-only items are left alone, the session total follows the Gear AH Threshold like a normal save (History's item values don't, as always), items whose data isn't loaded yet are skipped (run it again), safe to run twice
 
 ### Fixed
 
