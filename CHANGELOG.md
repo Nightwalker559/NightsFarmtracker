@@ -1,11 +1,5 @@
 # Changelog
 
-## 1.7.8
-
-### New
-
-- Setting "Show net value per AH item after the 5% cut in brackets" (Settings -> Display): every item priced from the AH shows what it brings after the AH cut in brackets behind its price. Vendor-priced items carry no cut and get no brackets; totals stay gross. The main window gets wider while the setting is on
-
 ## 1.7.7
 
 ### Changed

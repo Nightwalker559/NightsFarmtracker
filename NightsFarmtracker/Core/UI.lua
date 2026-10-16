@@ -32,7 +32,6 @@ local itemRows  = {}
 local itemOrder = {}
 local cachedGold = 0
 local totalH     = 0
-local contentW   = CONTENT_W   -- follows the window width (wider with the net-total setting)
 
 ------------------------------------------------------------------------
 -- Main frame
@@ -74,9 +73,8 @@ ns.MainFrame = MainFrame
 -- Right: [⚙] [?] [▼/▲] [✕]
 ------------------------------------------------------------------------
 local BtnBar = CreateFrame("Frame", nil, MainFrame)
-BtnBar:SetHeight(BTN_BAR_H)
+BtnBar:SetSize(CONTENT_W, BTN_BAR_H)
 BtnBar:SetPoint("TOPLEFT", PAD, -HDR_PAD)
-BtnBar:SetPoint("TOPRIGHT", -PAD, -HDR_PAD)
 
 local btnPause    = MakeBtn(BtnBar, 18, "btn_play.png")
 btnPause:SetPoint("LEFT", BtnBar, "LEFT", 0, 0)
@@ -340,22 +338,6 @@ local function SafeSetMainHeight(height)
     MainFrame:SetHeight(height)
 end
 
--- Window width: FRAME_W, plus NET_EXTRA_W while the net-total setting is on.
--- Same combat rule as the height (a protected lure button may be anchored to
--- MainFrame), so the change waits for PLAYER_REGEN_ENABLED there.
-local function ApplyMainWidth()
-    local netOn = NightsFarmtrackerDB.showNetPrice
-    local w = FRAME_W + (netOn and ns.NET_EXTRA_W or 0)
-    contentW = w - PAD * 2
-    ListFrame:SetWidth(contentW)
-    GoldFrame:SetWidth(w)
-    if InCombatLockdown() and ns.BaitDependsOnMainFrame and ns.BaitDependsOnMainFrame() then
-        pendingHeightUpdate = true
-        return
-    end
-    MainFrame:SetWidth(w)
-end
-
 local function UpdateFrameHeight()
     if not NightsFarmtrackerDB.expanded then return end
     if #itemOrder == 0 then
@@ -363,7 +345,7 @@ local function UpdateFrameHeight()
         SafeSetMainHeight(SCROLL_TOP + 60 + FOOTER_H)
     else
         emptyHint:Hide(); ScrollFrame:Show()
-        ListFrame:SetSize(contentW, totalH)
+        ListFrame:SetSize(CONTENT_W, totalH)
         SafeSetMainHeight(ExpandedHeight())
     end
 end
@@ -420,7 +402,6 @@ heightWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
 heightWatcher:SetScript("OnEvent", function()
     if pendingHeightUpdate then
         pendingHeightUpdate = false
-        ApplyMainWidth()
         UpdateFrameHeight()
     end
     if pendingMainHide then
@@ -466,7 +447,7 @@ end
 -- to a new row and again when a pooled row is released (headers and the
 -- price-source tag move these anchors).
 local function ResetRowLayout(row)
-    row:SetSize(contentW, ROW_H)
+    row:SetSize(CONTENT_W, ROW_H)
     row.icon:ClearAllPoints()
     row.icon:SetPoint("LEFT", 4, 0)
     row.nameText:ClearAllPoints()
@@ -478,16 +459,14 @@ local function ResetRowLayout(row)
     row.goldText:ClearAllPoints()
     row.goldText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.goldText:SetFontHeight(ns.FONT_NORMAL)
-    row.netText:ClearAllPoints()
-    row.netText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
 end
 
 local function AcquireRow()
     local row = table.remove(rowPool)
-    if row then row:SetWidth(contentW); row:Show(); return row end
+    if row then row:Show(); return row end
 
     row = CreateFrame("Frame", nil, ListFrame)
-    row:SetSize(contentW, ROW_H)
+    row:SetSize(CONTENT_W, ROW_H)
 
     row.catBg = row:CreateTexture(nil,"BACKGROUND")
     row.catBg:SetAllPoints()
@@ -603,13 +582,6 @@ local function AcquireRow()
     row.goldText:SetJustifyH("RIGHT")
     row.goldText:SetTextColor(unpack(ns.COL_GOLD))
 
-    -- Net value after the AH cut, in brackets, left of the price-source tag
-    -- (only filled in with the "net total" setting, see ShowGold).
-    row.netText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.netText:SetJustifyH("RIGHT")
-    row.netText:SetTextColor(0.72, 0.72, 0.72)
-    row.netText:SetFontHeight(ns.FONT_NORMAL)
-
     -- Price source tag ("AH" / "V") in its own fixed column at the right
     -- edge, after the gold amount; only filled in by ShowGold when the
     -- setting is on.
@@ -633,7 +605,6 @@ local function ReleaseRow(row)
     ResetRowLayout(row)
     row.icon:Show()
     row.srcText:SetText("")
-    row.netText:SetText("")
     row.rankBadge:SetText("")
     rowPool[#rowPool+1] = row
 end
@@ -670,29 +641,15 @@ local SRC_SHIFT = 24
 local function ShowGold(row, ah, vendor, forceVendor)
     local shown = forceVendor and (vendor or 0) or math.max(ah or 0, vendor or 0)
     row.goldText:SetText(shown > 0 and ns.FormatGold(shown) or "")
-    local fromAH = shown > 0 and not forceVendor and (ah or 0) >= (vendor or 0)
-    local db     = NightsFarmtrackerDB
-    local srcW   = (db.showPriceSource and shown > 0) and SRC_SHIFT or 0
-    -- Net column: reserved on every priced row so the gold amounts line up,
-    -- filled only where the AH takes its cut (vendor sales pay out in full).
-    local netW   = (db.showNetPrice and shown > 0) and ns.NET_COL_W or 0
-    if srcW > 0 then
+    if NightsFarmtrackerDB.showPriceSource and shown > 0 then
+        local fromAH = not forceVendor and (ah or 0) >= (vendor or 0)
         row.srcText:SetText(fromAH and "AH" or "V")
         if fromAH then row.srcText:SetTextColor(0.4, 0.75, 1) else row.srcText:SetTextColor(0.6, 0.6, 0.6) end
+        row.goldText:SetPoint("RIGHT", row, "RIGHT", -4 - SRC_SHIFT, 0)
+        row.nameText:SetPoint("RIGHT", row, "RIGHT", -128 - SRC_SHIFT, 0)
+        row.countText:SetPoint("RIGHT", row, "RIGHT", -90 - SRC_SHIFT, 0)
     else
         row.srcText:SetText("")
-    end
-    if netW > 0 and fromAH then
-        row.netText:SetText("(" .. ns.FormatGold(math.floor(shown * (1 - ns.AH_CUT))) .. ")")
-    else
-        row.netText:SetText("")
-    end
-    if srcW + netW > 0 then
-        local shift = srcW + netW
-        row.netText:SetPoint("RIGHT", row, "RIGHT", -4 - srcW, 0)
-        row.goldText:SetPoint("RIGHT", row, "RIGHT", -4 - shift, 0)
-        row.nameText:SetPoint("RIGHT", row, "RIGHT", -128 - shift, 0)
-        row.countText:SetPoint("RIGHT", row, "RIGHT", -90 - shift, 0)
     end
 end
 
@@ -706,7 +663,6 @@ end
 -- requests inside the same frame collapse into it.
 ------------------------------------------------------------------------
 local function BuildHUD()
-    ApplyMainWidth()
     local savedScroll = ScrollFrame:GetVerticalScroll()
     for _, row in pairs(itemRows) do ReleaseRow(row) end
     itemRows, itemOrder = {}, {}
@@ -828,7 +784,7 @@ local function BuildHUD()
         local isCollapsed = db.collapsed[catName]
 
         local hdr = AcquireRow()
-        hdr:SetSize(contentW, CAT_ROW_H)
+        hdr:SetSize(CONTENT_W, CAT_ROW_H)
         PlaceRow(hdr, yOffset, catName, nil, ns.COL_ACCENT)
         hdr.icon:Hide(); hdr.iconBorder:Hide()
         hdr.countText:SetText("")
@@ -843,13 +799,10 @@ local function BuildHUD()
         hdr.nameText:SetFontHeight(ns.FONT_NORMAL)
         hdr.goldText:ClearAllPoints()
         -- same right edge as the item amounts below (they leave room for the AH/V tag)
-        local hdrSrcW = NightsFarmtrackerDB.showPriceSource and SRC_SHIFT or 0
-        local hdrNetW = NightsFarmtrackerDB.showNetPrice and ns.NET_COL_W or 0
-        hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", -4 - hdrSrcW - hdrNetW, 0)
+        hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", NightsFarmtrackerDB.showPriceSource and (-4 - SRC_SHIFT) or -4, 0)
         hdr.goldText:SetFontHeight(ns.FONT_NORMAL)
 
         hdr.goldText:SetText(cat.totalGold > 0 and ns.FormatGold(cat.totalGold) or "")
-
         yOffset = yOffset + CAT_ROW_H
 
         if not isCollapsed then
