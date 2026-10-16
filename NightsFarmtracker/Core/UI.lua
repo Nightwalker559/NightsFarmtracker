@@ -32,6 +32,7 @@ local itemRows  = {}
 local itemOrder = {}
 local cachedGold = 0
 local totalH     = 0
+local contentW   = CONTENT_W   -- follows the window width (wider with the net-total setting)
 
 ------------------------------------------------------------------------
 -- Main frame
@@ -73,8 +74,9 @@ ns.MainFrame = MainFrame
 -- Right: [⚙] [?] [▼/▲] [✕]
 ------------------------------------------------------------------------
 local BtnBar = CreateFrame("Frame", nil, MainFrame)
-BtnBar:SetSize(CONTENT_W, BTN_BAR_H)
+BtnBar:SetHeight(BTN_BAR_H)
 BtnBar:SetPoint("TOPLEFT", PAD, -HDR_PAD)
+BtnBar:SetPoint("TOPRIGHT", -PAD, -HDR_PAD)
 
 local btnPause    = MakeBtn(BtnBar, 18, "btn_play.png")
 btnPause:SetPoint("LEFT", BtnBar, "LEFT", 0, 0)
@@ -338,6 +340,23 @@ local function SafeSetMainHeight(height)
     MainFrame:SetHeight(height)
 end
 
+-- Window width: FRAME_W, plus NET_EXTRA_W while the net-total setting is on.
+-- Same combat rule as the height (a protected lure button may be anchored to
+-- MainFrame), so the change waits for PLAYER_REGEN_ENABLED there.
+local function ApplyMainWidth()
+    local netOn = NightsFarmtrackerDB.showNetPrice
+    local w = FRAME_W + (netOn and ns.NET_EXTRA_W or 0)
+    contentW = w - PAD * 2
+    ListFrame:SetWidth(contentW)
+    GoldFrame:SetWidth(w)
+    goldBtn:SetWidth(netOn and (contentW / 2 - 30) or 140)
+    if InCombatLockdown() and ns.BaitDependsOnMainFrame and ns.BaitDependsOnMainFrame() then
+        pendingHeightUpdate = true
+        return
+    end
+    MainFrame:SetWidth(w)
+end
+
 local function UpdateFrameHeight()
     if not NightsFarmtrackerDB.expanded then return end
     if #itemOrder == 0 then
@@ -345,7 +364,7 @@ local function UpdateFrameHeight()
         SafeSetMainHeight(SCROLL_TOP + 60 + FOOTER_H)
     else
         emptyHint:Hide(); ScrollFrame:Show()
-        ListFrame:SetSize(CONTENT_W, totalH)
+        ListFrame:SetSize(contentW, totalH)
         SafeSetMainHeight(ExpandedHeight())
     end
 end
@@ -402,6 +421,7 @@ heightWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
 heightWatcher:SetScript("OnEvent", function()
     if pendingHeightUpdate then
         pendingHeightUpdate = false
+        ApplyMainWidth()
         UpdateFrameHeight()
     end
     if pendingMainHide then
@@ -410,9 +430,17 @@ heightWatcher:SetScript("OnEvent", function()
     end
 end)
 
-local function UpdateSummary(itemGoldTotal)
-    cachedGold = (itemGoldTotal or 0) + (NightsFarmtrackerDB.lootedGold or 0)
-    MainFrame.totalGoldText:SetText(cachedGold > 0 and ns.FormatGold(cachedGold) or "")
+local function UpdateSummary(itemGoldTotal, itemNetTotal)
+    local looted = NightsFarmtrackerDB.lootedGold or 0
+    cachedGold = (itemGoldTotal or 0) + looted
+    local net = math.floor((itemNetTotal or itemGoldTotal or 0) + looted)
+    local text = cachedGold > 0 and ns.FormatGold(cachedGold) or ""
+    -- Net value: what the session would bring after the AH cut (items sold to
+    -- a vendor carry none), in brackets behind the total.
+    if NightsFarmtrackerDB.showNetPrice and cachedGold > 0 then
+        text = text .. " (" .. ns.FormatGold(net) .. ")"
+    end
+    MainFrame.totalGoldText:SetText(text)
     ns.UpdateGoldRate()
     ns.UpdateGoldFrame()
 end
@@ -447,7 +475,7 @@ end
 -- to a new row and again when a pooled row is released (headers and the
 -- price-source tag move these anchors).
 local function ResetRowLayout(row)
-    row:SetSize(CONTENT_W, ROW_H)
+    row:SetSize(contentW, ROW_H)
     row.icon:ClearAllPoints()
     row.icon:SetPoint("LEFT", 4, 0)
     row.nameText:ClearAllPoints()
@@ -463,10 +491,10 @@ end
 
 local function AcquireRow()
     local row = table.remove(rowPool)
-    if row then row:Show(); return row end
+    if row then row:SetWidth(contentW); row:Show(); return row end
 
     row = CreateFrame("Frame", nil, ListFrame)
-    row:SetSize(CONTENT_W, ROW_H)
+    row:SetSize(contentW, ROW_H)
 
     row.catBg = row:CreateTexture(nil,"BACKGROUND")
     row.catBg:SetAllPoints()
@@ -663,6 +691,7 @@ end
 -- requests inside the same frame collapse into it.
 ------------------------------------------------------------------------
 local function BuildHUD()
+    ApplyMainWidth()
     local savedScroll = ScrollFrame:GetVerticalScroll()
     for _, row in pairs(itemRows) do ReleaseRow(row) end
     itemRows, itemOrder = {}, {}
@@ -670,6 +699,7 @@ local function BuildHUD()
     local db     = NightsFarmtrackerDB
     local cats   = {}
     local grandTotal = 0
+    local netTotal   = 0
 
     for itemID, data in pairs(db.count) do
         if data.classID == ns.QUEST_CLASS then
@@ -691,6 +721,9 @@ local function BuildHUD()
             c.items[#c.items+1] = {name=data.name,itemID=itemID,data=data,gold=gold,vendor=vendor,ah=ah}
             c.totalGold   = c.totalGold   + gold
             grandTotal    = grandTotal    + gold
+            -- Worth more than the vendor price = priced from the AH, which
+            -- takes its cut; vendor-priced items are paid out in full.
+            netTotal      = netTotal + (gold > vendor and gold * (1 - ns.AH_CUT) or gold)
         end
     end
 
@@ -784,7 +817,7 @@ local function BuildHUD()
         local isCollapsed = db.collapsed[catName]
 
         local hdr = AcquireRow()
-        hdr:SetSize(CONTENT_W, CAT_ROW_H)
+        hdr:SetSize(contentW, CAT_ROW_H)
         PlaceRow(hdr, yOffset, catName, nil, ns.COL_ACCENT)
         hdr.icon:Hide(); hdr.iconBorder:Hide()
         hdr.countText:SetText("")
@@ -946,7 +979,7 @@ local function BuildHUD()
     local maxScroll = math.max(0, totalH - ScrollFrame:GetHeight())
     ScrollFrame:SetVerticalScroll(math.min(savedScroll, maxScroll))
     UpdateFrameHeight()
-    UpdateSummary(grandTotal)
+    UpdateSummary(grandTotal, netTotal)
 
     if ns.FilterFrame and ns.FilterFrame:IsShown() then
         ns.RebuildFilterList()

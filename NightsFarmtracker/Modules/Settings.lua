@@ -1390,6 +1390,15 @@ function ns.RebuildSettingsContent()
             end)
         y = y - 38
 
+        local netRow = track(AcquireCheckbox(SListFrame), "checkbox")
+        ConfigureCheckbox(netRow, ns.L["show_net_price"], y,
+            function() return db.showNetPrice == true end,
+            function(v)
+                db.showNetPrice = v
+                ns.RefreshHUD()
+            end)
+        y = y - 38
+
         local mmRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(mmRow, ns.L["minimap_button"], y,
             function() return not db.minimap.hide end,

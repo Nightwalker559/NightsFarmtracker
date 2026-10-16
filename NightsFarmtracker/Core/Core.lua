@@ -77,6 +77,10 @@ ns.ICON_SIZE   = 30
 ns.RANK_ICON_W = 20   -- width of the R1/R2/R3 atlas markup (CreateAtlasMarkup)
 ns.RANK_ICON_H = 20   -- height of the R1/R2/R3 atlas markup
 ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
+-- "Show net value" setting: the main window is this much wider and the footer
+-- shows the sum after the Auction House cut in brackets.
+ns.NET_EXTRA_W = 120
+ns.AH_CUT      = 0.05
 ns.SCROLL_STEP = ns.ROW_H
 -- Maximum total window height (header + list + footer) of the main window and
 -- every list window; longer content scrolls. User setting db.maxWindowHeight
@@ -772,7 +776,7 @@ ns.PROFILE_KEYS = {
     venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
-    showPriceSource=true,
+    showPriceSource=true, showNetPrice=true,
 }
 
 ns.DEFAULT_PROFILE = "Default"
@@ -803,6 +807,7 @@ local function NewProfileDefaults()
         instanceLockoutEnabled = false,
         hudEnabled            = false,
         showPriceSource       = false,
+        showNetPrice          = false,
     }
 end
 
