@@ -52,11 +52,15 @@ local function ShouldHide(msg)
 end
 
 local function Filter(_, event, msg)
-    if ShouldHide(msg) then
-        ns.Log("chatfilter: hid " .. tostring(event) .. ": " .. msg)
-        return true
+    local hide = ShouldHide(msg)
+    -- Debug aid: with /nft debug on, every line mentioning "Finesse" is
+    -- logged with its channel, whether or not it is hidden (shows which
+    -- event carries the line when the phrase list does not match yet).
+    if ns.debugMode and type(msg) == "string" and not issecretvalue(msg)
+       and (hide or msg:lower():find("finesse", 1, true)) then
+        ns.Log("chatfilter: " .. (hide and "hid " or "saw ") .. tostring(event) .. ": " .. msg)
     end
-    return false
+    return hide
 end
 
 local addFilter = (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter) or ChatFrame_AddMessageEventFilter
