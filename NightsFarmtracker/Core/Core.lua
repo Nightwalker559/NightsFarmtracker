@@ -42,6 +42,11 @@ ns.FALLBACK_ICON  = 134400
 -- Housing classID: Enum.ItemClass.Housing if defined (12.0.0+), else runtime-detected
 ns.HOUSING = Enum.ItemClass and Enum.ItemClass.Housing or nil
 
+-- Weapon (2) and Armor (4) are the item classes that count as Equipment.
+function ns.IsGearClass(classID)
+    return classID == 2 or classID == 4
+end
+
 -- Item class priority for display order (by WoW classID)
 ns.CLASS_PRIORITY = {
     [7]  = 1,   -- Tradeskill / Tradegoods
@@ -72,7 +77,6 @@ ns.ICON_SIZE   = 30
 ns.RANK_ICON_W = 20   -- width of the R1/R2/R3 atlas markup (CreateAtlasMarkup)
 ns.RANK_ICON_H = 20   -- height of the R1/R2/R3 atlas markup
 ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
-ns.MAX_ROWS    = 8
 ns.SCROLL_STEP = ns.ROW_H
 -- Maximum total window height (header + list + footer) of the main window and
 -- every list window; longer content scrolls. User setting db.maxWindowHeight
@@ -366,6 +370,10 @@ ns.debugMode = false
 -- Live trace goes to the debug log window (Modules/Debug.lua), not chat.
 function ns.Log(...) if ns.debugMode then ns.DebugLogAdd(...) end end
 
+-- Chat output with the addon's colored prefix.
+ns.CHAT_PREFIX = "|cff30b0c0Night's Farmtracker:|r "
+function ns.Print(text) print(ns.CHAT_PREFIX .. text) end
+
 ------------------------------------------------------------------------
 -- Item tooltips for looted items shown in our own history/log frames.
 -- Blizzard auto-attaches a "currently equipped" comparison tooltip
@@ -383,7 +391,7 @@ function ns.Log(...) if ns.debugMode then ns.DebugLogAdd(...) end end
 -- drop), battle pets and Mythic keystones.
 local KEYSTONE_ITEM_ID = 180653
 local function TooltipNeedsLink(id, classID)
-    return classID == 2 or classID == 4 or classID == 17 or id == KEYSTONE_ITEM_ID
+    return ns.IsGearClass(classID) or classID == 17 or id == KEYSTONE_ITEM_ID
 end
 
 -- Safety net for the SetHyperlink path: if Auctionator is loaded but its
@@ -671,7 +679,7 @@ function ns.MigrateGearVariantsFromBags(items)
     if not items then return end
     local targets = {}
     for itemID, d in pairs(items) do
-        if (d.classID == 2 or d.classID == 4) and not d.variants then
+        if ns.IsGearClass(d.classID) and not d.variants then
             targets[itemID] = d
         end
     end
@@ -724,21 +732,25 @@ function ns.MigrateGearVariantsFromBags(items)
     end
 end
 
+-- Most recently saved session = the first (newest) entry of the newest day
+-- key. ISO-format day keys ("YYYY-MM-DD") sort correctly as plain strings.
+-- Returns session, dayKey (nothing if there is no saved session).
+function ns.GetNewestSession()
+    local sessions = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions
+    local latestKey
+    for k in pairs(sessions or {}) do
+        if type(k) == "string" and (not latestKey or k > latestKey) then latestKey = k end
+    end
+    local session = latestKey and sessions[latestKey] and sessions[latestKey][1]
+    if session then return session, latestKey end
+end
+
 -- Same repair as above, applied to the most recently saved session (rather
 -- than the live/current one) - for when a session was already closed before
 -- this fix was installed, but the items are still sitting in bags.
 function ns.RepairLastSessionGearVariants()
-    local sessions = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions
-    if not sessions then return end
-    -- "Most recent session" = the newest day key's first (newest) entry.
-    -- ISO-format day keys ("YYYY-MM-DD") sort correctly as plain strings.
-    local latestKey
-    for k in pairs(sessions) do
-        if not latestKey or k > latestKey then latestKey = k end
-    end
-    local dayList = latestKey and sessions[latestKey]
-    if not dayList or not dayList[1] then return end
-    ns.MigrateGearVariantsFromBags(dayList[1].items)
+    local session = ns.GetNewestSession()
+    if session then ns.MigrateGearVariantsFromBags(session.items) end
 end
 
 ------------------------------------------------------------------------
@@ -920,7 +932,7 @@ function ns.InitDB()
         ns.CLASS_PRIORITY[ns.HOUSING] = 3  -- show after gems, before consumables
     end
     local db = NightsFarmtrackerDB
-    if db.count         == nil then db.count         = {}                      end
+    if db.count == nil then db.count = {} end
     if not db.itemKeysMigrated then
         MigrateItemKeys(db.count)
         db.itemKeysMigrated = true
@@ -928,47 +940,31 @@ function ns.InitDB()
     -- One-time repairs for the LIVE (unsaved) session - see
     -- ns.RunCharacterRepairs / ns.CHARACTER_REPAIRS in Repairs.lua.
     ns.RunCharacterRepairs()
-    if db.paused        == nil then db.paused        = true                    end
-    if db.visible       == nil then db.visible       = true                    end
-    if db.expanded      == nil then db.expanded      = false                   end
-    if db.totalTime     == nil then db.totalTime     = 0                       end
-    if db.pos           == nil then db.pos           = {"TOP","TOP",0,-150} end
-    if db.qAtlas        == nil then db.qAtlas        = {}                      end
-    if db.collapsed     == nil then db.collapsed     = {}                      end
-    if db.excludedNames == nil then db.excludedNames = {}                      end
-    if db.excludedItemIDs == nil then db.excludedItemIDs = {}                  end
-    if db.goldRateMode  == nil then db.goldRateMode  = "hour"                  end
-    if db.sessionLength == nil then db.sessionLength = 0                       end
-    if db.minimapPos    == nil then db.minimapPos    = 225                     end
-    if db.minimapHidden == nil then db.minimapHidden = false                   end
-    -- Minimap button sub-table: minimapPos, hide, showInCompartment (migrates legacy keys on first load)
-    if db.minimap == nil then
-        db.minimap = { minimapPos = db.minimapPos, hide = db.minimapHidden }
+
+    -- Profile settings: fill in whatever the active profile lacks (keys added
+    -- by an update, profiles created before them).
+    for key, default in pairs(NewProfileDefaults()) do
+        if db[key] == nil then db[key] = default end
     end
-    if db.lootedGold    == nil then db.lootedGold    = 0                      end
-    if db.sessionHistoryEnabled == nil then db.sessionHistoryEnabled = true  end
-    if db.logWindowEnabled      == nil then db.logWindowEnabled      = false end
-    if db.logWindowShown        == nil then db.logWindowShown        = false end
-    if db.logEntries            == nil then db.logEntries            = {}    end
-    if db.vendorFilterEnabled   == nil then db.vendorFilterEnabled   = true  end
-    if db.blacklistEnabled      == nil then db.blacklistEnabled      = true  end
-    if db.blacklistCategoriesCollapsed == nil then db.blacklistCategoriesCollapsed = false end
-    if db.filterCategoriesCollapsed == nil then db.filterCategoriesCollapsed = false end
-    if db.ahExpansionsCollapsed == nil then db.ahExpansionsCollapsed = false end
-    if db.mergeDaily            == nil then db.mergeDaily            = true  end
-    if db.splitTradeGoods       == nil then db.splitTradeGoods       = false end
-    if db.splitGearByBinding    == nil then db.splitGearByBinding    = false end
-    if db.ahSource        == nil then db.ahSource        = "auto"     end
-    if db.gearAHThreshold == nil then db.gearAHThreshold = 0          end
-    if db.goldDisplayMode == nil then db.goldDisplayMode = "classic"  end
-    if db.tsmPriceSource  == nil then db.tsmPriceSource  = "DBMarket" end
-    if db.tsmCustomSource == nil then db.tsmCustomSource = ""         end
-    if db.colorTheme      == nil then db.colorTheme      = "default"  end
-    if db.headerGradient  == nil then db.headerGradient  = false      end
-    if db.maxWindowHeight == nil then db.maxWindowHeight = ns.DEFAULT_MAX_WINDOW_H end
-    if db.venomTrackerEnabled == nil then db.venomTrackerEnabled = false end
-    if db.hudEnabled          == nil then db.hudEnabled          = false end
-    if db.showPriceSource     == nil then db.showPriceSource     = false end
+
+    -- Character-local state
+    for key, default in pairs({
+        paused = true, visible = true, expanded = false, totalTime = 0, lootedGold = 0,
+        logWindowShown = false, blacklistCategoriesCollapsed = false,
+        filterCategoriesCollapsed = false, ahExpansionsCollapsed = false,
+    }) do
+        if db[key] == nil then db[key] = default end
+    end
+    for _, key in ipairs({ "qAtlas", "collapsed", "excludedNames", "excludedItemIDs", "logEntries" }) do
+        if db[key] == nil then db[key] = {} end
+    end
+    if db.pos == nil then db.pos = {"TOP", "TOP", 0, -150} end
+    -- Minimap button: minimapPos, hide, showInCompartment. The first two used
+    -- to be plain keys on db (pre-LibDBIcon saves).
+    if db.minimap == nil then
+        db.minimap = { minimapPos = db.minimapPos or 225, hide = db.minimapHidden or false }
+    end
+    db.minimapPos, db.minimapHidden = nil, nil
     ns.ApplyColorTheme(db.colorTheme)
 end
 
@@ -1335,6 +1331,21 @@ function ns.CreateSectionHeader(parent, width)
     header.text = text
 
     return header
+end
+
+-- Click-to-collapse plus hover tooltip for a header from CreateSectionHeader:
+-- title (locale key), optional extra hint line (locale key), then the
+-- "click to collapse" line. onToggle runs on mouse-up.
+function ns.WireSectionHeader(header, titleKey, onToggle, hintKey)
+    header:SetScript("OnMouseUp", onToggle)
+    header:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
+        GameTooltip:AddLine(ns.L[titleKey], 1, 1, 1)
+        if hintKey then GameTooltip:AddLine(ns.L[hintKey], 0.5, 0.5, 0.5, true) end
+        GameTooltip:AddLine(ns.L["cat_tip_click"], 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    header:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
 ------------------------------------------------------------------------
@@ -1792,6 +1803,20 @@ function ns.RebuildDropItemList(cfg)
 end
 
 ------------------------------------------------------------------------
+-- Hides GameTooltip if it belongs to `frame` or one of its children. A frame
+-- that is hidden while the mouse is over one of its rows never gets that
+-- row's OnLeave, so the tooltip would otherwise linger after closing.
+------------------------------------------------------------------------
+function ns.HideTooltipOf(frame)
+    if not GameTooltip:IsShown() then return end
+    local owner = GameTooltip:GetOwner()
+    while owner do
+        if owner == frame then GameTooltip:Hide(); return end
+        owner = owner:GetParent()
+    end
+end
+
+------------------------------------------------------------------------
 -- Shared window shell: border/background (ApplyFrameStyle), movable +
 -- clamped, ESC-closable (UISpecialFrames), title text, close button.
 -- Used by every top-level window (History, Log, Filter, Blacklist,
@@ -1803,18 +1828,6 @@ end
 -- opts (all optional): width, pad (default ns.PAD), titleColor (default
 -- ns.COL_GOLD), titleY (default -10).
 ------------------------------------------------------------------------
--- Hides GameTooltip if it belongs to `frame` or one of its children. A frame
--- that is hidden while the mouse is over one of its rows never gets that
--- row's OnLeave, so the tooltip would otherwise linger after closing.
-function ns.HideTooltipOf(frame)
-    if not GameTooltip:IsShown() then return end
-    local owner = GameTooltip:GetOwner()
-    while owner do
-        if owner == frame then GameTooltip:Hide(); return end
-        owner = owner:GetParent()
-    end
-end
-
 function ns.CreateWindowFrame(name, title, opts)
     opts = opts or {}
     local pad = opts.pad or ns.PAD

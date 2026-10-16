@@ -525,27 +525,21 @@ function ns.RepairSessionAHPrices(session)
     return fixed, missing, skipped, totalGold - oldTotal
 end
 
--- Newest saved session = newest day key's first entry (ISO keys sort as
--- plain strings). Run via /nft repairprices.
+-- Re-prices the newest saved session (ns.GetNewestSession). Run via /nft repairprices.
 function ns.RepairLastSessionPrices()
     local L = ns.L
-    local sessions = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions
-    local latestKey
-    for k in pairs(sessions or {}) do
-        if type(k) == "string" and (not latestKey or k > latestKey) then latestKey = k end
-    end
-    local session = latestKey and sessions[latestKey] and sessions[latestKey][1]
+    local session, dayKey = ns.GetNewestSession()
     if not session then
-        print("|cff30b0c0Night's Farmtracker:|r " .. L["repair_prices_nosession"])
+        ns.Print(L["repair_prices_nosession"])
         return
     end
     if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then
-        print("|cff30b0c0Night's Farmtracker:|r " .. L["repair_prices_noah"])
+        ns.Print(L["repair_prices_noah"])
         return
     end
     local fixed, missing, skipped, gained = ns.RepairSessionAHPrices(session)
-    print("|cff30b0c0Night's Farmtracker:|r " .. L["repair_prices_done"]:format(
-        latestKey, fixed, (gained < 0 and "-" or "+") .. ns.FormatGold(math.abs(gained)), missing, skipped))
+    ns.Print(L["repair_prices_done"]:format(
+        dayKey, fixed, (gained < 0 and "-" or "+") .. ns.FormatGold(math.abs(gained)), missing, skipped))
     if ns.RebuildHistory then ns.RebuildHistory() end
 end
 
@@ -881,8 +875,7 @@ local function AcquireDetRow()
             -- SetItemByID would show the generic base item (wrong item
             -- level/stats for scaling gear), so show just the name instead
             -- of a tooltip that looks precise but could be misleading.
-            local isGear = self.classID == 2 or self.classID == 4
-            if isGear then
+            if ns.IsGearClass(self.classID) then
                 GameTooltip:SetOwner(self, anchor)
                 GameTooltip:AddLine(self.itemName or "", 1,1,1)
                 GameTooltip:AddLine(ns.L["tooltip_scaling_unknown"], 0.6,0.6,0.6, true)
@@ -2086,22 +2079,13 @@ local function EnsureHistFrame()
     HistFrame.emptyLabel:SetTextColor(0.55,0.55,0.55)
     HistFrame.emptyLabel:Hide()
 
-    HistFrame.clrBtn=CreateFrame("Button",nil,HistFrame); HistFrame.clrBtn:SetPoint("BOTTOMRIGHT",-H_PAD,6)
-    local clrLabel = HistFrame.clrBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    clrLabel:SetJustifyH("RIGHT"); clrLabel:SetText(ns.L["clear_all"])
-    clrLabel:SetTextColor(0.50,0.22,0.22)
-    -- Width follows the text: a fixed 70 px cut "Alles löschen" off ("Alles lösch...")
-    HistFrame.clrBtn:SetSize(math.max(70, math.ceil(clrLabel:GetStringWidth()) + 4), 18)
-    clrLabel:SetAllPoints()
-    HistFrame.clrBtn:SetScript("OnClick",function()
-        if not NightsFarmtrackerAccountDB.sessions or not next(NightsFarmtrackerAccountDB.sessions) then return end
-        StaticPopup_Show("NFT_CONFIRM_CLEAR_ALL_HISTORY")
+    HistFrame.clrBtn = ns.CreateClearAllButton(HistFrame, H_PAD, function()
+        return NightsFarmtrackerAccountDB.sessions and next(NightsFarmtrackerAccountDB.sessions) ~= nil
+    end, "NFT_CONFIRM_CLEAR_ALL_HISTORY")
+    HistFrame.clrBtn:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP"); GameTooltip:SetText(ns.L["delete_all"]); GameTooltip:Show()
     end)
-    HistFrame.clrBtn:SetScript("OnEnter",function()
-        clrLabel:SetTextColor(1,0.4,0.4)
-        GameTooltip:SetOwner(HistFrame.clrBtn,"ANCHOR_TOP"); GameTooltip:SetText(ns.L["delete_all"]); GameTooltip:Show()
-    end)
-    HistFrame.clrBtn:SetScript("OnLeave",function() clrLabel:SetTextColor(0.50,0.22,0.22); GameTooltip:Hide() end)
+    HistFrame.clrBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
 ------------------------------------------------------------------------

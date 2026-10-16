@@ -20,7 +20,6 @@
 local _, ns = ...
 local L = ns.L
 
-local PREFIX = "|cff30b0c0Night's Farmtracker:|r "
 local STRATA = "BACKGROUND"
 
 local Hud, Cluster, Dummy       -- frames, created on first open
@@ -33,9 +32,7 @@ local redirected   = {}         -- obj -> true while its Minimap anchors point a
 local hooked       = {}         -- obj -> true once the SetPoint hook is installed
 local hooksReady   = false
 
-local function Msg(text)
-    print(PREFIX .. text)
-end
+local Msg = ns.Print
 
 local function Enabled()
     return NightsFarmtrackerDB and NightsFarmtrackerDB.hudEnabled == true

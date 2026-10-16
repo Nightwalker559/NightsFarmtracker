@@ -205,9 +205,7 @@ local function ScanVenom()
     UpdateVenomFrameWidth()
     if not NightsFarmtrackerDB.venomWarnedLocaleMismatch then
         NightsFarmtrackerDB.venomWarnedLocaleMismatch = true
-        print("|cff30b0c0Night's Farmtracker:|r couldn't find '" .. LABEL ..
-            "' in the tooltip for locale " .. GetLocale() ..
-            ". Use /nft venomdump to inspect the raw tooltip lines.")
+        ns.Print(ns.L["venom_locale_mismatch"]:format(LABEL, GetLocale()))
     end
 end
 
@@ -330,7 +328,7 @@ end
 -- used by "/nft venom".
 function ns.ToggleVenomTracker()
     if NightsFarmtrackerDB.venomTrackerEnabled ~= true then
-        print("|cff30b0c0Night's Farmtracker:|r Venom Tracker is disabled in Settings -> Fishing.")
+        ns.Print(ns.L["venom_disabled"])
         return
     end
     if ns.DeferInCombat(ns.ToggleVenomTracker) then return end

@@ -16,7 +16,6 @@ local _, ns = ...
 local B_W       = ns.FRAME_W
 local B_PAD     = ns.PAD
 local B_HDR_H   = ns.WINDOW_HDR_H
-local ROW_H     = ns.ROW_H
 local MIN_VIS_H = 30             -- room for the "list empty" label
 local DZ_H      = 34            -- permanent drop-zone height
 local B_FTR_H   = 26            -- footer strip height (Clear All button)
@@ -168,17 +167,10 @@ local function EnsureBlacklistFrame()
     -- Category checkbox section header - clickable to collapse/expand.
     local catHeader = ns.CreateSectionHeader(BListFrame, ns.CONTENT_W)
     catHeader:SetPoint("TOPLEFT", 0, -CAT_SEC_TOP)
-    catHeader:SetScript("OnMouseUp", function()
+    ns.WireSectionHeader(catHeader, "blacklist_categories_title", function()
         NightsFarmtrackerDB.blacklistCategoriesCollapsed = not NightsFarmtrackerDB.blacklistCategoriesCollapsed
         ns.RebuildBlacklistList()
     end)
-    catHeader:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:AddLine(ns.L["blacklist_categories_title"],1,1,1)
-        GameTooltip:AddLine(ns.L["cat_tip_click"],0.5,0.5,0.5)
-        GameTooltip:Show()
-    end)
-    catHeader:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BlacklistFrame.catHeader = catHeader
 
     local catSep = BListFrame:CreateTexture(nil,"ARTWORK"); catSep:SetHeight(1)

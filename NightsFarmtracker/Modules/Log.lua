@@ -46,7 +46,7 @@ local function AcquireRow()
 
     r.timeText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.timeText:SetPoint("LEFT", 4, 0)
-    r.timeText:SetWidth(38)
+    r.timeText:SetWidth(TIME_W)
     r.timeText:SetJustifyH("LEFT"); r.timeText:SetFontHeight(ns.FONT_NORMAL)
     r.timeText:SetTextColor(0.45,0.45,0.45)
 

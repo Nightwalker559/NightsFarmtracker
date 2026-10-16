@@ -425,17 +425,16 @@ end
 local function AddItemToList(itemID, itemName, toBlacklist)
     local d = NightsFarmtrackerDB.count[itemID]
     local name, icon, quality = (d and d.name) or itemName, d and d.icon, d and d.quality
-    local prefix = "|cff30b0c0Night's Farmtracker:|r "
     if toBlacklist then
         ns.AddBlacklist(itemID, name, icon, quality)
-        print(prefix .. ns.L["msg_added_blacklist"]:format(name))
+        ns.Print(ns.L["msg_added_blacklist"]:format(name))
         ns.RebuildBlacklistList()
     elseif ns.IsForceVendor(itemID) then
-        print(prefix .. ns.L["msg_already_vendor"]:format(name))
+        ns.Print(ns.L["msg_already_vendor"]:format(name))
         return
     else
         ns.AddForceVendor(itemID, name, icon, quality)
-        print(prefix .. ns.L["msg_added_vendor"]:format(name))
+        ns.Print(ns.L["msg_added_vendor"]:format(name))
         ns.RebuildFilterList()
     end
     ns.RefreshHUD()  -- also drops a just-blacklisted item from the live count
@@ -444,6 +443,24 @@ end
 ------------------------------------------------------------------------
 -- Row pool
 ------------------------------------------------------------------------
+-- Default column layout of an item row: icon | name ... count | gold. Applied
+-- to a new row and again when a pooled row is released (headers and the
+-- price-source tag move these anchors).
+local function ResetRowLayout(row)
+    row:SetSize(CONTENT_W, ROW_H)
+    row.icon:ClearAllPoints()
+    row.icon:SetPoint("LEFT", 4, 0)
+    row.nameText:ClearAllPoints()
+    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
+    row.nameText:SetPoint("RIGHT", row,      "RIGHT", -128, 0)
+    row.nameText:SetFontHeight(ns.FONT_NORMAL)
+    row.countText:ClearAllPoints()
+    row.countText:SetPoint("RIGHT", row, "RIGHT", -90, 0)
+    row.goldText:ClearAllPoints()
+    row.goldText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+    row.goldText:SetFontHeight(ns.FONT_NORMAL)
+end
+
 local function AcquireRow()
     local row = table.remove(rowPool)
     if row then row:Show(); return row end
@@ -542,7 +559,6 @@ local function AcquireRow()
 
     row.icon = row:CreateTexture(nil,"ARTWORK")
     row.icon:SetSize(ICON_SIZE, ICON_SIZE)
-    row.icon:SetPoint("LEFT", 4, 0)
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     row.iconBorder = row:CreateTexture(nil,"BACKGROUND")
@@ -554,23 +570,17 @@ local function AcquireRow()
 
     -- Single-line layout: all y=0 → vertically centered with icon
     row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
-    row.nameText:SetPoint("RIGHT", row,           "RIGHT", -128, 0)
     row.nameText:SetJustifyH("LEFT")
-    row.nameText:SetFontHeight(ns.FONT_NORMAL)
     row.nameText:SetWordWrap(false)
 
     row.countText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.countText:SetPoint("RIGHT", row, "RIGHT", -90, 0)
     row.countText:SetJustifyH("RIGHT")
     row.countText:SetTextColor(0.78, 0.78, 0.78)
     row.countText:SetFontHeight(ns.FONT_NORMAL)
 
     row.goldText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.goldText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.goldText:SetJustifyH("RIGHT")
     row.goldText:SetTextColor(unpack(ns.COL_GOLD))
-    row.goldText:SetFontHeight(ns.FONT_NORMAL)
 
     -- Price source tag ("AH" / "V") in its own fixed column at the right
     -- edge, after the gold amount; only filled in by ShowGold when the
@@ -581,6 +591,7 @@ local function AcquireRow()
     row.srcText:SetJustifyH("LEFT")
     row.srcText:SetFontHeight(ns.FONT_SMALL)
 
+    ResetRowLayout(row)
     return row
 end
 
@@ -591,19 +602,8 @@ local function ReleaseRow(row)
     row.catBg:Hide()
     row.catTopSep:Hide(); row.catBottomSep:Hide()
     row.sep:Show()
-    row:SetSize(CONTENT_W, ROW_H)
-    row.icon:ClearAllPoints()
-    row.icon:SetPoint("LEFT", 4, 0)
+    ResetRowLayout(row)
     row.icon:Show()
-    row.nameText:ClearAllPoints()
-    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
-    row.nameText:SetPoint("RIGHT", row,           "RIGHT", -128, 0)
-    row.nameText:SetFontHeight(ns.FONT_NORMAL)
-    row.countText:ClearAllPoints()
-    row.countText:SetPoint("RIGHT", row, "RIGHT", -90, 0)
-    row.goldText:ClearAllPoints()
-    row.goldText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-    row.goldText:SetFontHeight(ns.FONT_NORMAL)
     row.srcText:SetText("")
     row.rankBadge:SetText("")
     rowPool[#rowPool+1] = row
@@ -728,7 +728,7 @@ local function BuildHUD()
     local sorted = {}
     for catName, cat in pairs(cats) do sorted[#sorted+1]={name=catName,cat=cat} end
 
-    -- hasAH is needed below for fv
+    -- With no AH source (or "none" selected) every item is valued at vendor price
     local hasAH = ns.HasAnyAH() and db.ahSource ~= "none"
 
     -- Valuable-gear sound alert: runs independently of category collapse
@@ -768,14 +768,10 @@ local function BuildHUD()
         end
     end
 
-    -- displayGold per category: cat.totalGold is the sum of ns.ItemValue
-    -- (max(AH,Vendor) per item), matching the overall total gold logic.
-    for _, entry in ipairs(sorted) do
-        entry.cat.displayGold = entry.cat.totalGold
-    end
-
+    -- Categories by total gold (the sum of ns.ItemValue, matching the overall
+    -- total), ties by item class priority.
     table.sort(sorted, function(a,b)
-        if a.cat.displayGold ~= b.cat.displayGold then return a.cat.displayGold > b.cat.displayGold end
+        if a.cat.totalGold ~= b.cat.totalGold then return a.cat.totalGold > b.cat.totalGold end
         local oa = (a.cat.classID and ns.CLASS_PRIORITY[a.cat.classID]) or 50
         local ob = (b.cat.classID and ns.CLASS_PRIORITY[b.cat.classID]) or 50
         return oa < ob
@@ -882,68 +878,67 @@ local function BuildHUD()
             end
 
             -- Skip category entirely if no displayable items
-            if #flat == 0 and not isCollapsed then
+            if #flat == 0 then
                 DropLastHeader(hdr, catName)
                 yOffset = yOffset - CAT_ROW_H
             else
+                -- Sort flat list by gold descending
+                table.sort(flat, function(a,b)
+                    local ga = (a.isRank or a.isGearVariant) and a.tGold or a.gold
+                    local gb = (b.isRank or b.isGearVariant) and b.tGold or b.gold
+                    if ga ~= gb then return ga > gb end
+                    return a.name < b.name
+                end)
 
-            -- Sort flat list by gold descending
-            table.sort(flat, function(a,b)
-                local ga = (a.isRank or a.isGearVariant) and a.tGold or a.gold
-                local gb = (b.isRank or b.isGearVariant) and b.tGold or b.gold
-                if ga ~= gb then return ga > gb end
-                return a.name < b.name
-            end)
+                -- Render
+                for _, fi in ipairs(flat) do
+                    local row = AcquireRow()
+                    local d = fi.d
+                    row.sep:SetShown(yOffset > 0)
+                    row.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
+                    row.icon:SetTexCoord(0.08,0.92,0.08,0.92); row.icon:Show()
+                    row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", 4+CAT_INDENT, 0)
+                    row:SetPoint("TOPLEFT", 0, -yOffset)
+                    ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality, {1,1,1})
+                    row.nameText:ClearAllPoints()
+                    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
+                    row.nameText:SetPoint("RIGHT", row,          "RIGHT", -108, 0)
 
-            -- Render
-            for _, fi in ipairs(flat) do
-                local row = AcquireRow()
-                local d = fi.d
-                row.sep:SetShown(yOffset > 0)
-                row.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
-                row.icon:SetTexCoord(0.08,0.92,0.08,0.92); row.icon:Show()
-                row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", 4+CAT_INDENT, 0)
-                row:SetPoint("TOPLEFT", 0, -yOffset)
-                ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality, {1,1,1})
-                row.nameText:ClearAllPoints()
-                row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
-                row.nameText:SetPoint("RIGHT", row,          "RIGHT", -108, 0)
-
-                if fi.isRank then
-                    local key = tostring(d.itemID).."_q"..fi.tier
-                    row.itemName = fi.name; row.itemID = fi.tid; row.itemLink = nil; row.baseItemID = d.itemID
-                    row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, fi.tid)))
-                    row.rankBadge:SetText(fi.rankIcon or "")
-                    row.countText:SetText(tostring(fi.tc))
-                    ShowGold(row, fi.tAH, fi.tV, fi.fv)
-                    itemOrder[#itemOrder+1] = key; itemRows[key] = row
-                elseif fi.isGearVariant then
-                    local gv  = fi.gv
-                    local key = tostring(d.itemID).."_g"..tostring(fi.ilvl)
-                    row.itemName = fi.name; row.itemID = d.itemID; row.itemLink = gv.itemLink; row.baseItemID = d.itemID
-                    row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, gv.itemLink or d.itemID)))
-                    row.rankBadge:SetText("")
-                    row.countText:SetText(tostring(gv.amount))
-                    ShowGold(row, fi.tAH, fi.tV, fi.fv)
-                    itemOrder[#itemOrder+1] = key; itemRows[key] = row
-                else
-                    local it = fi.item
-                    row.isJunkMerged = d.isJunkMerged
-                    row.itemName = fi.name
-                    if d.isJunkMerged then
-                        row.itemID, row.itemLink, row.baseItemID = nil, nil, nil
+                    if fi.isRank then
+                        local key = tostring(d.itemID).."_q"..fi.tier
+                        row.itemName = fi.name; row.itemID = fi.tid; row.itemLink = nil; row.baseItemID = d.itemID
+                        row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, fi.tid)))
+                        row.rankBadge:SetText(fi.rankIcon or "")
+                        row.countText:SetText(tostring(fi.tc))
+                        ShowGold(row, fi.tAH, fi.tV, fi.fv)
+                        itemOrder[#itemOrder+1] = key; itemRows[key] = row
+                    elseif fi.isGearVariant then
+                        local gv  = fi.gv
+                        local key = tostring(d.itemID).."_g"..tostring(fi.ilvl)
+                        row.itemName = fi.name; row.itemID = d.itemID; row.itemLink = gv.itemLink; row.baseItemID = d.itemID
+                        row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, gv.itemLink or d.itemID)))
+                        row.rankBadge:SetText("")
+                        row.countText:SetText(tostring(gv.amount))
+                        ShowGold(row, fi.tAH, fi.tV, fi.fv)
+                        itemOrder[#itemOrder+1] = key; itemRows[key] = row
                     else
-                        row.itemID, row.itemLink, row.baseItemID = d.itemID, d.itemLink, d.itemID
+                        local it = fi.item
+                        row.isJunkMerged = d.isJunkMerged
+                        row.itemName = fi.name
+                        if d.isJunkMerged then
+                            row.itemID, row.itemLink, row.baseItemID = nil, nil, nil
+                        else
+                            row.itemID, row.itemLink, row.baseItemID = d.itemID, d.itemLink, d.itemID
+                        end
+                        row.nameText:SetText(d.isJunkMerged and ns.TruncateName(fi.name) or ns.TruncateName(ns.DisplayName(fi.name, d.itemID)))
+                        row.rankBadge:SetText(ns.RankIconFromLink(d.itemLink) or "")
+                        row.countText:SetText(tostring(d.amount))
+                        ShowGold(row, it.ah, it.vendor, fi.fv)
+                        itemOrder[#itemOrder+1] = fi.item.itemID; itemRows[fi.item.itemID] = row
                     end
-                    row.nameText:SetText(d.isJunkMerged and ns.TruncateName(fi.name) or ns.TruncateName(ns.DisplayName(fi.name, d.itemID)))
-                    row.rankBadge:SetText(ns.RankIconFromLink(d.itemLink) or "")
-                    row.countText:SetText(tostring(d.amount))
-                    ShowGold(row, it.ah, it.vendor, fi.fv)
-                    itemOrder[#itemOrder+1] = fi.item.itemID; itemRows[fi.item.itemID] = row
+                    yOffset = yOffset + ROW_H
                 end
-                yOffset = yOffset + ROW_H
             end
-            end  -- else (flat not empty)
         end
     end
 
@@ -983,7 +978,7 @@ function ns.Reset(skipSave)
     db.ahLast=nil   -- last-known AH prices belong to the filed session
     ns.ClearLog()
     if ns.LogFrame then ns.LogFrame:Hide() end
-    NightsFarmtrackerDB.logWindowShown = false
+    db.logWindowShown = false
     ns.StopTimer(); ns.CleanupPriceUpdate()
     GoldFrame:Hide()
     for _, row in pairs(itemRows) do ReleaseRow(row) end
@@ -1074,7 +1069,7 @@ btnPause:SetScript("OnClick", function()
     -- A finished fixed-length session can't be resumed (it would just
     -- pause again on the next tick) - point to Reset / the setting instead.
     if NightsFarmtrackerDB.paused and ns.SessionLimitReached() then
-        print("|cff30b0c0Night's Farmtracker:|r " .. ns.L["session_length_reached_resume"])
+        ns.Print(ns.L["session_length_reached_resume"])
         return
     end
     NightsFarmtrackerDB.paused = not NightsFarmtrackerDB.paused
@@ -1413,7 +1408,6 @@ end
 
 function ns.SetMinimapVisible(show)
     NightsFarmtrackerDB.minimap.hide  = not show
-    NightsFarmtrackerDB.minimapHidden = not show
     ApplyMinimapButton()
     NotifyButtonBars()
 end

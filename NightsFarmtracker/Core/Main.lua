@@ -120,7 +120,7 @@ local function ProcessLoot(items)
 
             -- Cosmetic weapons/armor (transmog-only, e.g. fishing rod skins) get
             -- their own category instead of being lumped into regular Equipment.
-            local isCosmetic = (classID == 2 or classID == 4) and C_Item.IsCosmeticItem(link) or nil
+            local isCosmetic = ns.IsGearClass(classID) and C_Item.IsCosmeticItem(link) or nil
 
             -- Category name for this pending item, using whatever bind/quality
             -- info is already available from GetItemInfo at loot time - lets
@@ -194,7 +194,7 @@ local function ProcessLoot(items)
                 -- that goes stale the moment a second, differently-rolled
                 -- variant is looted. Non-gear items have no per-variant
                 -- link, so this stays their only copy.
-                if not (classID == 2 or classID == 4) then
+                if not ns.IsGearClass(classID) then
                     entry.itemLink = link
                 end
 
@@ -214,21 +214,16 @@ local function ProcessLoot(items)
                     needsPriceUpdate = true
                 end
 
-                -- Gear quality/ilvl variant tracking: scaling gear (e.g. Adventurer's
-                -- gear) can drop under the SAME item ID at different item levels and
-                -- qualities. Track each item level as its own bucket so amounts and
-                -- prices don't mix between variants (mirrors the reagent tier split
-                -- below); the merged entry.quality/itemLink above stay as a fallback
-                -- for old saved data that predates this field.
-                -- Unified variant tracking (v1.7.0): scaling/Adventurer's
-                -- gear (same item ID, different item level/quality per drop)
-                -- and crafting-reagent quality tiers (Q1/Q2/Q3) both need
-                -- per-bucket amounts/prices instead of one shared
-                -- sellPrice*amount - they now share ONE entry.variants
-                -- table, keyed by bonus-ID string for gear or tier number
-                -- (1/2/3) for reagents. See GetVariants in PriceHelper.lua,
-                -- which every price/value calculation reads through.
-                if classID == 2 or classID == 4 then
+                -- Variant tracking: scaling/Adventurer's gear (same item ID,
+                -- different item level/quality per drop) and crafting-reagent
+                -- quality tiers (Q1/Q2/Q3) need per-bucket amounts/prices
+                -- instead of one shared sellPrice*amount. Both live in ONE
+                -- entry.variants table, keyed by bonus-ID string for gear or
+                -- tier number (1/2/3) for reagents; every price/value
+                -- calculation reads it through GetVariants (PriceHelper.lua).
+                -- The merged entry.quality stays as a fallback for old saved
+                -- data that predates the field.
+                if ns.IsGearClass(classID) then
                     local vKey = ns.GearVariantKey(link)
                     entry.variants = entry.variants or {}
                     local gv = entry.variants[vKey]
@@ -365,7 +360,7 @@ function ns.UpdatePricesFromBags()
                                 -- writing it here too would recreate the
                                 -- same unused top-level duplicate ProcessLoot
                                 -- no longer writes at loot time.
-                                if not (cID == 2 or cID == 4) then
+                                if not ns.IsGearClass(cID) then
                                     data.itemLink = bagLink
                                 end
                             else
@@ -381,9 +376,7 @@ function ns.UpdatePricesFromBags()
                             if iQuality and iQuality ~= data.quality then
                                 data.quality = iQuality
                                 if iQuality == 0 then data.isVendorTrash = true end
-                                if ns.UpdateLogEntryQuality then
-                                    ns.UpdateLogEntryQuality(ci.itemID, iQuality)
-                                end
+                                ns.UpdateLogEntryQuality(ci.itemID, iQuality)
                             end
                             -- classID / subclass / bind flags: authoritative now that the
                             -- item is cached via the bag link — overwrites any approximate
@@ -395,7 +388,7 @@ function ns.UpdatePricesFromBags()
                                 if bType == BIND_ON_PICKUP then data.isBoP = true end
                                 if BIND_TO_ACCOUNT[bType]  then data.isBoA = true end
                                 data.canAH = CanAH(bType, cID)
-                                if cID == 2 or cID == 4 then
+                                if ns.IsGearClass(cID) then
                                     data.isCosmetic = C_Item.IsCosmeticItem(bagLink) or nil
                                     -- Correct the matching gear variant bucket (see ProcessLoot)
                                     -- with the bag-cached quality/link, same reasoning as the
@@ -495,7 +488,7 @@ local function OnTick()
         db.paused = true
         ns.StopTimer()
         ns.ApplyPauseVisuals()
-        print("|cff30b0c0Night's Farmtracker:|r " .. ns.L["session_length_reached"])
+        ns.Print(ns.L["session_length_reached"])
     end
 end
 
@@ -554,7 +547,7 @@ SlashCmdList["FARMTRACK"] = function(msg)
     elseif cmd == "repairprices" then
         ns.RepairLastSessionPrices()
     else
-        print("|cff30b0c0Night's Farmtracker:|r /nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump · /nft repairprices")
+        ns.Print("/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump · /nft repairprices")
     end
 end
 
@@ -706,7 +699,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
                 MainFrame:ClearAllPoints()
                 MainFrame:SetPoint("TOP", UIParent, "TOP", pos[3], pos[4])
             end
-            if ns.ReapplyBaitPosition then ns.ReapplyBaitPosition() end
+            ns.ReapplyBaitPosition()
         end)
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 

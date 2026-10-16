@@ -20,7 +20,6 @@ local _, ns = ...
 local F_W       = ns.FRAME_W
 local F_PAD     = ns.PAD
 local F_HDR_H   = ns.WINDOW_HDR_H
-local ROW_H     = ns.ROW_H
 local MIN_VIS_H = 30             -- room for the "list empty" label
 local DZ_H      = 34            -- permanent drop-zone height
 local F_FTR_H   = 26            -- footer strip height (Clear All button)
@@ -207,34 +206,19 @@ local function EnsureFilterFrame()
 
     local catHeader = ns.CreateSectionHeader(FListFrame, ns.CONTENT_W)
     catHeader:SetPoint("TOPLEFT", 0, -CAT_SEC_TOP)
-    catHeader:SetScript("OnMouseUp", function()
+    ns.WireSectionHeader(catHeader, "filter_categories_title", function()
         NightsFarmtrackerDB.filterCategoriesCollapsed = not NightsFarmtrackerDB.filterCategoriesCollapsed
         ns.RebuildFilterList()
     end)
-    catHeader:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:AddLine(ns.L["filter_categories_title"],1,1,1)
-        GameTooltip:AddLine(ns.L["cat_tip_click"],0.5,0.5,0.5)
-        GameTooltip:Show()
-    end)
-    catHeader:SetScript("OnLeave", function() GameTooltip:Hide() end)
     FilterFrame.catHeader = catHeader
 
     -- AH-by-expansion section header - same collapsible pattern as the
     -- category section above (see catHeader for the full comment).
     local expHeader = ns.CreateSectionHeader(FListFrame, ns.CONTENT_W)
-    expHeader:SetScript("OnMouseUp", function()
+    ns.WireSectionHeader(expHeader, "filter_ah_expansions_title", function()
         NightsFarmtrackerDB.ahExpansionsCollapsed = not NightsFarmtrackerDB.ahExpansionsCollapsed
         ns.RebuildFilterList()
-    end)
-    expHeader:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:AddLine(ns.L["filter_ah_expansions_title"],1,1,1)
-        GameTooltip:AddLine(ns.L["filter_ah_expansions_hint"],0.5,0.5,0.5,true)
-        GameTooltip:AddLine(ns.L["cat_tip_click"],0.5,0.5,0.5)
-        GameTooltip:Show()
-    end)
-    expHeader:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end, "filter_ah_expansions_hint")
     FilterFrame.expHeader = expHeader
 
     -- Boundary separator between the AH-expansion section and the drop

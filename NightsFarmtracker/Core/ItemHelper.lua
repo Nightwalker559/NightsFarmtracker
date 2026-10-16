@@ -31,7 +31,7 @@ function ns.CategoryName(data)
         return ns.L and ns.L["cat_junk"] or "Junk"
     end
     if data.classID then
-        if data.classID == 2 or data.classID == 4 then
+        if ns.IsGearClass(data.classID) then
             if data.isCosmetic then
                 return ns.L and ns.L["cat_gear_cosmetic"] or "Equipment (Cosmetic)"
             end
@@ -105,7 +105,7 @@ end
 -- keeps this in sync with CategoryName's cosmetic detection).
 function ns.IsGear(data)
     return data.isBoE or data.isBoP or data.isBoA or data.isWarbound
-        or data.classID == 2 or data.classID == 4
+        or ns.IsGearClass(data.classID)
 end
 
 -- Equipment groups the Gear AH Threshold can be switched on/off for

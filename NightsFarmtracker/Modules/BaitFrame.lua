@@ -145,7 +145,7 @@ end
 local function HandleDrop()
     ns.HandleItemDrop(function(itemID, itemLink)
         if not IsShiftKeyDown() and not LooksLikeLure(itemLink) then
-            print("|cff30b0c0Night's Farmtracker:|r " .. ns.L["bait_frame_rejected"])
+            ns.Print(ns.L["bait_frame_rejected"])
             return
         end
         AddBaitSlot(itemID, itemLink, C_Item.GetItemIconByID(itemID))
@@ -556,7 +556,7 @@ end
 
 function ns.ToggleBaitFrame()
     if NightsFarmtrackerDB.baitFrameEnabled ~= true then
-        print("|cff30b0c0Night's Farmtracker:|r Fishing Lure Bar is disabled in Settings -> Fishing.")
+        ns.Print(ns.L["bait_disabled"])
         return
     end
     NightsFarmtrackerDB.baitUserHidden = not NightsFarmtrackerDB.baitUserHidden

@@ -1,14 +1,23 @@
 # Changelog
 
+## 1.7.7
+
+### Changed
+
+- Minimap button and addon-menu entry no longer use LibDBIcon/LibDataBroker/LibStub (libs removed); same look, position and settings
+- Code cleanup: shared chat output, item row layout, settings widgets, section headers; no behavior change
+
+### Fixed
+
+- 1.7.6 package lacked its bundled libs: Lua errors at login, no minimap button
+- Venom Tracker and Lure Bar hints were English only; now translated
+- `/nft hud` usage text missing in German
+
 ## 1.7.6
 
 ### New
 
 - `/nft repairprices`: re-prices the newest saved session with the current AH prices of each item's exact link (fixes sessions filed with missing or rough AH prices after a relog/disconnect, before 1.7.6). Vendor-only items are left alone, gear variants below the Gear AH Threshold get their vendor price (item values and session total), items whose data isn't loaded yet are skipped (run it again), safe to run twice
-
-### Changed
-
-- Minimap button and addon-menu entry no longer use LibDBIcon/LibDataBroker/LibStub (the bundled libs are gone); same look, position and settings as before
 
 ### Fixed
 

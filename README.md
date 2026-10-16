@@ -109,7 +109,6 @@ Debug commands for bug reports: `/nft debug` opens a live debug log window (copy
 ## Credits
 
 - **Button icons** (`Media/btn_*.png`): [Icons8](https://icons8.com), style "Glyph Neue", used under the Icons8 free license. Not made by the author of this addon.
-- **Libraries** (`libs/`): LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibDBIcon-1.0, each under its own license.
 
 ---
 

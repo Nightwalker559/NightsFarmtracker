@@ -251,6 +251,9 @@ L["lockout_reset_hint"]       = "Click to reset instances. Each entry shows when
 L["bait_frame_hint"]          = "Click to use · Right-click to remove · Drag a lure here to add it"
 L["bait_frame_empty"]         = "Drag a lure here to add it"
 L["bait_frame_rejected"]      = "Doesn't look like a fishing lure. Hold Shift to add it anyway."
+L["venom_disabled"]           = "Venom Tracker is disabled in Settings -> Fishing."
+L["venom_locale_mismatch"]    = "Couldn't find '%s' in the tooltip for locale %s. Use /nft venomdump to inspect the raw tooltip lines."
+L["bait_disabled"]            = "Fishing Lure Bar is disabled in Settings -> Fishing."
 L["bait_no_active_buff"]      = "No active lure"
 -- Minimap HUD
 L["sec_hud"]                  = "Minimap HUD"

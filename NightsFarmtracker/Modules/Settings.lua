@@ -131,7 +131,7 @@ end
 -- (Re-)configures a pooled radio row for its current position/label/value/
 -- callback. Called every time regardless of whether the row is freshly
 -- built or reused from the pool.
-local function ConfigureRadio(row, label, yOff, value, _, setGroup)
+local function ConfigureRadio(row, label, yOff, value, setGroup)
     row:SetPoint("TOPLEFT", S_PAD, yOff)
     row.label:SetText(label)
     row.value = value
@@ -143,74 +143,56 @@ local function ConfigureRadio(row, label, yOff, value, _, setGroup)
     return row
 end
 
-StaticPopupDialogs["NFT_PROFILE_NEW"] = {
-    text         = ns.L and ns.L["profile_new_prompt"] or "New profile name:",
-    button1      = OKAY,
-    button2      = CANCEL,
-    hasEditBox   = true,
-    OnShow       = function(dialog)
-        local eb = dialog:GetEditBox()
-        eb:SetText(""); eb:SetFocus()
-    end,
-    OnAccept     = function(dialog)
-        local name = dialog:GetEditBox():GetText()
-        if name and name ~= "" and ns.CreateProfile(name) then
-            ns.SetActiveProfile(name)
-            ns.RebuildSettingsContent()
-            StaticPopup_Show("NFT_RELOAD")
-        end
-    end,
-    EditBoxOnEnterPressed  = function(editBox) editBox:GetParent():GetButton1():Click() end,
-    EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-}
-StaticPopupDialogs["NFT_PROFILE_COPY"] = {
-    text         = ns.L and ns.L["profile_copy_prompt"] or "Name for the copy:",
-    button1      = OKAY,
-    button2      = CANCEL,
-    hasEditBox   = true,
-    OnShow       = function(dialog)
-        local eb = dialog:GetEditBox()
-        eb:SetText(""); eb:SetFocus()
-    end,
-    OnAccept     = function(dialog)
-        local name = dialog:GetEditBox():GetText()
-        if name and name ~= "" and ns.CopyProfile(name, ns.GetActiveProfileName()) then
-            ns.SetActiveProfile(name)
-            ns.RebuildSettingsContent()
-            StaticPopup_Show("NFT_RELOAD")
-        end
-    end,
-    EditBoxOnEnterPressed  = function(editBox) editBox:GetParent():GetButton1():Click() end,
-    EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-}
-StaticPopupDialogs["NFT_PROFILE_RENAME"] = {
-    text         = ns.L and ns.L["profile_rename_prompt"] or "Rename profile to:",
-    button1      = OKAY,
-    button2      = CANCEL,
-    hasEditBox   = true,
-    OnShow       = function(dialog)
+-- Text prompt for a profile name; onShow fills the box, onAccept gets the dialog.
+local function ProfilePrompt(textKey, onShow, onAccept)
+    return {
+        text         = ns.L[textKey],
+        button1      = OKAY,
+        button2      = CANCEL,
+        hasEditBox   = true,
+        OnShow       = onShow,
+        OnAccept     = onAccept,
+        EditBoxOnEnterPressed  = function(editBox) editBox:GetParent():GetButton1():Click() end,
+        EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
+        timeout      = 0,
+        whileDead    = true,
+        hideOnEscape = true,
+    }
+end
+
+local function ClearProfilePrompt(dialog)
+    local eb = dialog:GetEditBox()
+    eb:SetText(""); eb:SetFocus()
+end
+
+-- New / Copy: create the profile under the typed name, switch to it, reload.
+local function SwitchToNewProfile(dialog, create)
+    local name = dialog:GetEditBox():GetText()
+    if name and name ~= "" and create(name) then
+        ns.SetActiveProfile(name)
+        ns.RebuildSettingsContent()
+        StaticPopup_Show("NFT_RELOAD")
+    end
+end
+
+StaticPopupDialogs["NFT_PROFILE_NEW"] = ProfilePrompt("profile_new_prompt", ClearProfilePrompt,
+    function(dialog) SwitchToNewProfile(dialog, ns.CreateProfile) end)
+StaticPopupDialogs["NFT_PROFILE_COPY"] = ProfilePrompt("profile_copy_prompt", ClearProfilePrompt,
+    function(dialog)
+        SwitchToNewProfile(dialog, function(name) return ns.CopyProfile(name, ns.GetActiveProfileName()) end)
+    end)
+StaticPopupDialogs["NFT_PROFILE_RENAME"] = ProfilePrompt("profile_rename_prompt",
+    function(dialog)
         local eb = dialog:GetEditBox()
         eb:SetText(ns.GetActiveProfileName())
         eb:HighlightText()
     end,
-    OnAccept     = function(dialog)
+    function(dialog)
         local name = dialog:GetEditBox():GetText()
         if name and name ~= "" and ns.RenameProfile(ns.GetActiveProfileName(), name) then
             ns.RebuildSettingsContent()
         end
-    end,
-    EditBoxOnEnterPressed  = function(editBox) editBox:GetParent():GetButton1():Click() end,
-    EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-}
+    end)
 StaticPopupDialogs["NFT_PROFILE_DELETE_CONFIRM"] = {
     text         = ns.L and ns.L["profile_delete_confirm"] or "Delete profile \"%s\"? This cannot be undone.",
     button1      = OKAY,
@@ -419,9 +401,11 @@ function ns.ToggleGearThresholdConfig(anchor)
 end
 
 ------------------------------------------------------------------------
--- Helper: EditBox for gear AH threshold (gold, numeric only)
+-- Helper: boxed numeric input (60 px) with a unit label ("g", "min", "px")
+-- next to it. The label lives on the outer list, not inside the bordered box,
+-- so it has to be shown/hidden together with the (reused) frame explicitly.
 ------------------------------------------------------------------------
-local function MakeGearThresholdEB(parent, yOff)
+local function MakeNumberBox(parent, yOff, maxLetters, unitText)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     frame:SetSize(60, 24)
     frame:SetPoint("TOPLEFT", S_PAD, yOff)
@@ -432,30 +416,42 @@ local function MakeGearThresholdEB(parent, yOff)
     eb:SetPoint("LEFT", 6, 0)
     eb:SetAutoFocus(false)
     eb:SetNumeric(true)
-    eb:SetMaxLetters(7)
+    eb:SetMaxLetters(maxLetters)
     eb:SetFontObject(GameFontNormalSmall)
     eb:SetTextColor(0.85, 0.85, 0.85)
+    HookEditBoxFocus(frame, eb)
+
+    local unitLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    unitLbl:SetPoint("LEFT", frame, "RIGHT", 6, 0)
+    unitLbl:SetText(unitText)
+    unitLbl:SetTextColor(0.6,0.6,0.6)
+    frame.unitLbl = unitLbl
+    local baseShow, baseHide = frame.Show, frame.Hide
+    frame.Show = function(self) baseShow(self); unitLbl:Show() end
+    frame.Hide = function(self) baseHide(self); unitLbl:Hide() end
+
+    frame.eb = eb
+    return frame, eb
+end
+
+------------------------------------------------------------------------
+-- Helper: gear AH threshold (gold) plus the config icon that opens the
+-- per-group popup (see ns.ToggleGearThresholdConfig)
+------------------------------------------------------------------------
+local function MakeGearThresholdEB(parent, yOff)
+    local frame, eb = MakeNumberBox(parent, yOff, 7, ns.L["gold_suffix"])
     eb:SetScript("OnTextChanged", function(self, userInput)
         if not userInput then return end
         local gold = tonumber(self:GetText()) or 0
         NightsFarmtrackerDB.gearAHThreshold = gold * 10000
         ns.RefreshHUD()
     end)
-    HookEditBoxFocus(frame, eb)
-
-    -- Parented to the outer settings list, not the bordered box, so it
-    -- renders clearly outside the input field instead of hugging the edge.
-    local goldLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    goldLbl:SetPoint("LEFT", frame, "RIGHT", 6, 0)
-    goldLbl:SetText(ns.L["gold_suffix"])
-    goldLbl:SetTextColor(0.6,0.6,0.6)
-    frame.goldLbl = goldLbl
 
     -- Config icon: opens a small popup to pick which Equipment categories
     -- the threshold applies to (see ns.GEAR_THRESHOLD_GROUPS).
     local cfgBtn = CreateFrame("Button", nil, parent)
     cfgBtn:SetSize(16, 16)
-    cfgBtn:SetPoint("LEFT", goldLbl, "RIGHT", 8, 0)
+    cfgBtn:SetPoint("LEFT", frame.unitLbl, "RIGHT", 8, 0)
     local cfgTex = cfgBtn:CreateTexture(nil, "ARTWORK")
     cfgTex:SetAllPoints()
     cfgTex:SetTexture(ns.ART.."btn_settings.png")
@@ -469,83 +465,35 @@ local function MakeGearThresholdEB(parent, yOff)
     end)
     cfgBtn:SetScript("OnLeave", function() cfgTex:SetAlpha(0.75); GameTooltip:Hide() end)
     cfgBtn:SetScript("OnClick", function(self) ns.ToggleGearThresholdConfig(self) end)
-    frame.cfgBtn = cfgBtn
 
-    -- goldLbl/cfgBtn aren't children of frame (they need to sit outside
-    -- frame's bordered box), so they won't auto-hide/show with frame - keep
-    -- them in sync explicitly since this widget is reused across settings
-    -- rebuilds.
+    -- Same sync as the unit label (see MakeNumberBox); hiding also closes the popup.
     local baseShow, baseHide = frame.Show, frame.Hide
-    frame.Show = function(self) baseShow(self); goldLbl:Show(); cfgBtn:Show() end
+    frame.Show = function(self) baseShow(self); cfgBtn:Show() end
     frame.Hide = function(self)
-        baseHide(self); goldLbl:Hide(); cfgBtn:Hide()
+        baseHide(self); cfgBtn:Hide()
         if ns.GearThresholdConfigFrame then ns.GearThresholdConfigFrame:Hide() end
     end
-
-    frame.eb = eb
     return frame
 end
 
-------------------------------------------------------------------------
--- Helper: EditBox for the fixed session length (minutes, numeric only)
-------------------------------------------------------------------------
+-- Fixed session length in minutes (0 = off)
 local function MakeSessionLengthEB(parent, yOff)
-    local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    frame:SetSize(60, 24)
-    frame:SetPoint("TOPLEFT", S_PAD, yOff)
-    ns.StyleBackdropBox(frame, {0.05,0.08,0.09,1})
-
-    local eb = CreateFrame("EditBox", nil, frame)
-    eb:SetSize(48, 18)
-    eb:SetPoint("LEFT", 6, 0)
-    eb:SetAutoFocus(false)
-    eb:SetNumeric(true)
-    eb:SetMaxLetters(4)
-    eb:SetFontObject(GameFontNormalSmall)
-    eb:SetTextColor(0.85, 0.85, 0.85)
+    local frame, eb = MakeNumberBox(parent, yOff, 4, ns.L["minutes_suffix"])
     eb:SetScript("OnTextChanged", function(self, userInput)
         if not userInput then return end
         NightsFarmtrackerDB.sessionLength = tonumber(self:GetText()) or 0
         ns.UpdateTimerDisplay()
         ns.ApplyPauseVisuals()
     end)
-    HookEditBoxFocus(frame, eb)
-
-    -- Suffix label lives on the outer list (see MakeGearThresholdEB), so
-    -- keep its visibility in sync with the reused frame explicitly.
-    local unitLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    unitLbl:SetPoint("LEFT", frame, "RIGHT", 6, 0)
-    unitLbl:SetText(ns.L["minutes_suffix"])
-    unitLbl:SetTextColor(0.6,0.6,0.6)
-    local baseShow, baseHide = frame.Show, frame.Hide
-    frame.Show = function(self) baseShow(self); unitLbl:Show() end
-    frame.Hide = function(self) baseHide(self); unitLbl:Hide() end
-
-    frame.eb = eb
     return frame
 end
 
-------------------------------------------------------------------------
--- Helper: EditBox for the maximum window height (px, numeric only). Applied
--- when the field loses focus / Enter is pressed, not per keystroke - typing
--- "5" on the way to "500" must not resize every open window to the minimum.
--- Empty or 0 falls back to the default; values are clamped to the allowed range.
-------------------------------------------------------------------------
+-- Maximum window height (px). Applied when the field loses focus / Enter is
+-- pressed, not per keystroke - typing "5" on the way to "500" must not resize
+-- every open window to the minimum. Empty or 0 falls back to the default;
+-- values are clamped to the allowed range.
 local function MakeMaxHeightEB(parent, yOff)
-    local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    frame:SetSize(60, 24)
-    frame:SetPoint("TOPLEFT", S_PAD, yOff)
-    ns.StyleBackdropBox(frame, {0.05,0.08,0.09,1})
-
-    local eb = CreateFrame("EditBox", nil, frame)
-    eb:SetSize(48, 18)
-    eb:SetPoint("LEFT", 6, 0)
-    eb:SetAutoFocus(false)
-    eb:SetNumeric(true)
-    eb:SetMaxLetters(4)
-    eb:SetFontObject(GameFontNormalSmall)
-    eb:SetTextColor(0.85, 0.85, 0.85)
-    HookEditBoxFocus(frame, eb)
+    local frame, eb = MakeNumberBox(parent, yOff, 4, ns.L["px_suffix"])
     eb:HookScript("OnEditFocusLost", function(self)
         local v = tonumber(self:GetText())
         if not v or v <= 0 then v = ns.DEFAULT_MAX_WINDOW_H end
@@ -556,18 +504,6 @@ local function MakeMaxHeightEB(parent, yOff)
             ns.ApplyWindowHeightSetting()
         end
     end)
-
-    -- Suffix label lives on the outer list (see MakeGearThresholdEB), so
-    -- keep its visibility in sync with the reused frame explicitly.
-    local unitLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    unitLbl:SetPoint("LEFT", frame, "RIGHT", 6, 0)
-    unitLbl:SetText(ns.L["px_suffix"])
-    unitLbl:SetTextColor(0.6,0.6,0.6)
-    local baseShow, baseHide = frame.Show, frame.Hide
-    frame.Show = function(self) baseShow(self); unitLbl:Show() end
-    frame.Hide = function(self) baseHide(self); unitLbl:Hide() end
-
-    frame.eb = eb
     return frame
 end
 
@@ -1264,6 +1200,24 @@ function ns.RebuildSettingsContent()
         return widget
     end
 
+    -- Section title label at y; returns the y below it.
+    local function sectionTitle(y, key, step)
+        local lbl = track(AcquireSectionLabel(SListFrame), "section")
+        lbl:SetPoint("TOPLEFT", S_PAD, y)
+        lbl:SetText(ns.L[key])
+        return y - step
+    end
+
+    -- Grey wrapped hint text at y (full width); returns the FontString so the
+    -- caller can size the space below it.
+    local function wrappedHint(y, text)
+        local fs = track(AcquireWrappedHint(SListFrame), "wrappedHint")
+        fs:SetPoint("TOPLEFT", S_PAD, y)
+        fs:SetTextColor(0.5,0.5,0.5)
+        fs:SetText(text)
+        return fs
+    end
+
     local sections = {}
     local function addSection(titleKey, builder)
         sections[#sections + 1] = {titleKey = titleKey, title = ns.L[titleKey], builder = builder}
@@ -1274,10 +1228,7 @@ function ns.RebuildSettingsContent()
     -- which has no header of its own and always follows this section)
     -- ----------------------------------------------------------------
     addSection("ah_source", function(y)
-        local secLbl = track(AcquireSectionLabel(SListFrame), "section")
-        secLbl:SetPoint("TOPLEFT", S_PAD, y)
-        secLbl:SetText(ns.L["ah_source"])
-        y = y - 22
+        y = sectionTitle(y, "ah_source", 22)
 
         local ahOptions = {
             {label=ns.L["ah_auctionator"], value="auctionator", avail=ns.HasAuctionator()},
@@ -1295,7 +1246,7 @@ function ns.RebuildSettingsContent()
 
         for _, opt in ipairs(ahOptions) do
             local row = track(AcquireRadio(SListFrame), "radio")
-            ConfigureRadio(row, opt.label, y, opt.value, getAH, setAH)
+            ConfigureRadio(row, opt.label, y, opt.value, setAH)
             row:SetSelected(getAH() == opt.value)
             row:SetEnabled(opt.avail)
             y = y - 24
@@ -1311,10 +1262,7 @@ function ns.RebuildSettingsContent()
         -- Gear AH Threshold (below this vendor price, Equipment skips the
         -- AH lookup and always uses vendor price; 0 = disabled)
         y = y - 4
-        local threshHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
-        threshHint:SetPoint("TOPLEFT", S_PAD, y)
-        threshHint:SetTextColor(0.5,0.5,0.5)
-        threshHint:SetText(ns.L["gear_ah_threshold_hint"])
+        local threshHint = wrappedHint(y, ns.L["gear_ah_threshold_hint"])
         y = y - math.max(28, math.ceil(threshHint:GetStringHeight()) + 6)
 
         if not gearThresholdEB then
@@ -1338,10 +1286,7 @@ function ns.RebuildSettingsContent()
         -- AH source choice above, not a separate concern of its own.
         if ns.HasTSM() then
             y = y - 4
-            local hint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
-            hint:SetPoint("TOPLEFT", S_PAD, y)
-            hint:SetTextColor(0.5,0.5,0.5)
-            hint:SetText(ns.L["tsm_hint"])
+            local hint = wrappedHint(y, ns.L["tsm_hint"])
             y = y - 28
 
             if not tsmDropdown then
@@ -1378,29 +1323,23 @@ function ns.RebuildSettingsContent()
     -- Section: Display
     -- ----------------------------------------------------------------
     addSection("display", function(y)
-        local dispLbl = track(AcquireSectionLabel(SListFrame), "section")
-        dispLbl:SetPoint("TOPLEFT", S_PAD, y)
-        dispLbl:SetText(ns.L["display"])
-        y = y - 26
+        y = sectionTitle(y, "display", 26)
 
         local function getRateMode() return db.goldRateMode=="min" and "min" or "hour" end
         local rateRow1 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(rateRow1, ns.L["gold_per_hour"], y, "hour", getRateMode,
+        ConfigureRadio(rateRow1, ns.L["gold_per_hour"], y, "hour",
             function(v) db.goldRateMode=v; ns.UpdateGoldRate() end)
         rateRow1:SetSelected(getRateMode()=="hour"); rateRow1:SetEnabled(true)
         y = y - 24
 
         local rateRow2 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(rateRow2, ns.L["gold_per_min"], y, "min", getRateMode,
+        ConfigureRadio(rateRow2, ns.L["gold_per_min"], y, "min",
             function(v) db.goldRateMode=v; ns.UpdateGoldRate() end)
         rateRow2:SetSelected(getRateMode()=="min"); rateRow2:SetEnabled(true)
         y = y - 32
 
         -- Fixed session length (0 = off): timer counts down, session pauses at 0
-        local lenHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
-        lenHint:SetPoint("TOPLEFT", S_PAD, y)
-        lenHint:SetTextColor(0.5,0.5,0.5)
-        lenHint:SetText(ns.L["session_length_hint"])
+        wrappedHint(y, ns.L["session_length_hint"])
         y = y - 28
 
         if not sessionLengthEB then
@@ -1415,10 +1354,7 @@ function ns.RebuildSettingsContent()
         y = y - 40
 
         -- Max window height: windows grow up to this, then their lists scroll
-        local heightHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
-        heightHint:SetPoint("TOPLEFT", S_PAD, y)
-        heightHint:SetTextColor(0.5,0.5,0.5)
-        heightHint:SetText(string.format(ns.L["max_window_height_hint"],
+        local heightHint = wrappedHint(y, string.format(ns.L["max_window_height_hint"],
             ns.DEFAULT_MAX_WINDOW_H, ns.MIN_MAX_WINDOW_H, ns.MAX_MAX_WINDOW_H))
         y = y - math.ceil(heightHint:GetStringHeight()) - 6
 
@@ -1436,12 +1372,12 @@ function ns.RebuildSettingsContent()
         local function setGoldDisplay(v) db.goldDisplayMode=v; ns.RefreshHUD() end
 
         local gdRow1 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(gdRow1, ns.L["gold_display_classic"], y, "classic", getGoldDisplay, setGoldDisplay)
+        ConfigureRadio(gdRow1, ns.L["gold_display_classic"], y, "classic", setGoldDisplay)
         gdRow1:SetSelected(getGoldDisplay()=="classic"); gdRow1:SetEnabled(true)
         y = y - 24
 
         local gdRow2 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(gdRow2, ns.L["gold_display_modern"], y, "modern", getGoldDisplay, setGoldDisplay)
+        ConfigureRadio(gdRow2, ns.L["gold_display_modern"], y, "modern", setGoldDisplay)
         gdRow2:SetSelected(getGoldDisplay()=="modern"); gdRow2:SetEnabled(true)
         y = y - 28
 
@@ -1456,8 +1392,8 @@ function ns.RebuildSettingsContent()
 
         local mmRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(mmRow, ns.L["minimap_button"], y,
-            function() return not db.minimapHidden end,
-            function(v) ns.SetMinimapVisible(v) end)  -- the button is registered at login even when hidden, so no reload needed
+            function() return not db.minimap.hide end,
+            function(v) ns.SetMinimapVisible(v) end)
         y = y - 38
 
         local compRow = track(AcquireCheckbox(SListFrame), "checkbox")
@@ -1489,10 +1425,7 @@ function ns.RebuildSettingsContent()
     -- Section: Colors (theme, custom color, header gradient)
     -- ----------------------------------------------------------------
     addSection("sec_colors", function(y)
-        local colLbl = track(AcquireSectionLabel(SListFrame), "section")
-        colLbl:SetPoint("TOPLEFT", S_PAD, y)
-        colLbl:SetText(ns.L["sec_colors"])
-        y = y - 26
+        y = sectionTitle(y, "sec_colors", 26)
 
         if not themeDropdown then
             themeDropdown = MakeThemeDropdown(SListFrame, y)
@@ -1531,10 +1464,7 @@ function ns.RebuildSettingsContent()
     -- Section: Profiles
     -- ----------------------------------------------------------------
     addSection("sec_profiles", function(y)
-        local profLbl = track(AcquireSectionLabel(SListFrame), "section")
-        profLbl:SetPoint("TOPLEFT", S_PAD, y)
-        profLbl:SetText(ns.L["sec_profiles"])
-        y = y - 26
+        y = sectionTitle(y, "sec_profiles", 26)
 
         if not profileDropdown then
             profileDropdown = MakeProfileDropdown(SListFrame)
@@ -1578,10 +1508,7 @@ function ns.RebuildSettingsContent()
     -- Section: Session History
     -- ----------------------------------------------------------------
     addSection("session_history", function(y)
-        local trackLbl = track(AcquireSectionLabel(SListFrame), "section")
-        trackLbl:SetPoint("TOPLEFT", S_PAD, y)
-        trackLbl:SetText(ns.L["session_history"])
-        y = y - 26
+        y = sectionTitle(y, "session_history", 26)
 
         local histRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(histRow, ns.L["session_history_enabled"], y,
@@ -1601,16 +1528,16 @@ function ns.RebuildSettingsContent()
         local function getHistMode() return db.sessionHistoryMode == "compact" and "compact" or "full" end
 
         local histModeRow1 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(histModeRow1, ns.L["session_history_mode_full"], y, "full", getHistMode,
+        ConfigureRadio(histModeRow1, ns.L["session_history_mode_full"], y, "full",
             function(v) db.sessionHistoryMode = v end)
         histModeRow1:SetSelected(getHistMode()=="full"); histModeRow1:SetEnabled(true)
         y = y - 24
 
         -- "compact" folds past months irreversibly, so route it through a
         -- confirmation popup instead of ConfigureRadio's default instant-set
-        -- OnMouseUp behavior.
+        -- OnMouseUp behavior (replaced right below).
         local histModeRow2 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(histModeRow2, ns.L["session_history_mode_compact"], y, "compact", getHistMode, function() end)
+        ConfigureRadio(histModeRow2, ns.L["session_history_mode_compact"], y, "compact")
         histModeRow2:SetScript("OnMouseUp", function()
             if getHistMode() ~= "compact" then
                 StaticPopup_Show("NFT_CONFIRM_HISTORY_COMPACT")
@@ -1634,10 +1561,7 @@ function ns.RebuildSettingsContent()
     -- Section: Categories & Grouping
     -- ----------------------------------------------------------------
     addSection("sec_categories", function(y)
-        local catLbl = track(AcquireSectionLabel(SListFrame), "section")
-        catLbl:SetPoint("TOPLEFT", S_PAD, y)
-        catLbl:SetText(ns.L["sec_categories"])
-        y = y - 26
+        y = sectionTitle(y, "sec_categories", 26)
 
         local splitRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(splitRow, ns.L["split_trade_goods"], y,
@@ -1673,10 +1597,7 @@ function ns.RebuildSettingsContent()
     -- Section: Filters
     -- ----------------------------------------------------------------
     addSection("sec_filters", function(y)
-        local filterLbl = track(AcquireSectionLabel(SListFrame), "section")
-        filterLbl:SetPoint("TOPLEFT", S_PAD, y)
-        filterLbl:SetText(ns.L["sec_filters"])
-        y = y - 26
+        y = sectionTitle(y, "sec_filters", 26)
 
         local filterRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(filterRow, ns.L["vendor_filter_enabled"], y,
@@ -1705,10 +1626,7 @@ function ns.RebuildSettingsContent()
     -- Section: Fishing
     -- ----------------------------------------------------------------
     addSection("sec_fishing", function(y)
-        local fishingLbl = track(AcquireSectionLabel(SListFrame), "section")
-        fishingLbl:SetPoint("TOPLEFT", S_PAD, y)
-        fishingLbl:SetText(ns.L["sec_fishing"])
-        y = y - 26
+        y = sectionTitle(y, "sec_fishing", 26)
 
         local venomRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(venomRow, ns.L["venom_tracker_enabled"], y,
@@ -1729,10 +1647,7 @@ function ns.RebuildSettingsContent()
     -- Section: Minimap HUD
     -- ----------------------------------------------------------------
     addSection("sec_hud", function(y)
-        local hudLbl = track(AcquireSectionLabel(SListFrame), "section")
-        hudLbl:SetPoint("TOPLEFT", S_PAD, y)
-        hudLbl:SetText(ns.L["sec_hud"])
-        y = y - 26
+        y = sectionTitle(y, "sec_hud", 26)
 
         local hudRow = track(AcquireCheckbox(SListFrame), "checkbox")
         ConfigureCheckbox(hudRow, ns.L["hud_enabled"], y,
@@ -1740,10 +1655,7 @@ function ns.RebuildSettingsContent()
             function(v) ns.SetHudEnabled(v) end)
         y = y - 38
 
-        local hudHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
-        hudHint:SetPoint("TOPLEFT", S_PAD, y)
-        hudHint:SetTextColor(0.5,0.5,0.5)
-        hudHint:SetText(ns.L["hud_keybind_hint"])
+        local hudHint = wrappedHint(y, ns.L["hud_keybind_hint"])
         y = y - math.ceil(hudHint:GetStringHeight()) - 10
 
         return y
@@ -1753,15 +1665,9 @@ function ns.RebuildSettingsContent()
     -- Section: Data Export
     -- ----------------------------------------------------------------
     addSection("sec_export", function(y)
-        local exportLbl = track(AcquireSectionLabel(SListFrame), "section")
-        exportLbl:SetPoint("TOPLEFT", S_PAD, y)
-        exportLbl:SetText(ns.L["sec_export"])
-        y = y - 26
+        y = sectionTitle(y, "sec_export", 26)
 
-        local exportHint = track(AcquireWrappedHint(SListFrame), "wrappedHint")
-        exportHint:SetPoint("TOPLEFT", S_PAD, y)
-        exportHint:SetTextColor(0.5,0.5,0.5)
-        exportHint:SetText(ns.L["export_hint"])
+        local exportHint = wrappedHint(y, ns.L["export_hint"])
         -- Button sits 2 px below the (wrapped) hint, however many lines it takes.
         y = y - math.ceil(exportHint:GetStringHeight()) - 2
 
