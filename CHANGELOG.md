@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.8
+
+### Fixed
+
+- Session History: the detail window no longer overlaps the history window when there is no room beside it and the window sits near the bottom of the screen; it now opens above instead of below
+
 ## 1.7.7
 
 ### Changed

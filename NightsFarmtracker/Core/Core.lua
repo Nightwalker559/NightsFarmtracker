@@ -1180,8 +1180,26 @@ end
 -- Used by every window that docks next to another one (Log/Filter/
 -- Blacklist to the right of MainFrame, Session History to the left of
 -- MainFrame, Session Detail to the left of History) so none of them can
--- overlap another frame or run off the screen edge.
+-- overlap another frame or run off the screen edge. If there is no room
+-- beside the anchor it docks below it, or - when the screen bottom is too
+-- close for that - above it (the frame is clamped to the screen, so a
+-- "below" placement without room would slide up over the anchor).
+-- Call it after the frame has its final height.
 ------------------------------------------------------------------------
+local function DockStacked(frame, anchor, edge)
+    local height       = frame:GetHeight() or 0
+    local screenTop    = UIParent:GetTop()
+    local anchorBottom = anchor:GetBottom()
+    local anchorTop    = anchor:GetTop()
+    local noRoomBelow  = anchorBottom and UIParent:GetBottom() and (anchorBottom - 1 - height) < UIParent:GetBottom()
+    local roomAbove    = anchorTop and screenTop and (anchorTop + 1 + height) <= screenTop
+    if noRoomBelow and roomAbove then
+        frame:SetPoint("BOTTOM" .. edge, anchor, "TOP" .. edge, 0, 1)
+    else
+        frame:SetPoint("TOP" .. edge, anchor, "BOTTOM" .. edge, 0, -1)
+    end
+end
+
 function ns.DockFrame(frame, anchor, side)
     frame:ClearAllPoints()
     local width       = frame:GetWidth() or ns.FRAME_W
@@ -1190,14 +1208,14 @@ function ns.DockFrame(frame, anchor, side)
     if side == "left" then
         local anchorLeft = anchor:GetLeft()
         if anchorLeft and screenLeft and (anchorLeft - 1 - width) < screenLeft then
-            frame:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -1)
+            DockStacked(frame, anchor, "RIGHT")
         else
             frame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -1, 0)
         end
     else
         local anchorRight = anchor:GetRight()
         if anchorRight and screenRight and (anchorRight + 1 + width) > screenRight then
-            frame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -1)
+            DockStacked(frame, anchor, "LEFT")
         else
             frame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 1, 0)
         end

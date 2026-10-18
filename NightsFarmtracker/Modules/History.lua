@@ -1818,8 +1818,6 @@ local function ShowDetail(session)
     if ns.DeferInCombat(function() ShowDetail(session) end) then return end
     EnsureDetailFrame()
     detCollapsed = {}
-    DetailFrame:ClearAllPoints()
-    ns.DockFrame(DetailFrame, HistFrame, "left")
     local dateStr
     if session.isMonthCompact then
         dateStr = (ns.L.MONTH_NAMES[tonumber(date("%m", session.timestamp))] or "")
@@ -1829,6 +1827,7 @@ local function ShowDetail(session)
     end
     DetailFrame.dateText:SetText(dateStr)
     RebuildDetailContent(session)
+    ns.DockFrame(DetailFrame, HistFrame, "left")
     DetailFrame:Show()
 end
 
