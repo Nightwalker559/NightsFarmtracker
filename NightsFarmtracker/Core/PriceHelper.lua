@@ -48,17 +48,11 @@ ns.EXPANSION_ORDER = {0,1,2,3,4,5,6,7,8,9,10,11}
 ------------------------------------------------------------------------
 -- Item link normalization
 ------------------------------------------------------------------------
--- Canonical item link for a given link/ID. Passing the raw stored link straight
--- to an external addon's API can mismatch its own internal lookup if the link
--- isn't in the exact form that addon expects; GetItemInfo returns the
--- canonical link Auctionator (and others) key their price data on.
---
--- Memoized: the canonical form of a given link never changes, but this runs
--- for every item several times per list rebuild (price lookups, gear
--- variant keys, expansion filter), and each GetItemInfo call returns 17
--- values. Only a real lookup is cached - when the client has not cached the
--- item yet the raw link is returned and the next call tries again. The
--- cache is bounded (reset when it grows past MEMO_LIMIT).
+-- Canonical link for a link/ID: external price addons key their data on the
+-- link GetItemInfo returns, so a raw stored link can miss. Memoized, since the
+-- canonical form never changes and this runs several times per list rebuild;
+-- only real lookups are cached (an uncached item returns the raw link and is
+-- retried), and the cache is reset when it passes MEMO_LIMIT.
 local MEMO_LIMIT = 2000
 local cleanLinkMemo, cleanLinkCount = {}, 0
 
@@ -132,17 +126,11 @@ end
 ------------------------------------------------------------------------
 -- Oribos Exchange
 ------------------------------------------------------------------------
--- OEMarketInfo(item, tbl) fills tbl with (among others) ['market'] (this
--- realm's median price over the past 4 days) and ['region'] (median across
--- the region) in copper - see OribosExchange.lua's header comment. Mirrors
--- the addon's own GetAuctionBuyout override: prefer the realm price, fall
--- back to the region price when this realm has no recent data.
---
--- OribosExchange.lua explicitly nils out region when it's 0, but NOT
--- market (OEMarketInfo just assigns the raw decoded byte there) - so an
--- item with no recent realm data comes back as market=0, not market=nil.
--- In Lua, 0 is truthy, so a plain `r["market"] or r["region"]` never falls
--- through to region for those items; it has to be checked explicitly.
+-- OEMarketInfo(item, tbl) fills tbl with ['market'] (this realm's median over
+-- four days) and ['region'] (region median) in copper. Prefer the realm
+-- price, else the region price. An item without realm data comes back as
+-- market = 0, not nil, and 0 is truthy in Lua, so the fallback must check
+-- for it explicitly.
 local oribosResult = {}
 function ns.GetOribosPrice(itemID, itemLink)
     if not ns.HasOribos() then return nil end
@@ -156,17 +144,11 @@ function ns.GetOribosPrice(itemID, itemLink)
 end
 
 ------------------------------------------------------------------------
--- Price cache (session-only, 1h TTL)
--- Auctionator/TSM price data changes rarely mid-session, so re-querying
--- their APIs on every RefreshHUD (called on every loot event, and for
--- every gear-variant group in the threshold-sound check) is wasted work
--- once an item's price is already known. Only successful lookups are
--- cached - a miss (nil, e.g. AH scan not loaded yet right after a fresh
--- drop) is never cached, so the delayed-refresh self-heal in Main.lua
--- keeps retrying on the next RefreshHUD until a real price resolves.
--- Cleared on logout/reload (plain Lua table, not a SavedVariable) and
--- explicitly whenever a setting that changes the computed price itself
--- (AH source, TSM source/custom string) is changed - see Settings.lua.
+-- Price cache (session only, 1 h TTL). AH prices rarely change mid-session, so
+-- RefreshHUD should not query the AH addon again for every item. Only hits are
+-- cached: a miss (e.g. AH scan not ready after a fresh drop) is retried on the
+-- next refresh. Cleared on logout and whenever a setting that changes the
+-- price itself (AH source, TSM source) changes.
 ------------------------------------------------------------------------
 ns.priceCache = ns.priceCache or {}
 local PRICE_CACHE_TTL = 3600
@@ -250,37 +232,23 @@ function ns.GetAHPriceForID(itemID, itemLink)
     return p
 end
 
--- Stable per-drop key for scaling/Adventurer's gear (same item ID, different
--- item level/quality per roll). itemLevel and quality from GetItemInfo are
--- NOT reliable at loot time: a cache miss leaves itemLevel nil, and some
--- scaling gear reports a uniform loot-toast quality regardless of the true
--- rolled rarity - either way two different rolls can end up with the same
--- fallback key and get merged into one bucket (wrong shared price). The
--- bonus-ID string baked into the item link is fixed the moment the item
--- drops and always differs between rolls, cache state or not.
---
--- Cleaned via CleanItemLink first: the raw loot-message/bag link carries
--- incidental fields (uniqueID, linkLevel) that can differ between two
--- drops of the exact same item/roll, which fragmented identical loot into
--- separate variant rows instead of merging their amounts. The canonical
--- link from GetItemInfo keeps the bonus IDs (the actual stat/ilvl roll)
--- but normalizes that incidental noise.
+-- Stable key per roll of scaling gear (same item ID, different item level and
+-- quality). itemLevel and quality are unreliable at loot time (cache miss, or
+-- a uniform toast quality), so two rolls could share a fallback key; the
+-- bonus-ID string in the link is fixed at drop and always differs. The link
+-- goes through CleanItemLink first so incidental fields (uniqueID, linkLevel)
+-- do not split identical drops into separate rows.
 function ns.GearVariantKey(link)
     if not link then return "unknown" end
     local clean = ns.CleanItemLink(link) or link
     return clean:match("item[%-%d:]+") or clean
 end
 
--- Display-only grouping of raw gearVariants (keyed by full bonus-ID string)
--- into buckets keyed by (itemLevel, quality). Two drops can carry different
--- bonus-ID strings yet show the IDENTICAL item level/quality/stats - e.g.
--- Adventurer's/scaling gear bakes a hidden per-drop scaling component into
--- the bonus IDs that doesn't affect the displayed result. Those are visually
--- indistinguishable to the player and should sum into one row; only bonus-ID
--- rolls that actually produce a different item level or quality stay split.
--- Backend storage (db.count/session data) keeps the raw per-bonus-ID keys
--- untouched, so per-roll AH pricing accuracy is unaffected - this only
--- changes what UI.lua/History.lua iterate over when building display rows.
+-- Display-only grouping of gear variants (stored per bonus-ID string) into
+-- buckets per (itemLevel, quality). Scaling gear can carry a hidden per-drop
+-- component in its bonus IDs that changes nothing the player sees, so such
+-- drops sum into one row; only rolls with a different item level or quality
+-- stay split. Storage keeps the raw keys, so per-roll AH pricing is unaffected.
 function ns.GroupGearVariantsForDisplay(gearVariants)
     -- A variant can be missing its itemLevel (the __novariant__ placeholder
     -- MergeSessionInto creates for a merge-side with no breakdown at all, or
@@ -321,25 +289,18 @@ function ns.GroupGearVariantsForDisplay(gearVariants)
 end
 
 ------------------------------------------------------------------------
--- Unified variant view (read-only)
--- Every tracked item is stored in one of three legacy shapes: plain
--- (single sellPrice/itemLink), gear (data.gearVariants, keyed by bonus-ID
--- string - scaling/Adventurer's gear), or reagent (data.q/qIDs/qAHTotal,
--- three parallel arrays for crafting-reagent quality tiers). This builds
--- a single normalized view over whichever shape a given item actually
--- uses, so price/value code has ONE loop instead of three near-duplicate
--- ones. It does NOT change how data is written/merged/repaired (see
--- ProcessLoot in Main.lua and SaveCurrentSession/MergeSessionInto in
--- History.lua) - purely a read-side view, rebuilt fresh on every call.
+-- Unified variant view (read-only). An item is stored in one of three shapes:
+-- plain (one sellPrice/itemLink), gear (variants keyed by bonus-ID string) or
+-- reagent (variants keyed by quality tier 1/2/3). This returns one normalized
+-- list for any of them, so price code has a single loop. It only reads: writing
+-- and merging stay in ProcessLoot and Sessions.lua.
 --
--- Each returned variant: { amount, quality, itemLevel, itemLink,
--- sellPrice, ahTotal, priceItemID }.
---   - ahTotal is nil unless already frozen (saved session data); a live
---     db.count entry never has this set, so callers always do a live
---     AH lookup for it.
---   - priceItemID is the itemID to price this variant against. Only set
---     explicitly for reagent tiers, which are a genuinely different
---     itemID per tier; gear/plain variants fall back to data.itemID.
+-- Each variant: { amount, quality, itemLevel, itemLink, sellPrice, ahTotal,
+-- priceItemID }.
+--   - ahTotal is nil unless frozen in a saved session; live entries always
+--     look the AH price up.
+--   - priceItemID is the itemID to price against: set for reagent tiers (a
+--     different itemID per tier), otherwise data.itemID.
 ------------------------------------------------------------------------
 function ns.GetVariants(data)
     if data.variants then return data.variants end

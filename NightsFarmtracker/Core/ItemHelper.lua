@@ -1,8 +1,7 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Item Helper
 -- Item classification (category names) and gold-value resolution.
--- Split out of Core.lua so item-domain logic lives together with
--- PriceHelper.lua instead of alongside the generic UI/frame utilities.
+-- VendorTotal/AHTotal live in PriceHelper.lua.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -28,22 +27,22 @@ end
 ------------------------------------------------------------------------
 function ns.CategoryName(data)
     if data.isVendorTrash or (data.quality == 0) then
-        return ns.L and ns.L["cat_junk"] or "Junk"
+        return ns.L["cat_junk"]
     end
     if data.classID then
         if ns.IsGearClass(data.classID) then
             if data.isCosmetic then
-                return ns.L and ns.L["cat_gear_cosmetic"] or "Equipment (Cosmetic)"
+                return ns.L["cat_gear_cosmetic"]
             end
             return ns.GearCategoryName(data)
         end
         -- Mounts / Companion Pets always get their own category (classID 15, Miscellaneous)
         if data.classID == Enum.ItemClass.Miscellaneous and data.subClassID then
             if data.subClassID == Enum.ItemMiscellaneousSubclass.Mount then
-                return ns.L and ns.L["cat_mounts"] or "Mounts"
+                return ns.L["cat_mounts"]
             end
             if data.subClassID == Enum.ItemMiscellaneousSubclass.CompanionPet then
-                return ns.L and ns.L["cat_pets"] or "Pets"
+                return ns.L["cat_pets"]
             end
         end
         -- Split trade goods (7) and reagents (5) by WoW subtype when enabled.
@@ -71,7 +70,7 @@ function ns.CategoryName(data)
     end
     if data.isBoE or data.isBoP or data.isBoA or data.isWarbound then
         if data.isCosmetic then
-            return ns.L and ns.L["cat_gear_cosmetic"] or "Equipment (Cosmetic)"
+            return ns.L["cat_gear_cosmetic"]
         end
         return ns.GearCategoryName(data)
     end
@@ -87,16 +86,15 @@ end
 -- categorizing correctly after the isBoA rename.
 function ns.GearCategoryName(data)
     if NightsFarmtrackerDB and NightsFarmtrackerDB.splitGearByBinding then
-        if data.isBoA or data.isWarbound then return ns.L and ns.L["cat_gear_boa"]  or "Equipment (BoA)" end
-        if data.isBoP then return ns.L and ns.L["cat_gear_soul"] or "Equipment (Soulbound)" end
-        if data.isBoE then return ns.L and ns.L["cat_gear_boe"]  or "Equipment (BoE)" end
+        if data.isBoA or data.isWarbound then return ns.L["cat_gear_boa"] end
+        if data.isBoP then return ns.L["cat_gear_soul"] end
+        if data.isBoE then return ns.L["cat_gear_boe"] end
     end
-    return ns.L and ns.L["cat_gear"] or "Equipment"
+    return ns.L["cat_gear"]
 end
 
 ------------------------------------------------------------------------
 -- Gear / vendor-only / value resolution
--- VendorTotal/AHTotal live in Core/PriceHelper.lua
 ------------------------------------------------------------------------
 
 -- True if this item counts as Equipment for GearAHThreshold purposes
@@ -149,13 +147,11 @@ function ns.IsGearThresholdApplicable(data)
     return ns.IsGear(data) and ns.IsGearThresholdGroupEnabled(ns.GearThresholdGroup(data))
 end
 
--- True if the Gear AH Threshold setting forces vendor-only pricing for
--- this item: Equipment whose AH price is below the configured gold
--- threshold (or has no AH price at all) always displays vendor price.
--- Groups switched off in the threshold config are skipped entirely.
--- Shared by ItemValue() and the HUD row display so both stay in sync -
--- a display-side re-derivation of this rule previously caused item rows
--- to disagree with the category header (which goes through ItemValue).
+-- True if the Gear AH Threshold forces vendor-only pricing for this item:
+-- Equipment whose AH price is below the configured gold threshold (or missing)
+-- shows its vendor price. Groups switched off in the threshold config are
+-- skipped. ItemValue() and the HUD row both use it, so a row always agrees
+-- with its category header.
 function ns.IsGearThresholdVendorOnly(data, ahTotal)
     local threshold = NightsFarmtrackerDB.gearAHThreshold or 0
     if threshold <= 0 or not ns.IsGearThresholdApplicable(data) then return false end
@@ -226,7 +222,7 @@ end
 
 ------------------------------------------------------------------------
 -- Item DB (audit/debug catalog) — one entry per itemID, written once and
--- never updated again. See ns.InitItemDB (Core.lua) for the SavedVariable
+-- never updated again. See ns.InitItemDB (Database.lua) for the SavedVariable
 -- itself and why it exists. subcategory is the raw WoW item subclass name
 -- (independent of the "splitTradeGoods" display setting), so the catalog
 -- always shows the real classification regardless of addon settings.
@@ -252,12 +248,12 @@ end
 -- Filter and Blacklist windows show it as an always-available toggle.
 -- Shared by both windows' category checkbox sections.
 ------------------------------------------------------------------------
--- Every category name ns.CategoryName can produce in the CURRENT client
--- language. Used to ignore stale saved filter keys from another language
--- (e.g. "Junk" next to "Müll" after switching the client from EN to DE).
+-- Every category name ns.CategoryName can produce in the current client
+-- language. Saved filter keys from another language (e.g. "Junk" next to
+-- "Müll" after switching the client from EN to DE) are ignored.
 local function BuildKnownCategoryNames()
     local known = {}
-    local L = ns.L or {}
+    local L = ns.L
     for _, key in ipairs({ "cat_junk", "cat_gear", "cat_gear_boa", "cat_gear_soul",
                            "cat_gear_boe", "cat_gear_cosmetic", "cat_mounts", "cat_pets" }) do
         if L[key] then known[L[key]] = true end
@@ -276,7 +272,7 @@ local function BuildKnownCategoryNames()
 end
 
 function ns.GetTrackedCategoryNames(activeCategories)
-    local junkName = ns.L and ns.L["cat_junk"] or "Junk"
+    local junkName = ns.L["cat_junk"]
     local seen, names = { [junkName] = true }, { junkName }
     -- Categories already switched on in the calling window stay listed even
     -- when nothing of them is tracked right now (e.g. after a Reset) -
@@ -314,7 +310,7 @@ end
 ns.JUNK_MERGED_ICON = "Interface\\Icons\\INV_Misc_Coin_02"
 
 function ns.IsJunkCategory(catName)
-    return catName == (ns.L and ns.L["cat_junk"] or "Junk")
+    return catName == (ns.L["cat_junk"])
 end
 
 -- Builds the pseudo-item record standing in for every Junk item once
@@ -327,7 +323,7 @@ function ns.JunkMergedRecord(totalAmount, totalGold)
         quality       = 0,
         itemID        = nil,
         itemLink      = nil,
-        name          = ns.L and ns.L["junk_merged_name"] or "Plunder",
+        name          = ns.L["junk_merged_name"],
         isVendorTrash = true,
         isJunkMerged  = true,
         vendorTotal   = totalGold,

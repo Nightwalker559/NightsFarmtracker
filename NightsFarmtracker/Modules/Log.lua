@@ -40,9 +40,7 @@ local function AcquireRow()
     r = CreateFrame("Frame", nil, LListFrame)
     r:SetSize(ns.CONTENT_W, ROW_H)
 
-    r.sep = r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1)
-    r.sep:SetColorTexture(0.12,0.22,0.25,0.5)
-    r.sep:SetPoint("BOTTOMLEFT",0,0); r.sep:SetPoint("BOTTOMRIGHT",0,0)
+    ns.AddRowSeparator(r)
 
     r.timeText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.timeText:SetPoint("LEFT", 4, 0)
@@ -50,15 +48,7 @@ local function AcquireRow()
     r.timeText:SetJustifyH("LEFT"); r.timeText:SetFontHeight(ns.FONT_NORMAL)
     r.timeText:SetTextColor(0.45,0.45,0.45)
 
-    r.icon = r:CreateTexture(nil,"ARTWORK")
-    r.icon:SetSize(ns.ICON_SIZE, ns.ICON_SIZE)
-    r.icon:SetPoint("LEFT", r.timeText, "RIGHT", 4, 0)
-    r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-    r.iconBorder = r:CreateTexture(nil,"BACKGROUND")
-    r.iconBorder:SetPoint("TOPLEFT",     r.icon,"TOPLEFT",     -1,  1)
-    r.iconBorder:SetPoint("BOTTOMRIGHT", r.icon,"BOTTOMRIGHT",  1, -1)
-    r.iconBorder:Hide()
+    ns.AddRowIcon(r):SetPoint("LEFT", r.timeText, "RIGHT", 4, 0)
 
     r.rankBadge = ns.CreateIconBadge(r, r.icon)
 
@@ -221,7 +211,7 @@ end
 -- window / Instance Lockout frame if those are also open there, to avoid
 -- overlapping them), otherwise
 -- part of the Log/Filter/Blacklist right-side chain (see
--- ns.RefreshWindowChain in Core.lua), which also re-flows Filter/
+-- ns.RefreshWindowChain in Widgets.lua), which also re-flows Filter/
 -- Blacklist if they're open.
 ------------------------------------------------------------------------
 local function ReanchorLogFrame()

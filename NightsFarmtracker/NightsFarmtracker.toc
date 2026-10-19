@@ -15,13 +15,19 @@ Locales\deDE.lua
 
 # Core
 Core\Core.lua
+Core\Database.lua
+Core\Widgets.lua
+Core\DropList.lua
 Core\PriceHelper.lua
 Core\ItemHelper.lua
+Core\Sessions.lua
 Core\Repairs.lua
 Core\UI.lua
 
 # Modules
 Modules\History.lua
+Modules\Help.lua
+Modules\Minimap.lua
 Modules\Export.lua
 Modules\Debug.lua
 Modules\Log.lua

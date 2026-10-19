@@ -25,35 +25,24 @@ local BIND_TO_ACCOUNT = { [7] = true, [8] = true, [9] = true }
 local PRICE_MAX_RETRIES = 3
 local priceRetryCount   = 0
 
--- Localized self-loot prefix derived from WoW's own global string.
--- EN: "You receive loot: "  /  DE: "Ihr erhaltet Beute: "
--- Only messages starting with this prefix belong to the player.
--- First word extracted from LOOT_ITEM_SELF ("You "/"Ihr " etc.), covers all
--- self-loot variants (loot, item, an item, ...). Other players' loot lines
--- start with their character name and are filtered out this way.
-local SELF_LOOT_PREFIX    = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(%S+%s)") or nil
+-- First word of WoW's own self-loot string ("You " / "Ihr "): only chat lines
+-- starting with it belong to the player; other players' lines start with
+-- their name.
+local SELF_LOOT_PREFIX = LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(%S+%s)") or nil
 
--- Midnight (12.x) can hand addons "secret values" (e.g. chat/event payloads
--- while restricted): any string operation on one throws. Event handlers
--- below bail out on them instead of erroring. No-op on clients without it.
-local issecretvalue = issecretvalue or function() return false end
+-- Midnight (12.x) can hand addons "secret values": any string operation on
+-- one throws, so the event handlers bail out on them.
+local issecretvalue = ns.IsSecret
 
--- Coin patterns from WoW's own global strings ("%d Gold" etc.), so the
--- CHAT_MSG_MONEY parse works in every client language instead of only
--- matching hardcoded EN/DE words.
-local function AmountPattern(fmt)
-    if not fmt then return nil end
-    local pattern = fmt:gsub("([%^%$%(%)%.%[%]%*%+%-%?])", "%%%1"):gsub("%%d", "(%%d+)")
-    return pattern
-end
-local GOLD_PATTERN   = AmountPattern(GOLD_AMOUNT)
-local SILVER_PATTERN = AmountPattern(SILVER_AMOUNT)
-local COPPER_PATTERN = AmountPattern(COPPER_AMOUNT)
+-- Coin patterns from WoW's own global strings, so CHAT_MSG_MONEY parses in
+-- every client language.
+local GOLD_PATTERN   = ns.FormatToPattern(GOLD_AMOUNT)
+local SILVER_PATTERN = ns.FormatToPattern(SILVER_AMOUNT)
+local COPPER_PATTERN = ns.FormatToPattern(COPPER_AMOUNT)
 
--- Cache reagent quality API at load time; nil if unavailable
 local GetReagentQualityInfo = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityInfo or nil
 
--- Item link color → quality (avoids GetItemInfo cache dependency for quality)
+-- Item link color -> quality (spares the GetItemInfo cache for the quality)
 local LINK_QUALITY = {
     ["9d9d9d"] = 0,  -- Poor
     ["ffffff"] = 1,  -- Common
@@ -68,9 +57,8 @@ local LINK_QUALITY = {
 local pendingLoot = {}
 local delayedRefreshTicket = 0   -- see the delayed re-check at the end of ProcessLoot
 
--- canAH: BoE, Bind-on-Use and unbound items (0/nil), plus Trade Goods, may
--- go on the AH (all still tradeable before the bind actually triggers).
--- BoP (1), Warbound/account-bound and everything else → vendor only.
+-- BoE, Bind-on-Use, unbound items (0/nil) and Trade Goods may go on the AH;
+-- BoP, Warbound and everything else is vendor-only.
 local function CanAH(bindType, classID)
     return (bindType == BIND_ON_EQUIP)
         or (bindType == BIND_ON_USE)
@@ -78,233 +66,197 @@ local function CanAH(bindType, classID)
         or (classID == TRADE_GOODS)
 end
 
+-- Starts watching the bags (BAG_UPDATE_DELAYED) so sell prices that were not
+-- cached at loot time can be filled in, see UpdatePricesFromBags.
+local function RequestPriceUpdate()
+    if ns.pendingPriceUpdate then return end
+    ns.pendingPriceUpdate = true
+    priceRetryCount       = 0
+    EventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+end
+
+-- Whether a looted item enters the session count: not ignored, blacklisted
+-- or excluded, and not unsellable. Unknown prices (cache miss) are tracked
+-- and resolved later.
+local function ShouldTrack(db, itemID, name, classID, quality, sellPrice, bindType, catData)
+    if ns.IsIgnoredItemClass(classID) or ns.IsBlacklisted(itemID) or ns.IsBlacklistCategory(catData)
+       or db.excludedItemIDs[itemID] or db.excludedNames[name]
+       or db.excludedNames[ns.CategoryName(catData)] then
+        return false
+    end
+    if quality == 0 then
+        return sellPrice == nil or sellPrice > 0   -- grey: vendor junk
+    end
+    -- Quest items report sellPrice 0 but are not necessarily BoP; anything
+    -- else is skipped only when it is explicitly unsellable.
+    if classID == QUEST_CLASS then return false end
+    return not (sellPrice == 0 and bindType == BIND_ON_PICKUP and classID ~= TRADE_GOODS)
+end
+
+local function NewVariant(variants, key)
+    local gv = variants[key]
+    if not gv then
+        gv = { amount = 0 }
+        variants[key] = gv
+    end
+    return gv
+end
+
+-- Scaling gear (same item ID, different item level/quality per drop) gets one
+-- variant per roll, keyed by bonus-ID string, so amounts and prices don't mix.
+-- The threshold sound is checked in BuildHUD, not here: the AH price of an
+-- exact roll can take a moment to become queryable.
+local function RecordGearVariant(entry, link, qty, quality, itemLevel, sellPrice)
+    entry.variants = entry.variants or {}
+    local gv = NewVariant(entry.variants, ns.GearVariantKey(link))
+    gv.amount    = gv.amount + qty
+    gv.quality   = quality   or gv.quality
+    gv.itemLevel = itemLevel or gv.itemLevel
+    gv.itemLink  = link
+    if sellPrice and sellPrice > 0 then gv.sellPrice = sellPrice end
+end
+
+local function TierSum(v)
+    return (v[1] and v[1].amount or 0) + (v[2] and v[2].amount or 0) + (v[3] and v[3].amount or 0)
+end
+
+-- Crafting-reagent quality tiers (Q1/Q2/Q3) are variants keyed 1/2/3. Returns
+-- the rank badge markup for the loot log, or nil.
+local function RecordReagentTier(db, entry, itemID, link, qty, sellPrice)
+    if not GetReagentQualityInfo then return end
+    local ok, qi = pcall(GetReagentQualityInfo, link)
+    if not (ok and qi) then return end
+    local tier = qi.quality
+    local v = entry.variants
+    local hasTiers = v and (v[1] or v[2] or v[3])
+    local qSum = hasTiers and TierSum(v) or 0
+    -- Self-heal: the breakdown was already inconsistent with the item's own
+    -- amount before this loot (e.g. a corrupted save merged in): drop it so
+    -- tracking can recover instead of freezing the bad numbers.
+    if hasTiers and qSum ~= (entry.amount - qty) then
+        v[1], v[2], v[3] = nil, nil, nil
+        qSum = 0
+    end
+    -- GetReagentQualityInfo can report a tier that does not fit the item
+    -- (seen with reagents whose quality is fixed by their itemID, e.g.
+    -- per-rank ore); accepting it would push the tier total above the amount.
+    if not tier or qSum + qty > entry.amount then return end
+    entry.variants = entry.variants or {}
+    local gv = NewVariant(entry.variants, tier)
+    gv.amount      = gv.amount + qty
+    gv.priceItemID = itemID
+    if sellPrice and sellPrice > 0 then gv.sellPrice = sellPrice end
+    db.qAtlas       = db.qAtlas or {}
+    db.qAtlas[tier] = qi.iconChat
+    return qi.iconChat and CreateAtlasMarkup(qi.iconChat, ns.RANK_ICON_W, ns.RANK_ICON_H)
+        or ("|cffaaaaaa R" .. tier .. "|r")
+end
+
+-- Adds one looted stack to the session count. Returns true if the item still
+-- needs a price lookup from the bags.
+local function AddToCount(db, pending, info)
+    local itemID, qty, link = pending.itemID, pending.qty, pending.link
+    local entry = db.count[itemID]
+    if not entry then
+        entry = { icon = info.icon, amount = 0, name = info.name }
+        db.count[itemID] = entry
+    end
+    entry.amount      = entry.amount + qty
+    entry.name        = entry.name or info.name
+    entry.quality     = info.quality     or entry.quality
+    entry.itemSubType = info.itemSubType or entry.itemSubType
+    entry.classID     = entry.classID    or info.classID
+    entry.subClassID  = entry.subClassID or info.subClassID
+    entry.itemID      = entry.itemID     or itemID
+    -- Gear keeps its link per variant; a top-level copy would only go stale.
+    if not ns.IsGearClass(info.classID) then entry.itemLink = link end
+
+    if info.quality == 0                   then entry.isVendorTrash = true end
+    if info.bindType == BIND_ON_EQUIP      then entry.isBoE         = true end
+    if info.bindType == BIND_ON_PICKUP     then entry.isBoP         = true end
+    if BIND_TO_ACCOUNT[info.bindType]      then entry.isBoA         = true end
+    if info.isCosmetic                     then entry.isCosmetic    = true end
+    if entry.canAH == nil then entry.canAH = CanAH(info.bindType, info.classID) end
+
+    local needsPrice = false
+    -- Trade goods and junk don't scale: the loot-time price is trusted.
+    if info.sellPrice and info.sellPrice > 0 and (info.classID == TRADE_GOODS or info.quality == 0) then
+        entry.sellPrice = info.sellPrice
+    elseif not entry.noSell then
+        needsPrice = true
+    end
+
+    if ns.IsGearClass(info.classID) then
+        RecordGearVariant(entry, link, qty, info.quality, info.itemLevel, info.sellPrice)
+    end
+    info.rankIcon = RecordReagentTier(db, entry, itemID, link, qty, info.sellPrice)
+    return needsPrice
+end
+
+-- GetItemInfo for a pending loot entry. On a cache miss it falls back to the
+-- chat link (name, quality color) plus GetItemInfoInstant (class, icon); with
+-- neither, the entry is queued for a retry and nil is returned.
+local function ResolveItemInfo(pending)
+    local name, _, quality, itemLevel, _, _, itemSubType, _, _, icon, sellPrice, classID, subClassID, bindType =
+        C_Item.GetItemInfo(pending.link)
+    if not name then
+        local _, _, _, _, icon2, classID2, subClassID2 = C_Item.GetItemInfoInstant(pending.itemID)
+        ns.Log("CacheMiss", pending.itemID, "classID2=", classID2, "itemName=", pending.itemName)
+        if classID2 and pending.itemName then
+            name, quality, icon, classID, subClassID = pending.itemName, pending.linkQuality, icon2, classID2, subClassID2
+        else
+            pendingLoot[#pendingLoot + 1] = pending
+            RequestPriceUpdate()
+        end
+    end
+    ns.Log("ProcessLoot", name, "classID=", classID, "quality=", quality)
+    if not (name and classID) then return nil end
+    return {
+        name = name, quality = quality, itemLevel = itemLevel, itemSubType = itemSubType, icon = icon,
+        sellPrice = sellPrice, classID = classID, subClassID = subClassID, bindType = bindType,
+    }
+end
+
 local function ProcessLoot(items)
-    local changed          = false
-    local needsPriceUpdate = false
+    local changed, needsPriceUpdate = false, false
 
     for _, pending in ipairs(items) do
-        local itemID = pending.itemID
-        local qty    = pending.qty
-        local link   = pending.link
+        local info = ResolveItemInfo(pending)
+        if info then
+            local db = NightsFarmtrackerDB
+            local classID, quality, bindType = info.classID, info.quality, info.bindType
+            -- Cosmetic weapons/armor (transmog only) get their own category.
+            info.isCosmetic = ns.IsGearClass(classID) and C_Item.IsCosmeticItem(pending.link) or nil
 
-        local name, _, quality, itemLevel, _, _, itemSubType, _, _, icon, sellPrice, classID, subClassID, bindType =
-            C_Item.GetItemInfo(link)
-
-        -- Cache miss: recover from link color (quality) + GetItemInfoInstant (classID/icon)
-        -- C_Item.GetItemInfoInstant returns: itemID, itemType, itemSubType, itemEquipLoc, icon, classID, subClassID
-        -- (no bindType — that gets resolved later via bag scan in ns.UpdatePricesFromBags)
-        if not name then
-            local _, _, _, _, icon2, classID2, subClassID2 = C_Item.GetItemInfoInstant(itemID)
-            ns.Log("CacheMiss", itemID, "classID2=", classID2, "itemName=", pending.itemName)
-            if classID2 and pending.itemName then
-                name        = pending.itemName
-                quality     = pending.linkQuality
-                icon        = icon2
-                classID     = classID2
-                subClassID  = subClassID2
-            else
-                pendingLoot[#pendingLoot+1] = pending
-                if not ns.pendingPriceUpdate then
-                    ns.pendingPriceUpdate = true
-                    priceRetryCount       = 0
-                    EventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
-                end
-            end
-        end
-
-        ns.Log("ProcessLoot", name, "classID=", classID, "quality=", quality, "shouldTrack check")
-
-        if name and classID then
-            local db          = NightsFarmtrackerDB
-            local shouldTrack = false
-
-            -- Cosmetic weapons/armor (transmog-only, e.g. fishing rod skins) get
-            -- their own category instead of being lumped into regular Equipment.
-            local isCosmetic = ns.IsGearClass(classID) and C_Item.IsCosmeticItem(link) or nil
-
-            -- Category name for this pending item, using whatever bind/quality
-            -- info is already available from GetItemInfo at loot time - lets
-            -- category-level exclusion (Shift+Right-click on a category header)
-            -- catch items before they're ever added to db.count, not just clear
-            -- already-tracked ones.
+            -- Category data from what GetItemInfo knows right now, so a whole
+            -- excluded/blacklisted category is caught before it is counted.
             local catData = {
-                classID = classID, subClassID = subClassID, quality = quality,
-                itemSubType = itemSubType, isVendorTrash = (quality == 0),
+                classID = classID, subClassID = info.subClassID, quality = quality,
+                itemSubType = info.itemSubType, isVendorTrash = (quality == 0),
                 isBoE = (bindType == BIND_ON_EQUIP), isBoP = (bindType == BIND_ON_PICKUP),
-                isBoA = BIND_TO_ACCOUNT[bindType] or nil, isCosmetic = isCosmetic,
+                isBoA = BIND_TO_ACCOUNT[bindType] or nil, isCosmetic = info.isCosmetic,
             }
+            ns.RecordItemDBEntry(pending.itemID, info.name, pending.link, quality, classID, info.subClassID, catData)
 
-            ns.RecordItemDBEntry(itemID, name, link, quality, classID, subClassID, catData)
-
-            if ns.IsIgnoredItemClass(classID) then
-                -- obsolete/irrelevant item class (WoW Token, obsolete money/permanent) - never tracked
-            elseif ns.IsBlacklisted(itemID) then
-                -- itemID explicitly blacklisted — never tracked, wins over everything else
-            elseif ns.IsBlacklistCategory(catData) then
-                -- category blacklisted
-            elseif db.excludedItemIDs[itemID] then
-                -- itemID explicitly excluded — survives a client-language switch
-            elseif db.excludedNames[name] then
-                -- name explicitly excluded (legacy, pre-itemID-based exclusion)
-            elseif db.excludedNames[ns.CategoryName(catData)] then
-                -- category explicitly excluded (Shift+Right-click on category header)
-            elseif quality == 0 then
-                -- grey: vendor junk (known or unknown=cache miss, resolve later)
-                if sellPrice ~= nil then
-                    shouldTrack = sellPrice > 0
-                else
-                    shouldTrack = true
-                end
-            else
-                -- quality > 0: track unless definitely unsellable.
-                -- sellPrice == nil = cache miss = unknown → track and resolve price later.
-                -- Quest items (classID 12) are always unsellable per the Blizzard API
-                -- (sellPrice always 0) but not necessarily BIND_ON_PICKUP - hence its own check.
-                -- Otherwise: only skip when sellPrice is explicitly 0 AND BoP AND not a trade good.
-                local definitelyUnsellable
-                if classID == QUEST_CLASS then
-                    definitelyUnsellable = true
-                else
-                    definitelyUnsellable = (sellPrice == 0)
-                                        and (bindType == BIND_ON_PICKUP)
-                                        and (classID ~= TRADE_GOODS)
-                end
-                shouldTrack = not definitelyUnsellable
-            end
-
-            ns.Log("shouldTrack=", shouldTrack, "for", name)
-
+            local shouldTrack = ShouldTrack(db, pending.itemID, info.name, classID, quality, info.sellPrice, bindType, catData)
+            ns.Log("shouldTrack=", shouldTrack, "for", info.name)
             if shouldTrack then
-                local entry = db.count[itemID]
-                if not entry then
-                    entry            = { icon = icon, amount = 0, name = name }
-                    db.count[itemID] = entry
-                end
-                entry.amount      = entry.amount + qty
-                entry.name        = entry.name or name
-                entry.quality     = quality     or entry.quality
-                entry.itemSubType = itemSubType or entry.itemSubType
-                entry.classID     = entry.classID or classID
-                entry.subClassID  = entry.subClassID or subClassID
-                entry.itemID      = entry.itemID or itemID
-                -- Gear (classID 2/4) tracks its link per-variant instead
-                -- (see gv.itemLink below) - every display/tooltip path for
-                -- a gear item with variants reads that, never this field,
-                -- so writing it here would just be an unused duplicate
-                -- that goes stale the moment a second, differently-rolled
-                -- variant is looted. Non-gear items have no per-variant
-                -- link, so this stays their only copy.
-                if not ns.IsGearClass(classID) then
-                    entry.itemLink = link
-                end
-
-                if quality == 0               then entry.isVendorTrash = true end
-                if bindType == BIND_ON_EQUIP  then entry.isBoE         = true end
-                if bindType == BIND_ON_PICKUP then entry.isBoP         = true end
-                if BIND_TO_ACCOUNT[bindType]  then entry.isBoA         = true end
-                if isCosmetic                 then entry.isCosmetic   = true end
-                if entry.canAH == nil then
-                    entry.canAH = CanAH(bindType, classID)
-                end
-
-                -- Sell price: trust directly for trade goods and junk (no scaling)
-                if sellPrice and sellPrice > 0 and (classID == TRADE_GOODS or quality == 0) then
-                    entry.sellPrice = sellPrice
-                elseif not entry.noSell then
-                    needsPriceUpdate = true
-                end
-
-                -- Variant tracking: scaling/Adventurer's gear (same item ID,
-                -- different item level/quality per drop) and crafting-reagent
-                -- quality tiers (Q1/Q2/Q3) need per-bucket amounts/prices
-                -- instead of one shared sellPrice*amount. Both live in ONE
-                -- entry.variants table, keyed by bonus-ID string for gear or
-                -- tier number (1/2/3) for reagents; every price/value
-                -- calculation reads it through GetVariants (PriceHelper.lua).
-                -- The merged entry.quality stays as a fallback for old saved
-                -- data that predates the field.
-                if ns.IsGearClass(classID) then
-                    local vKey = ns.GearVariantKey(link)
-                    entry.variants = entry.variants or {}
-                    local gv = entry.variants[vKey]
-                    if not gv then
-                        gv = { amount = 0 }
-                        entry.variants[vKey] = gv
-                    end
-                    gv.amount    = gv.amount + qty
-                    gv.quality   = quality    or gv.quality
-                    gv.itemLevel = itemLevel  or gv.itemLevel
-                    gv.itemLink  = link
-                    if sellPrice and sellPrice > 0 then gv.sellPrice = sellPrice end
-                    -- Threshold-sound check happens in RefreshHUD (UI.lua),
-                    -- not here: the AH price for this exact bonus-ID roll can
-                    -- take a moment to become queryable, and RefreshHUD is
-                    -- what re-checks it (see the delayed refresh below).
-                end
-
-                -- Quality tier tracking (crafting reagents Q1/Q2/Q3)
-                local rankIcon
-                if GetReagentQualityInfo then
-                    local ok, qi = pcall(GetReagentQualityInfo, link)
-                    if ok and qi then
-                        local tier = qi.quality
-                        local v = entry.variants
-                        local hasTiers = v and (v[1] or v[2] or v[3])
-                        local qSum = hasTiers and ((v[1] and v[1].amount or 0) + (v[2] and v[2].amount or 0) + (v[3] and v[3].amount or 0)) or 0
-                        -- Self-heal: the breakdown was ALREADY inconsistent with
-                        -- this item's own amount before this loot event (e.g. an
-                        -- older corrupted save that got merged in) - wipe it
-                        -- instead of permanently freezing the bad numbers in
-                        -- place, so tier tracking can recover cleanly from here.
-                        if hasTiers and qSum ~= (entry.amount - qty) then
-                            entry.variants[1], entry.variants[2], entry.variants[3] = nil, nil, nil
-                            qSum = 0
-                        end
-                        -- Sanity guard: GetReagentQualityInfo can occasionally
-                        -- report a tier that doesn't match this item (seen with
-                        -- some reagents whose quality is already fixed by their
-                        -- itemID, e.g. per-rank ore). Accepting it would push
-                        -- the tier total above the item's own tracked amount -
-                        -- skip the update instead of corrupting entry.variants.
-                        if tier and qSum + qty > entry.amount then
-                            tier = nil
-                        end
-                        if tier then
-                            entry.variants = entry.variants or {}
-                            local gv = entry.variants[tier]
-                            if not gv then gv = { amount = 0 }; entry.variants[tier] = gv end
-                            gv.amount      = gv.amount + qty
-                            gv.priceItemID = itemID
-                            if sellPrice and sellPrice > 0 then gv.sellPrice = sellPrice end
-                            db.qAtlas        = db.qAtlas or {}
-                            db.qAtlas[tier]  = qi.iconChat
-                            rankIcon = qi.iconChat and CreateAtlasMarkup(qi.iconChat, ns.RANK_ICON_W, ns.RANK_ICON_H)
-                                    or ("|cffaaaaaa R" .. tier .. "|r")
-                        end
-                    end
-                end
-
+                if AddToCount(db, pending, info) then needsPriceUpdate = true end
                 changed = true
-                ns.AddLogEntry(icon, name, qty, link, quality, rankIcon or ns.RankIconFromLink(link))
+                ns.AddLogEntry(info.icon, info.name, pending.qty, pending.link, quality,
+                    info.rankIcon or ns.RankIconFromLink(pending.link))
             end
         end
     end
 
     if changed then
         ns.RefreshHUD()
-        if needsPriceUpdate and not ns.pendingPriceUpdate then
-            ns.pendingPriceUpdate = true
-            priceRetryCount       = 0
-            EventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
-        end
+        if needsPriceUpdate then RequestPriceUpdate() end
         -- Auctionator/TSM can take a moment after looting before an AH price
-        -- for a specific bonus-ID roll is queryable. RefreshHUD only reruns
-        -- on the next loot event otherwise, so an item that priced as
-        -- vendor-only on this pass (AH price not yet available) would stay
-        -- stuck showing vendor price/never trigger the threshold sound.
-        -- One delayed re-check self-corrects that. Only the timer of the
-        -- LAST loot of a burst fires (ticket check), so N drops in quick
-        -- succession cost one delayed rebuild instead of N.
+        -- for an exact roll is queryable; without a re-check an item priced
+        -- as vendor-only here would stay that way until the next loot. Only
+        -- the last loot of a burst fires its timer (ticket), so N quick
+        -- drops cost one delayed rebuild.
         delayedRefreshTicket = delayedRefreshTicket + 1
         local ticket = delayedRefreshTicket
         C_Timer.After(2, function()
@@ -322,7 +274,7 @@ local function FlushPendingLoot()
 end
 
 ------------------------------------------------------------------------
--- Deferred price update — scans bags for correct equipment sell prices
+-- Deferred price update: scans the bags for correct sell prices
 ------------------------------------------------------------------------
 function ns.CleanupPriceUpdate()
     if ns.pendingPriceUpdate then
@@ -332,9 +284,65 @@ function ns.CleanupPriceUpdate()
     priceRetryCount = 0
 end
 
+-- Gear variant bucket matching a bag link. The exact key can differ once the
+-- item is fully cached (the bonus-ID tail can shift), so fall back to the
+-- bucket with the same item level and quality.
+local function FindGearVariant(data, bagLink, iLevel, iQuality)
+    local gv = data.variants[ns.GearVariantKey(bagLink)]
+    if gv or not (iLevel and iQuality) then return gv end
+    for _, candidate in pairs(data.variants) do
+        if candidate.itemLevel == iLevel and candidate.quality == iQuality then return candidate end
+    end
+end
+
+-- Takes the authoritative item data from a cached bag link and overwrites the
+-- loot-time guesses (quality from a chat link color, class/bind flags from a
+-- cache miss). Quality corrections are passed on to the Loot Log, whose
+-- entries are otherwise never revisited.
+local function ApplyBagItemInfo(data, bag, slot, bagLink)
+    local _, _, iQuality, iLevel, _, _, _, _, _, _, sp, cID, subID, bType = C_Item.GetItemInfo(bagLink)
+    if sp and sp > 0 then
+        data.sellPrice = sp
+        if not ns.IsGearClass(cID) then data.itemLink = bagLink end
+    else
+        data.noSell = true
+    end
+    if iQuality and iQuality ~= data.quality then
+        data.quality = iQuality
+        if iQuality == 0 then data.isVendorTrash = true end
+        ns.UpdateLogEntryQuality(data.itemID, iQuality)
+    end
+    if not cID then return end
+
+    data.classID    = cID
+    data.subClassID = subID
+    if bType == BIND_ON_EQUIP  then data.isBoE = true end
+    if bType == BIND_ON_PICKUP then data.isBoP = true end
+    if BIND_TO_ACCOUNT[bType]  then data.isBoA = true end
+    data.canAH = CanAH(bType, cID)
+    if ns.IsGearClass(cID) then
+        data.isCosmetic = C_Item.IsCosmeticItem(bagLink) or nil
+        local gv = data.variants and FindGearVariant(data, bagLink, iLevel, iQuality)
+        if gv then
+            gv.itemLink = bagLink
+            if sp and sp > 0 then gv.sellPrice = sp end
+            if iQuality then gv.quality = iQuality end
+            if iLevel then gv.itemLevel = iLevel end
+        end
+    end
+    -- Older clients report Warbound-until-equipped gear as plain BoE: detect
+    -- it through the item location so it is still flagged BoA (vendor-only).
+    if data.canAH and not data.isBoA and C_Item.IsBoundToAccountUntilEquip then
+        local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
+        if loc and loc:IsValid() and C_Item.IsBoundToAccountUntilEquip(loc) then
+            data.canAH = false
+            data.isBoA = true
+        end
+    end
+end
+
 function ns.UpdatePricesFromBags()
-    local updated      = false
-    local stillMissing = false
+    local updated = false
 
     local byID = {}
     for _, data in pairs(NightsFarmtrackerDB.count) do
@@ -347,106 +355,24 @@ function ns.UpdatePricesFromBags()
         for bag = 0, 5 do
             for slot = 1, C_Container.GetContainerNumSlots(bag) do
                 local ci = C_Container.GetContainerItemInfo(bag, slot)
-                if ci then
-                    local data = byID[ci.itemID]
-                    if data then
-                        local bagLink = C_Container.GetContainerItemLink(bag, slot)
-                        if bagLink then
-                            local _, _, iQuality, iLevel, _, _, _, _, _, _, sp, cID, subID, bType = C_Item.GetItemInfo(bagLink)
-                            if sp and sp > 0 then
-                                data.sellPrice = sp
-                                -- Gear (classID 2/4) mirrors its link into
-                                -- the matching variant bucket below instead -
-                                -- writing it here too would recreate the
-                                -- same unused top-level duplicate ProcessLoot
-                                -- no longer writes at loot time.
-                                if not ns.IsGearClass(cID) then
-                                    data.itemLink = bagLink
-                                end
-                            else
-                                data.noSell = true
-                            end
-                            -- Quality: authoritative now, same reasoning as classID/bind below.
-                            -- At loot time this can be a rough guess (chat-message link color,
-                            -- or a cache-miss fallback) that's wrong for items whose real
-                            -- quality only resolves once the client fully caches them (seen
-                            -- with scaling/track gear) - correct it here, and propagate the
-                            -- correction to any already-written Loot Log entries for this item,
-                            -- since those are otherwise never revisited after being written.
-                            if iQuality and iQuality ~= data.quality then
-                                data.quality = iQuality
-                                if iQuality == 0 then data.isVendorTrash = true end
-                                ns.UpdateLogEntryQuality(ci.itemID, iQuality)
-                            end
-                            -- classID / subclass / bind flags: authoritative now that the
-                            -- item is cached via the bag link — overwrites any approximate
-                            -- values set during a loot-time cache miss (no bindType there)
-                            if cID then
-                                data.classID    = cID
-                                data.subClassID = subID
-                                if bType == BIND_ON_EQUIP  then data.isBoE = true end
-                                if bType == BIND_ON_PICKUP then data.isBoP = true end
-                                if BIND_TO_ACCOUNT[bType]  then data.isBoA = true end
-                                data.canAH = CanAH(bType, cID)
-                                if ns.IsGearClass(cID) then
-                                    data.isCosmetic = C_Item.IsCosmeticItem(bagLink) or nil
-                                    -- Correct the matching gear variant bucket (see ProcessLoot)
-                                    -- with the bag-cached quality/link, same reasoning as the
-                                    -- top-level quality fix above but per item-level bucket.
-                                    if data.variants then
-                                        local gv = data.variants[ns.GearVariantKey(bagLink)]
-                                        if not gv and iLevel and iQuality then
-                                            -- The exact key can differ once the item is fully
-                                            -- cached (bonus-ID/modifier tail can shift position
-                                            -- between an early and a later lookup of the same
-                                            -- roll - see ns.MergeDuplicateGearVariants). Fall
-                                            -- back to the bucket matching this roll's own
-                                            -- itemLevel+quality instead of leaving it stale.
-                                            for _, candidate in pairs(data.variants) do
-                                                if candidate.itemLevel == iLevel and candidate.quality == iQuality then
-                                                    gv = candidate
-                                                    break
-                                                end
-                                            end
-                                        end
-                                        if gv then
-                                            gv.itemLink = bagLink
-                                            if sp and sp > 0 then gv.sellPrice = sp end
-                                            if iQuality then gv.quality = iQuality end
-                                            if iLevel then gv.itemLevel = iLevel end
-                                        end
-                                    end
-                                end
-                                -- Older/compat-mode clients can still report Warbound-until-
-                                -- equipped gear as plain bindType 2 (BoE) instead of 9 - detect
-                                -- that case explicitly via the item location so it's still
-                                -- flagged BoA and forced to vendor-only pricing.
-                                if data.canAH and not data.isBoA and C_Item.IsBoundToAccountUntilEquip then
-                                    local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
-                                    if loc and loc:IsValid() and C_Item.IsBoundToAccountUntilEquip(loc) then
-                                        data.canAH = false
-                                        data.isBoA = true
-                                    end
-                                end
-                            end
-                            updated            = true
-                            byID[ci.itemID]    = nil
-                        end
-                        -- bagLink nil: keep in byID, try other slots / next retry
-                    end
+                local data = ci and byID[ci.itemID]
+                local bagLink = data and C_Container.GetContainerItemLink(bag, slot)
+                -- no link yet: keep the item in byID for another slot or retry
+                if bagLink then
+                    ApplyBagItemInfo(data, bag, slot, bagLink)
+                    updated = true
+                    byID[ci.itemID] = nil
                 end
             end
         end
-        if next(byID) then stillMissing = true end
     end
 
+    local stillMissing = next(byID) ~= nil
     if not stillMissing or priceRetryCount >= PRICE_MAX_RETRIES then
-        -- Items still in byID were never found in any bag slot.
-        -- After max retries, mark them noSell so they only show if they have an AH price.
-        if stillMissing then
-            for _, data in pairs(byID) do
-                data.noSell = true
-            end
+        -- Items never found in any bag after the last retry are marked
+        -- noSell, so they only show if they have an AH price.
+        for _, data in pairs(byID) do
+            data.noSell = true
             updated = true
         end
         EventFrame:UnregisterEvent("BAG_UPDATE_DELAYED")
@@ -515,37 +441,29 @@ end
 ------------------------------------------------------------------------
 -- Slash commands
 ------------------------------------------------------------------------
+local SLASH_COMMANDS = {
+    debug        = function() ns.ToggleDebugMode() end,
+    filter       = function() ns.ToggleFilterWindow() end,
+    venom        = function() ns.ToggleVenomTracker() end,
+    venomdump    = function() ns.DumpVenomTooltip() end,
+    bait         = function() ns.ToggleBaitFrame() end,
+    hud          = function(args) ns.HudSlash(args) end,
+    export       = function() ns.ToggleExportWindow() end,
+    test         = function() ns.DebugTest() end,
+    itemdb       = function() ns.DebugItemDB() end,
+    monthdump    = function(args) ns.DebugMonthDump(tonumber(args)) end,
+    sessionsdump = function() ns.DebugSessionsDump() end,
+    repairprices = function() ns.RepairLastSessionPrices() end,
+}
+
 SLASH_FARMTRACK1 = "/nft"
 SlashCmdList["FARMTRACK"] = function(msg)
-    local cmd = (msg or ""):lower():match("^%s*(%S*)")
+    local cmd, args = (msg or ""):match("^%s*(%S*)%s*(.*)$")
+    cmd = cmd:lower()
     if cmd == "" then
         ns.ToggleMainFrame()
-    elseif cmd == "debug" then
-        ns.ToggleDebugMode()
-    elseif cmd == "filter" then
-        ns.ToggleFilterWindow()
-    elseif cmd == "venom" then
-        ns.ToggleVenomTracker()
-    elseif cmd == "venomdump" then
-        ns.DumpVenomTooltip()
-    elseif cmd == "bait" then
-        ns.ToggleBaitFrame()
-    elseif cmd == "hud" then
-        ns.HudSlash((msg or ""):match("^%s*%S*%s*(.*)$"))
-    elseif cmd == "export" then
-        ns.ToggleExportWindow()
-    elseif cmd == "test" then
-        ns.DebugTest()
-    elseif cmd == "itemdb" then
-        ns.DebugItemDB()
-    elseif cmd == "monthdump" then
-        local rest     = (msg or ""):match("^%s*%S*%s*(.*)$")
-        local targetID = tonumber(rest)
-        ns.DebugMonthDump(targetID)
-    elseif cmd == "sessionsdump" then
-        ns.DebugSessionsDump()
-    elseif cmd == "repairprices" then
-        ns.RepairLastSessionPrices()
+    elseif SLASH_COMMANDS[cmd] then
+        SLASH_COMMANDS[cmd](args)
     else
         ns.Print("/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump · /nft repairprices")
     end
@@ -630,14 +548,8 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         -- instead of just downward. Runs every login as a safety net; same
         -- screen spot, no visual jump.
         if p[1] ~= "TOP" then
-            local top, left, right = MainFrame:GetTop(), MainFrame:GetLeft(), MainFrame:GetRight()
-            if top and left and right then
-                local offsetY = top - UIParent:GetTop()
-                local offsetX = (left + right) / 2 - UIParent:GetWidth() / 2
-                NightsFarmtrackerDB.pos = {"TOP", "TOP", offsetX, offsetY}
-                MainFrame:ClearAllPoints()
-                MainFrame:SetPoint("TOP", UIParent, "TOP", offsetX, offsetY)
-            end
+            local x, y = ns.AnchorToTop(MainFrame)
+            if x then NightsFarmtrackerDB.pos = {"TOP", "TOP", x, y} end
         end
 
         ns.UpdateTimerDisplay()

@@ -15,17 +15,10 @@ local MAX_RESETS = 9
 local LOCK_TIME  = 3600  -- seconds a reset counts against the limit
 local FRAME_H    = 28
 
-local issecretvalue = issecretvalue or function() return false end
+local issecretvalue = ns.IsSecret
 
 -- "%s has been reset." -> pattern capturing the zone name.
-local RESET_PATTERN
-do
-    local fmt = INSTANCE_RESET_SUCCESS
-    if fmt then
-        local p = fmt:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"):gsub("%%%%s", "(.+)")
-        RESET_PATTERN = p
-    end
-end
+local RESET_PATTERN = ns.FormatToPattern(INSTANCE_RESET_SUCCESS)
 
 local LockoutFrame
 
@@ -130,11 +123,8 @@ local function EnsureFrame()
 
     local btn = ns.MakeBtn(LockoutFrame, 16, "btn_reset.png")
     btn:SetPoint("RIGHT", -pad, 0)
-    btn:SetScript("OnEnter", function(self)
-        self.tex:SetAlpha(1)
-        ShowTooltip(self)
-    end)
-    btn:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.75); GameTooltip:Hide() end)
+    btn:HookScript("OnEnter", ShowTooltip)
+    btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
     btn:SetScript("OnClick", function() ResetInstances() end)
     LockoutFrame.resetBtn = btn
 
@@ -147,23 +137,21 @@ local function EnsureFrame()
     LockoutFrame:SetScript("OnEnter", function(self) ShowTooltip(self) end)
     LockoutFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- 1s refresh of the countdown, only while visible (not a per-frame OnUpdate).
+    -- The Log window chains below this frame while it is visible (main window
+    -- collapsed), so it re-anchors on show and hide. The countdown refreshes
+    -- once a second, only while visible.
+    local function ReanchorLog()
+        if ns.LogFrame and ns.LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
+    end
     local ticker
     LockoutFrame:HookScript("OnShow", function()
-        if not ticker then ticker = C_Timer.NewTicker(1, function() UpdateText() end) end
+        Reanchor(); UpdateText()
+        if not ticker then ticker = C_Timer.NewTicker(1, UpdateText) end
+        ReanchorLog()
     end)
     LockoutFrame:HookScript("OnHide", function()
         if ticker then ticker:Cancel(); ticker = nil end
-    end)
-
-    -- Frames below the main window (Log while collapsed) chain below this
-    -- one while it's visible; follow Gold Overview open/close too.
-    LockoutFrame:HookScript("OnShow", function()
-        Reanchor(); UpdateText()
-        if ns.LogFrame and ns.LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
-    end)
-    LockoutFrame:HookScript("OnHide", function()
-        if ns.LogFrame and ns.LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
+        ReanchorLog()
     end)
     ns.GoldFrame:HookScript("OnShow", Reanchor)
     ns.GoldFrame:HookScript("OnHide", Reanchor)

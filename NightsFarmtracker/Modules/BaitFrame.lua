@@ -320,15 +320,8 @@ local function EnsureBaitFrame()
     BaitFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
     BaitFrame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        local top, left, right = self:GetTop(), self:GetLeft(), self:GetRight()
-        local uiTop, uiWidth    = UIParent:GetTop(), UIParent:GetWidth()
-        if top and left and right and uiTop and uiWidth then
-            local offsetY = top - uiTop
-            local offsetX = (left + right) / 2 - uiWidth / 2
-            NightsFarmtrackerDB.baitPos = { "TOP", offsetX, offsetY }
-            self:ClearAllPoints()
-            self:SetPoint("TOP", UIParent, "TOP", offsetX, offsetY)
-        end
+        local x, y = ns.AnchorToTop(self)
+        if x then NightsFarmtrackerDB.baitPos = { "TOP", x, y } end
     end)
 
     BaitFrame:SetScript("OnMouseUp", function(_, button)

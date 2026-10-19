@@ -1,13 +1,10 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Data Export
--- Builds a JSON export of the saved session history (every calendar
--- month or one chosen month, aggregated and categorized exactly like
--- Session History itself) and shows it in a copyable text window after a
--- month picker. Opened via Settings -> Data Export or "/nft export".
---
--- Feeds Nightwalker559's WoW Goldtracker web tool ("Beute" tab import) -
--- already-computed month/category/item gold values, no client-side
--- re-implementation of the addon's pricing/categorization logic needed.
+-- JSON export of the saved session history (all months or one chosen month),
+-- aggregated and categorized like Session History itself, shown in a copyable
+-- text window after a month picker. Opened via Settings -> Data Export or
+-- "/nft export". It feeds the author's WoW Goldtracker web tool ("Beute" tab
+-- import) with already computed gold values.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -59,7 +56,7 @@ end
 -- Build export data
 ------------------------------------------------------------------------
 -- Same per-item/category gold values Session History shows (see
--- BuildSessionCategories in Modules/History.lua) - only rows
+-- BuildSessionCategories in Core/Sessions.lua) - only rows
 -- with a non-zero gold value are ever added there, so no extra filtering
 -- needed here.
 local function BuildCategoriesList(agg)
@@ -100,7 +97,7 @@ end
 
 -- Aggregates every saved session into one virtual, non-persisted session
 -- per calendar month (same merge BuildMonthAggregate/the "/nft monthdump"
--- diagnostic use - see Modules/History.lua / Core/Main.lua),
+-- diagnostic use - see Modules/History.lua / Core/Sessions.lua),
 -- then runs each month through BuildCategoriesList. `onlyMonth` ("YYYY-MM")
 -- limits the export to that one month; nil exports every month.
 function ns.BuildFullExportJSON(onlyMonth)
@@ -141,7 +138,7 @@ end
 -- Export windows. Step 1: a month picker ("All months" + every month with
 -- saved sessions, newest first). Step 2: the copy-text window (shared
 -- helper, see ns.CreateCopyTextWindow/ns.ShowCopyText in
--- Core/Core.lua) with the JSON for the chosen selection.
+-- Core/Widgets.lua) with the JSON for the chosen selection.
 ------------------------------------------------------------------------
 local PICK_W, PICK_ROW_H, PICK_MAX_ROWS = 260, 22, 10
 
@@ -199,9 +196,7 @@ local function CreatePickRow(content)
     hl:SetAllPoints(); hl:SetColorTexture(unpack(ns.COL_CAT_BG)); hl:Hide()
     row.hl = hl
 
-    local sep = row:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1); sep:SetColorTexture(0.12, 0.22, 0.25, 0.5)
-    sep:SetPoint("BOTTOMLEFT"); sep:SetPoint("BOTTOMRIGHT")
+    ns.AddRowSeparator(row)
 
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     row.text:SetPoint("LEFT", 6, 0)

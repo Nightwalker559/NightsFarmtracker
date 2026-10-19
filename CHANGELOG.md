@@ -10,12 +10,15 @@
 ### Changed
 
 - Button icons redrawn as original artwork
+- Internal cleanup: smaller files, shared helpers (Filter and Blacklist are one window type), no behavior change
 
 ### Fixed
 
 - Session History detail window no longer overlaps the history window near the screen bottom
 - Session History month header stayed white after hovering it
 - Settings: reset link text was cut off; shorter label, button fits the text
+- Saved sessions with old name-keyed items were never migrated to item IDs
+- English: the junk merge setting called the row "Plunder" instead of "Trash"
 
 ## 1.7.7
 

@@ -7,7 +7,7 @@ local _, ns = ...
 
 
 StaticPopupDialogs["NFT_RELOAD"] = {
-    text        = ns.L and ns.L["reload_required"] or "Reload required.",
+    text        = ns.L["reload_required"],
     button1     = OKAY,
     button2     = CANCEL,
     OnAccept    = function() ReloadUI() end,
@@ -16,7 +16,7 @@ StaticPopupDialogs["NFT_RELOAD"] = {
     hideOnEscape = true,
 }
 StaticPopupDialogs["NFT_CONFIRM_HISTORY_COMPACT"] = {
-    text        = ns.L and ns.L["compact_history_confirm"] or "Merge all past months into one entry each? This cannot be undone.",
+    text        = ns.L["compact_history_confirm"],
     button1     = OKAY,
     button2     = CANCEL,
     OnAccept    = function()
@@ -40,7 +40,7 @@ function ns.ResetAddonToDefault()
 end
 
 StaticPopupDialogs["NFT_CONFIRM_RESET_ADDON"] = {
-    text        = ns.L and ns.L["reset_addon_confirm"] or "Reset the entire addon to default? This deletes ALL saved data (settings, session history, Vendor-Only filter, Blacklist) and cannot be undone. The UI will reload.",
+    text        = ns.L["reset_addon_confirm"],
     button1     = OKAY,
     button2     = CANCEL,
     OnAccept    = function() ns.ResetAddonToDefault() end,
@@ -194,7 +194,7 @@ StaticPopupDialogs["NFT_PROFILE_RENAME"] = ProfilePrompt("profile_rename_prompt"
         end
     end)
 StaticPopupDialogs["NFT_PROFILE_DELETE_CONFIRM"] = {
-    text         = ns.L and ns.L["profile_delete_confirm"] or "Delete profile \"%s\"? This cannot be undone.",
+    text         = ns.L["profile_delete_confirm"],
     button1      = OKAY,
     button2      = CANCEL,
     OnAccept     = function(_, name)
@@ -228,6 +228,47 @@ local maxHeightEB
 local profileDropdown
 local profileButtons
 local deleteProfileRow
+
+-- Single-instance widgets are built on first use, then only moved and shown.
+local function PlaceWidget(widget, make, y)
+    if not widget then widget = make(SListFrame, y) end
+    widget:SetParent(SListFrame)
+    widget:ClearAllPoints()
+    widget:SetPoint("TOPLEFT", S_PAD, y)
+    widget:Show()
+    return widget
+end
+
+local function MenuTextColor(row)
+    if row.isActive then row.txt:SetTextColor(1, 0.82, 0) else row.txt:SetTextColor(0.85, 0.85, 0.85) end
+end
+
+-- Fills a popup list with one clickable row per name (rows are reused).
+-- The row matching activeName is highlighted; onPick(name) runs on click.
+local function FillMenu(list, rows, names, rowH, activeName, onPick)
+    for _, row in ipairs(rows) do row:Hide() end
+    for i, name in ipairs(names) do
+        local row = rows[i]
+        if not row then
+            row = CreateFrame("Button", nil, list)
+            row:SetHeight(rowH)
+            row.txt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.txt:SetPoint("LEFT", 6, 0)
+            row:SetScript("OnEnter", function() row.txt:SetTextColor(1, 1, 1) end)
+            row:SetScript("OnLeave", function() MenuTextColor(row) end)
+            rows[i] = row
+        end
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 2, -2 - (i - 1) * rowH)
+        row:SetPoint("RIGHT", -2, 0)
+        row.txt:SetText(name)
+        row.isActive = (name == activeName)
+        MenuTextColor(row)
+        row:SetScript("OnClick", function() onPick(name) end)
+        row:Show()
+    end
+    list:SetHeight(2 + rowH * math.max(#names, 1) + 2)
+end
 
 -- Boxed dropdown header (label + expand arrow) shared by every dropdown below.
 local function MakeDropdownBox(parent, width)
@@ -786,39 +827,14 @@ local function MakeProfileDropdown(parent)
     profileMenuList = list
 
     local function RebuildList()
-        local names = ns.GetProfileList()
-        local active = ns.GetActiveProfileName()
-        for _, row in ipairs(profileMenuRows) do row:Hide() end
-        for i, name in ipairs(names) do
-            local row = profileMenuRows[i]
-            if not row then
-                row = CreateFrame("Button", nil, list)
-                row:SetHeight(PROFILE_ROW_H)
-                row.txt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                row.txt:SetPoint("LEFT", 6, 0)
-                row:SetScript("OnEnter", function() row.txt:SetTextColor(1,1,1) end)
-                row:SetScript("OnLeave", function()
-                    row.txt:SetTextColor(row.isActive and 1 or 0.85, row.isActive and 0.82 or 0.85, row.isActive and 0 or 0.85)
-                end)
-                profileMenuRows[i] = row
+        FillMenu(list, profileMenuRows, ns.GetProfileList(), PROFILE_ROW_H, ns.GetActiveProfileName(), function(name)
+            if name ~= ns.GetActiveProfileName() then
+                ns.SetActiveProfile(name)
+                ns.RebuildSettingsContent()
+                StaticPopup_Show("NFT_RELOAD")
             end
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", 2, -2 - (i-1)*PROFILE_ROW_H)
-            row:SetPoint("RIGHT", -2, 0)
-            row.txt:SetText(name)
-            row.isActive = (name == active)
-            row.txt:SetTextColor(row.isActive and 1 or 0.85, row.isActive and 0.82 or 0.85, row.isActive and 0 or 0.85)
-            row:SetScript("OnClick", function()
-                if name ~= ns.GetActiveProfileName() then
-                    ns.SetActiveProfile(name)
-                    ns.RebuildSettingsContent()
-                    StaticPopup_Show("NFT_RELOAD")
-                end
-                list:Hide()
-            end)
-            row:Show()
-        end
-        list:SetHeight(2 + PROFILE_ROW_H * #names + 2)
+            list:Hide()
+        end)
     end
 
     frame:EnableMouse(true)
@@ -913,32 +929,11 @@ local function MakeDeleteProfileRow(parent)
     end
 
     local function RebuildList()
-        local names = Candidates()
-        for _, row in ipairs(deleteMenuRows) do row:Hide() end
-        for i, name in ipairs(names) do
-            local row = deleteMenuRows[i]
-            if not row then
-                row = CreateFrame("Button", nil, list)
-                row:SetHeight(DELETE_ROW_H)
-                row.txt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                row.txt:SetPoint("LEFT", 6, 0)
-                row.txt:SetTextColor(0.85,0.85,0.85)
-                row:SetScript("OnEnter", function() row.txt:SetTextColor(1,1,1) end)
-                row:SetScript("OnLeave", function() row.txt:SetTextColor(0.85,0.85,0.85) end)
-                deleteMenuRows[i] = row
-            end
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", 2, -2 - (i-1)*DELETE_ROW_H)
-            row:SetPoint("RIGHT", -2, 0)
-            row.txt:SetText(name)
-            row:SetScript("OnClick", function()
-                frame.selected = name
-                UpdateLabel()
-                list:Hide()
-            end)
-            row:Show()
-        end
-        list:SetHeight(2 + DELETE_ROW_H * math.max(#names, 1) + 2)
+        FillMenu(list, deleteMenuRows, Candidates(), DELETE_ROW_H, nil, function(name)
+            frame.selected = name
+            UpdateLabel()
+            list:Hide()
+        end)
     end
 
     dd:EnableMouse(true)
@@ -1095,16 +1090,11 @@ local function ReleaseWrappedHint(fs)
 end
 
 ------------------------------------------------------------------------
--- Settings content (rebuilt on open / change)
--- All widgets are parented to SListFrame (the scroll child). Entries are
--- tracked with their "kind" so the next rebuild can release each one back
--- to its pool instead of leaking a fresh Frame/FontString every time -
--- radios, checkboxes and labels are all reused (see AcquireRadio/
--- AcquireCheckbox/AcquireSectionLabel/AcquireHintLabel above). The
--- persistent single-instance widgets (tsmDropdown, tsmCustomEB,
--- themeDropdown) are not pooled here - they already manage their own
--- reuse (create-once, reposition-and-show on every rebuild) and are
--- simply hidden between rebuilds like before.
+-- Settings content, rebuilt on open and on every change. All widgets are
+-- parented to SListFrame (the scroll child) and tracked with their "kind", so
+-- the next rebuild releases each one back to its pool instead of leaking
+-- frames. Single-instance widgets (tsmDropdown, tsmCustomEB, themeDropdown)
+-- are created once and only repositioned.
 ------------------------------------------------------------------------
 local settingsContent = {}
 
@@ -1224,6 +1214,48 @@ function ns.RebuildSettingsContent()
         sections[#sections + 1] = {titleKey = titleKey, title = ns.L[titleKey], builder = builder}
     end
 
+    -- Grey single-line hint label; the caller moves y down.
+    local function hintLabel(x, y, text, gray)
+        local fs = track(AcquireHintLabel(SListFrame), "hint")
+        fs:SetPoint("TOPLEFT", x, y)
+        fs:SetTextColor(gray, gray, gray)
+        fs:SetText(text)
+    end
+
+    -- Checkbox row at y; returns the y below it.
+    local function checkbox(y, labelKey, get, set)
+        ConfigureCheckbox(track(AcquireCheckbox(SListFrame), "checkbox"), ns.L[labelKey], y, get, set)
+        return y - 38
+    end
+
+    -- Checkbox bound to db[key]. With defaultOn an unset value counts as
+    -- checked. after(v) runs once the value is stored.
+    local function flag(y, labelKey, key, defaultOn, after)
+        return checkbox(y, labelKey,
+            function()
+                if defaultOn then return db[key] ~= false end
+                return db[key] == true
+            end,
+            function(v)
+                db[key] = v
+                if after then after(v) end
+            end)
+    end
+
+    -- Radio group, one row per { labelKey, value }; `after` is the space below
+    -- the last row. Returns the new y and the rows.
+    local function radioGroup(y, options, current, set, after)
+        local rows = {}
+        for i, opt in ipairs(options) do
+            local row = track(AcquireRadio(SListFrame), "radio")
+            ConfigureRadio(row, ns.L[opt[1]], y, opt[2], set)
+            row:SetSelected(current == opt[2]); row:SetEnabled(true)
+            rows[i] = row
+            y = y - (i < #options and 24 or after)
+        end
+        return y, rows
+    end
+
     -- ----------------------------------------------------------------
     -- Section: AH Price Source (includes the Gear AH Threshold sub-block,
     -- which has no header of its own and always follows this section)
@@ -1252,66 +1284,40 @@ function ns.RebuildSettingsContent()
             row:SetEnabled(opt.avail)
             y = y - 24
             if opt.value == "auto" and availableCount > 1 then
-                local infoLbl = track(AcquireHintLabel(SListFrame), "hint")
-                infoLbl:SetPoint("TOPLEFT", S_PAD + 22, y)
-                infoLbl:SetTextColor(0.38, 0.38, 0.38)
-                infoLbl:SetText(ns.L["ah_auto_info"])
+                hintLabel(S_PAD + 22, y, ns.L["ah_auto_info"], 0.38)
                 y = y - 16
             end
         end
 
-        -- Gear AH Threshold (below this vendor price, Equipment skips the
-        -- AH lookup and always uses vendor price; 0 = disabled)
+        -- Gear AH Threshold: below this price Equipment skips the AH lookup
+        -- and uses its vendor price (0 = off).
         y = y - 4
         local threshHint = wrappedHint(y, ns.L["gear_ah_threshold_hint"])
         y = y - math.max(28, math.ceil(threshHint:GetStringHeight()) + 6)
 
-        if not gearThresholdEB then
-            gearThresholdEB = MakeGearThresholdEB(SListFrame, y)
-        else
-            gearThresholdEB:SetPoint("TOPLEFT", S_PAD, y)
-            gearThresholdEB:Show()
-        end
+        gearThresholdEB = PlaceWidget(gearThresholdEB, MakeGearThresholdEB, y)
         local threshGold = math.floor((db.gearAHThreshold or 0) / 10000)
         gearThresholdEB.eb:SetText(threshGold > 0 and tostring(threshGold) or "")
         track(gearThresholdEB, "other")
         y = y - 32
 
-        local threshSoundRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(threshSoundRow, ns.L["gear_ah_threshold_sound"], y,
-            function() return db.gearAHThresholdSound == true end,
-            function(v) db.gearAHThresholdSound = v end)
-        y = y - 38
+        y = flag(y, "gear_ah_threshold_sound", "gearAHThresholdSound", false)
 
-        -- TSM source sub-block (only if TSM is installed) - a detail of the
-        -- AH source choice above, not a separate concern of its own.
+        -- TSM source block, only if TSM is installed.
         if ns.HasTSM() then
             y = y - 4
-            local hint = wrappedHint(y, ns.L["tsm_hint"])
+            wrappedHint(y, ns.L["tsm_hint"])
             y = y - 28
 
-            if not tsmDropdown then
-                tsmDropdown = MakeDropdown(SListFrame, y)
-            else
-                tsmDropdown:SetPoint("TOPLEFT", S_PAD, y)
-                tsmDropdown:Show()
-            end
+            tsmDropdown = PlaceWidget(tsmDropdown, MakeDropdown, y)
             tsmDropdown:Refresh()
             track(tsmDropdown, "other")
             y = y - 32
 
-            local customLbl = track(AcquireHintLabel(SListFrame), "hint")
-            customLbl:SetPoint("TOPLEFT", S_PAD, y)
-            customLbl:SetTextColor(0.50, 0.50, 0.50)
-            customLbl:SetText(ns.L["tsm_custom"])
+            hintLabel(S_PAD, y, ns.L["tsm_custom"], 0.50)
             y = y - 18
 
-            if not tsmCustomEB then
-                tsmCustomEB = MakeCustomSourceEB(SListFrame, y)
-            else
-                tsmCustomEB:SetPoint("TOPLEFT", S_PAD, y)
-                tsmCustomEB:Show()
-            end
+            tsmCustomEB = PlaceWidget(tsmCustomEB, MakeCustomSourceEB, y)
             tsmCustomEB.eb:SetText(db.tsmCustomSource or "")
             track(tsmCustomEB, "other")
             y = y - 32
@@ -1326,146 +1332,74 @@ function ns.RebuildSettingsContent()
     addSection("display", function(y)
         y = sectionTitle(y, "display", 26)
 
-        local function getRateMode() return db.goldRateMode=="min" and "min" or "hour" end
-        local rateRow1 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(rateRow1, ns.L["gold_per_hour"], y, "hour",
-            function(v) db.goldRateMode=v; ns.UpdateGoldRate() end)
-        rateRow1:SetSelected(getRateMode()=="hour"); rateRow1:SetEnabled(true)
-        y = y - 24
+        y = radioGroup(y, { {"gold_per_hour", "hour"}, {"gold_per_min", "min"} },
+            db.goldRateMode == "min" and "min" or "hour",
+            function(v) db.goldRateMode = v; ns.UpdateGoldRate() end, 32)
 
-        local rateRow2 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(rateRow2, ns.L["gold_per_min"], y, "min",
-            function(v) db.goldRateMode=v; ns.UpdateGoldRate() end)
-        rateRow2:SetSelected(getRateMode()=="min"); rateRow2:SetEnabled(true)
-        y = y - 32
-
-        -- Fixed session length (0 = off): timer counts down, session pauses at 0
+        -- Fixed session length (0 = off): the timer counts down and the
+        -- session pauses at 0.
         wrappedHint(y, ns.L["session_length_hint"])
         y = y - 28
 
-        if not sessionLengthEB then
-            sessionLengthEB = MakeSessionLengthEB(SListFrame, y)
-        else
-            sessionLengthEB:SetPoint("TOPLEFT", S_PAD, y)
-            sessionLengthEB:Show()
-        end
+        sessionLengthEB = PlaceWidget(sessionLengthEB, MakeSessionLengthEB, y)
         local lenMin = tonumber(db.sessionLength) or 0
         sessionLengthEB.eb:SetText(lenMin > 0 and tostring(lenMin) or "")
         track(sessionLengthEB, "other")
         y = y - 40
 
-        -- Max window height: windows grow up to this, then their lists scroll
+        -- Max window height: windows grow up to this, then their lists scroll.
         local heightHint = wrappedHint(y, string.format(ns.L["max_window_height_hint"],
             ns.DEFAULT_MAX_WINDOW_H, ns.MIN_MAX_WINDOW_H, ns.MAX_MAX_WINDOW_H))
         y = y - math.ceil(heightHint:GetStringHeight()) - 6
 
-        if not maxHeightEB then
-            maxHeightEB = MakeMaxHeightEB(SListFrame, y)
-        else
-            maxHeightEB:SetPoint("TOPLEFT", S_PAD, y)
-            maxHeightEB:Show()
-        end
+        maxHeightEB = PlaceWidget(maxHeightEB, MakeMaxHeightEB, y)
         maxHeightEB.eb:SetText(tostring(ns.GetMaxWindowH()))
         track(maxHeightEB, "other")
         y = y - 40
 
-        local function getGoldDisplay() return db.goldDisplayMode=="modern" and "modern" or "classic" end
-        local function setGoldDisplay(v) db.goldDisplayMode=v; ns.RefreshHUD() end
+        y = radioGroup(y, { {"gold_display_classic", "classic"}, {"gold_display_modern", "modern"} },
+            db.goldDisplayMode == "modern" and "modern" or "classic",
+            function(v) db.goldDisplayMode = v; ns.RefreshHUD() end, 28)
 
-        local gdRow1 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(gdRow1, ns.L["gold_display_classic"], y, "classic", setGoldDisplay)
-        gdRow1:SetSelected(getGoldDisplay()=="classic"); gdRow1:SetEnabled(true)
-        y = y - 24
-
-        local gdRow2 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(gdRow2, ns.L["gold_display_modern"], y, "modern", setGoldDisplay)
-        gdRow2:SetSelected(getGoldDisplay()=="modern"); gdRow2:SetEnabled(true)
-        y = y - 28
-
-        local srcRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(srcRow, ns.L["show_price_source"], y,
-            function() return db.showPriceSource == true end,
-            function(v)
-                db.showPriceSource = v
-                ns.RefreshHUD()
-            end)
-        y = y - 38
-
-        local mmRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(mmRow, ns.L["minimap_button"], y,
+        y = flag(y, "show_price_source", "showPriceSource", false, function() ns.RefreshHUD() end)
+        y = checkbox(y, "minimap_button",
             function() return not db.minimap.hide end,
             function(v) ns.SetMinimapVisible(v) end)
-        y = y - 38
-
-        local compRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(compRow, ns.L["compartment_button"], y,
+        y = checkbox(y, "compartment_button",
             function() return ns.IsInCompartment() end,
             function(v) ns.SetInCompartment(v) end)
-        y = y - 38
-
-        local logRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(logRow, ns.L["log_window_enabled"], y,
-            function() return db.logWindowEnabled == true end,
-            function(v)
-                db.logWindowEnabled = v
-                if not v then ns.OnLogWindowDisabled() end
-                ns.RefreshLeftButtons()
-            end)
-        y = y - 38
-
-        local lockoutRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(lockoutRow, ns.L["lockout_enabled"], y,
+        y = flag(y, "log_window_enabled", "logWindowEnabled", false, function(v)
+            if not v then ns.OnLogWindowDisabled() end
+            ns.RefreshLeftButtons()
+        end)
+        y = checkbox(y, "lockout_enabled",
             function() return db.instanceLockoutEnabled == true end,
             function(v) ns.SetInstanceLockoutEnabled(v) end)
-        y = y - 38
 
         return y
     end)
 
     -- ----------------------------------------------------------------
-    -- Section: Colors (theme, custom color, header gradient)
+    -- Section: Colors (theme, custom color, header gradient, button tint)
     -- ----------------------------------------------------------------
     addSection("sec_colors", function(y)
         y = sectionTitle(y, "sec_colors", 26)
 
-        if not themeDropdown then
-            themeDropdown = MakeThemeDropdown(SListFrame, y)
-        else
-            themeDropdown:SetPoint("TOPLEFT", S_PAD, y)
-            themeDropdown:Show()
-        end
+        themeDropdown = PlaceWidget(themeDropdown, MakeThemeDropdown, y)
         themeDropdown:Refresh()
         track(themeDropdown, "other")
         y = y - 32
 
-        if not customColorRow then
-            customColorRow = MakeCustomColorRow(SListFrame, themeDropdown)
-        end
-        customColorRow:ClearAllPoints()
-        customColorRow:SetPoint("TOPLEFT", S_PAD, y)
-        customColorRow:Show()
+        customColorRow = PlaceWidget(customColorRow, function(parent) return MakeCustomColorRow(parent, themeDropdown) end, y)
         customColorRow:Refresh()
         track(customColorRow, "other")
         y = y - 52
 
-        local gradRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(gradRow, ns.L["header_gradient"], y,
-            function() return db.headerGradient == true end,
-            function(v)
-                db.headerGradient = v
-                customColorRow:Refresh()
-                StaticPopup_Show("NFT_RELOAD")
-            end)
-        y = y - 38
-
-        local btnRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(btnRow, ns.L["themed_buttons"], y,
-            function() return db.themedButtons == true end,
-            function(v)
-                db.themedButtons = v
-                ns.RefreshButtonTint()
-            end)
-        y = y - 38
+        y = flag(y, "header_gradient", "headerGradient", false, function()
+            customColorRow:Refresh()
+            StaticPopup_Show("NFT_RELOAD")
+        end)
+        y = flag(y, "themed_buttons", "themedButtons", false, function() ns.RefreshButtonTint() end)
 
         return y
     end)
@@ -1476,37 +1410,19 @@ function ns.RebuildSettingsContent()
     addSection("sec_profiles", function(y)
         y = sectionTitle(y, "sec_profiles", 26)
 
-        if not profileDropdown then
-            profileDropdown = MakeProfileDropdown(SListFrame)
-        end
-        profileDropdown:ClearAllPoints()
-        profileDropdown:SetPoint("TOPLEFT", S_PAD, y)
-        profileDropdown:Show()
+        profileDropdown = PlaceWidget(profileDropdown, MakeProfileDropdown, y)
         profileDropdown:Refresh()
         track(profileDropdown, "other")
         y = y - 30
 
-        if not profileButtons then
-            profileButtons = MakeProfileButtons(SListFrame)
-        end
-        profileButtons:ClearAllPoints()
-        profileButtons:SetPoint("TOPLEFT", S_PAD, y)
-        profileButtons:Show()
+        profileButtons = PlaceWidget(profileButtons, MakeProfileButtons, y)
         track(profileButtons, "other")
         y = y - 30
 
-        local delHint = track(AcquireHintLabel(SListFrame), "hint")
-        delHint:SetPoint("TOPLEFT", S_PAD, y)
-        delHint:SetTextColor(0.50, 0.50, 0.50)
-        delHint:SetText(ns.L["profile_delete_hint"])
+        hintLabel(S_PAD, y, ns.L["profile_delete_hint"], 0.50)
         y = y - 18
 
-        if not deleteProfileRow then
-            deleteProfileRow = MakeDeleteProfileRow(SListFrame)
-        end
-        deleteProfileRow:ClearAllPoints()
-        deleteProfileRow:SetPoint("TOPLEFT", S_PAD, y)
-        deleteProfileRow:Show()
+        deleteProfileRow = PlaceWidget(deleteProfileRow, MakeDeleteProfileRow, y)
         deleteProfileRow:Refresh()
         track(deleteProfileRow, "other")
         y = y - 30
@@ -1520,49 +1436,25 @@ function ns.RebuildSettingsContent()
     addSection("session_history", function(y)
         y = sectionTitle(y, "session_history", 26)
 
-        local histRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(histRow, ns.L["session_history_enabled"], y,
-            function() return db.sessionHistoryEnabled ~= false end,
-            function(v)
-                db.sessionHistoryEnabled = v
-                ns.RefreshLeftButtons()
-            end)
-        y = y - 38
+        y = flag(y, "session_history_enabled", "sessionHistoryEnabled", true, function() ns.RefreshLeftButtons() end)
 
-        local histModeLbl = track(AcquireHintLabel(SListFrame), "hint")
-        histModeLbl:SetPoint("TOPLEFT", S_PAD, y)
-        histModeLbl:SetTextColor(0.6, 0.6, 0.6)
-        histModeLbl:SetText(ns.L["session_history_mode"])
+        hintLabel(S_PAD, y, ns.L["session_history_mode"], 0.6)
         y = y - 18
 
         local function getHistMode() return db.sessionHistoryMode == "compact" and "compact" or "full" end
-
-        local histModeRow1 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(histModeRow1, ns.L["session_history_mode_full"], y, "full",
-            function(v) db.sessionHistoryMode = v end)
-        histModeRow1:SetSelected(getHistMode()=="full"); histModeRow1:SetEnabled(true)
-        y = y - 24
-
-        -- "compact" folds past months irreversibly, so route it through a
-        -- confirmation popup instead of ConfigureRadio's default instant-set
-        -- OnMouseUp behavior (replaced right below).
-        local histModeRow2 = track(AcquireRadio(SListFrame), "radio")
-        ConfigureRadio(histModeRow2, ns.L["session_history_mode_compact"], y, "compact")
-        histModeRow2:SetScript("OnMouseUp", function()
+        local rows
+        y, rows = radioGroup(y,
+            { {"session_history_mode_full", "full"}, {"session_history_mode_compact", "compact"} },
+            getHistMode(), function(v) db.sessionHistoryMode = v end, 30)
+        -- "compact" folds past months irreversibly: ask first instead of
+        -- switching on click.
+        rows[2]:SetScript("OnMouseUp", function()
             if getHistMode() ~= "compact" then
                 StaticPopup_Show("NFT_CONFIRM_HISTORY_COMPACT")
             end
         end)
-        histModeRow2:SetSelected(getHistMode()=="compact"); histModeRow2:SetEnabled(true)
-        y = y - 30
 
-        local mergeRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(mergeRow, ns.L["merge_daily_sessions"], y,
-            function() return db.mergeDaily ~= false end,
-            function(v)
-                db.mergeDaily = v
-            end)
-        y = y - 38
+        y = flag(y, "merge_daily_sessions", "mergeDaily", true)
 
         return y
     end)
@@ -1573,32 +1465,9 @@ function ns.RebuildSettingsContent()
     addSection("sec_categories", function(y)
         y = sectionTitle(y, "sec_categories", 26)
 
-        local splitRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(splitRow, ns.L["split_trade_goods"], y,
-            function() return db.splitTradeGoods == true end,
-            function(v)
-                db.splitTradeGoods = v
-                ns.RefreshHUD()
-            end)
-        y = y - 38
-
-        local splitGearRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(splitGearRow, ns.L["split_gear_by_binding"], y,
-            function() return db.splitGearByBinding == true end,
-            function(v)
-                db.splitGearByBinding = v
-                ns.RefreshHUD()
-            end)
-        y = y - 38
-
-        local mergeJunkRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(mergeJunkRow, ns.L["merge_junk_entries"], y,
-            function() return db.mergeJunkEntries == true end,
-            function(v)
-                db.mergeJunkEntries = v
-                StaticPopup_Show("NFT_RELOAD")
-            end)
-        y = y - 38
+        y = flag(y, "split_trade_goods", "splitTradeGoods", false, function() ns.RefreshHUD() end)
+        y = flag(y, "split_gear_by_binding", "splitGearByBinding", false, function() ns.RefreshHUD() end)
+        y = flag(y, "merge_junk_entries", "mergeJunkEntries", false, function() StaticPopup_Show("NFT_RELOAD") end)
 
         return y
     end)
@@ -1609,25 +1478,9 @@ function ns.RebuildSettingsContent()
     addSection("sec_filters", function(y)
         y = sectionTitle(y, "sec_filters", 26)
 
-        local filterRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(filterRow, ns.L["vendor_filter_enabled"], y,
-            function() return db.vendorFilterEnabled ~= false end,
-            function(v)
-                db.vendorFilterEnabled = v
-                ns.RefreshLeftButtons()
-                ns.RefreshHUD()
-            end)
-        y = y - 38
-
-        local blacklistRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(blacklistRow, ns.L["blacklist_enabled"], y,
-            function() return db.blacklistEnabled ~= false end,
-            function(v)
-                db.blacklistEnabled = v
-                ns.RefreshLeftButtons()
-                ns.RefreshHUD()
-            end)
-        y = y - 38
+        local function filterChanged() ns.RefreshLeftButtons(); ns.RefreshHUD() end
+        y = flag(y, "vendor_filter_enabled", "vendorFilterEnabled", true, filterChanged)
+        y = flag(y, "blacklist_enabled", "blacklistEnabled", true, filterChanged)
 
         return y
     end)
@@ -1638,17 +1491,12 @@ function ns.RebuildSettingsContent()
     addSection("sec_fishing", function(y)
         y = sectionTitle(y, "sec_fishing", 26)
 
-        local venomRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(venomRow, ns.L["venom_tracker_enabled"], y,
+        y = checkbox(y, "venom_tracker_enabled",
             function() return db.venomTrackerEnabled == true end,
             function(v) ns.SetVenomTrackerEnabled(v) end)
-        y = y - 38
-
-        local baitRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(baitRow, ns.L["bait_frame_enabled"], y,
+        y = checkbox(y, "bait_frame_enabled",
             function() return db.baitFrameEnabled == true end,
             function(v) ns.SetBaitFrameEnabled(v) end)
-        y = y - 38
 
         return y
     end)
@@ -1659,11 +1507,9 @@ function ns.RebuildSettingsContent()
     addSection("sec_hud", function(y)
         y = sectionTitle(y, "sec_hud", 26)
 
-        local hudRow = track(AcquireCheckbox(SListFrame), "checkbox")
-        ConfigureCheckbox(hudRow, ns.L["hud_enabled"], y,
+        y = checkbox(y, "hud_enabled",
             function() return db.hudEnabled == true end,
             function(v) ns.SetHudEnabled(v) end)
-        y = y - 38
 
         local hudHint = wrappedHint(y, ns.L["hud_keybind_hint"])
         y = y - math.ceil(hudHint:GetStringHeight()) - 10
@@ -1681,13 +1527,7 @@ function ns.RebuildSettingsContent()
         -- Button sits 2 px below the (wrapped) hint, however many lines it takes.
         y = y - math.ceil(exportHint:GetStringHeight()) - 2
 
-        if not exportBtn then
-            exportBtn = MakeExportButton(SListFrame)
-        else
-            exportBtn:SetParent(SListFrame)
-            exportBtn:Show()
-        end
-        exportBtn:SetPoint("TOPLEFT", S_PAD, y)
+        exportBtn = PlaceWidget(exportBtn, MakeExportButton, y)
         track(exportBtn, "other")
         y = y - 30
 
@@ -1778,15 +1618,7 @@ local function EnsureSettingsFrame()
     SListFrame:EnableMouseWheel(true)
     SListFrame:SetScript("OnMouseWheel", OnWheel)
 
-    local resetBtn = CreateFrame("Button", nil, SF)
-    resetBtn:SetHeight(18); resetBtn:SetPoint("BOTTOMRIGHT",-S_PAD,6)
-    local resetLabel = resetBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    resetLabel:SetPoint("RIGHT"); resetLabel:SetJustifyH("RIGHT"); resetLabel:SetText(ns.L["reset_addon"])
-    resetBtn:SetWidth(math.ceil(resetLabel:GetStringWidth()) + 6)  -- fit the label, whatever the language
-    resetLabel:SetTextColor(0.50,0.22,0.22)
-    resetBtn:SetScript("OnClick", function() StaticPopup_Show("NFT_CONFIRM_RESET_ADDON") end)
-    resetBtn:SetScript("OnEnter", function() resetLabel:SetTextColor(1,0.4,0.4) end)
-    resetBtn:SetScript("OnLeave", function() resetLabel:SetTextColor(0.50,0.22,0.22) end)
+    ns.CreateDangerLink(SF, S_PAD, ns.L["reset_addon"], function() StaticPopup_Show("NFT_CONFIRM_RESET_ADDON") end)
 end
 
 ------------------------------------------------------------------------

@@ -88,17 +88,8 @@ local function EnsureVenomFrame()
     VenomFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
     VenomFrame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        -- Normalize to a "TOP"/UIParent anchor (same approach as MainFrame)
-        -- so the saved position stays independent of MainFrame afterwards.
-        local top, left, right = self:GetTop(), self:GetLeft(), self:GetRight()
-        local uiTop, uiWidth    = UIParent:GetTop(), UIParent:GetWidth()
-        if top and left and right and uiTop and uiWidth then
-            local offsetY = top - uiTop
-            local offsetX = (left + right) / 2 - uiWidth / 2
-            NightsFarmtrackerDB.venomPos = { "TOP", offsetX, offsetY }
-            self:ClearAllPoints()
-            self:SetPoint("TOP", UIParent, "TOP", offsetX, offsetY)
-        end
+        local x, y = ns.AnchorToTop(self)
+        if x then NightsFarmtrackerDB.venomPos = { "TOP", x, y } end
     end)
 
     VenomFrame:SetScript("OnMouseUp", function(_, button)

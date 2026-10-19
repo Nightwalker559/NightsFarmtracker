@@ -49,21 +49,8 @@ MainFrame:RegisterForDrag("LeftButton")
 MainFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
 MainFrame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
-    -- WoW's drag mechanism does not preserve the original anchor point type -
-    -- StopMovingOrSizing()/GetPoint() can return a different point (e.g.
-    -- "RIGHT", which is vertically centered) depending on where the frame
-    -- ends up. A "RIGHT" anchor would make height changes grow symmetrically
-    -- up/down again, so always normalize back to a "TOP" anchor here.
-    local top      = self:GetTop()
-    local left     = self:GetLeft()
-    local right    = self:GetRight()
-    local uiTop    = UIParent:GetTop()
-    local uiWidth  = UIParent:GetWidth()
-    local offsetY  = top - uiTop
-    local offsetX  = (left + right) / 2 - uiWidth / 2
-    NightsFarmtrackerDB.pos = {"TOP", "TOP", offsetX, offsetY}
-    self:ClearAllPoints()
-    self:SetPoint("TOP", UIParent, "TOP", offsetX, offsetY)
+    local x, y = ns.AnchorToTop(self)
+    if x then NightsFarmtrackerDB.pos = {"TOP", "TOP", x, y} end
 end)
 ns.MainFrame = MainFrame
 
@@ -547,11 +534,7 @@ local function AcquireRow()
         if GameTooltip:GetOwner()==self then GameTooltip:Hide() end
     end)
 
-    row.sep = row:CreateTexture(nil,"ARTWORK")
-    row.sep:SetHeight(1)
-    row.sep:SetColorTexture(0.12,0.22,0.25,0.5)
-    row.sep:SetPoint("BOTTOMLEFT",  row,"BOTTOMLEFT",  0, 0)
-    row.sep:SetPoint("BOTTOMRIGHT", row,"BOTTOMRIGHT", 0, 0)
+    ns.AddRowSeparator(row)
 
     -- Category header only: proper top+bottom border (matches the
     -- Filter/Blacklist/History header style) instead of relying on the
@@ -569,15 +552,7 @@ local function AcquireRow()
     row.catBottomSep:SetPoint("BOTTOMLEFT"); row.catBottomSep:SetPoint("BOTTOMRIGHT")
     row.catBottomSep:Hide()
 
-    row.icon = row:CreateTexture(nil,"ARTWORK")
-    row.icon:SetSize(ICON_SIZE, ICON_SIZE)
-    row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-    row.iconBorder = row:CreateTexture(nil,"BACKGROUND")
-    row.iconBorder:SetPoint("TOPLEFT",     row.icon,"TOPLEFT",     -1,  1)
-    row.iconBorder:SetPoint("BOTTOMRIGHT", row.icon,"BOTTOMRIGHT",  1, -1)
-    row.iconBorder:Hide()
-
+    ns.AddRowIcon(row)
     row.rankBadge = ns.CreateIconBadge(row, row.icon)
 
     -- Single-line layout: all y=0 → vertically centered with icon
@@ -668,286 +643,280 @@ end
 ------------------------------------------------------------------------
 -- RefreshHUD
 -- BuildHUD rebuilds the whole item list (every row, price lookup and sort).
--- Callers ask for a refresh on every loot event, every settings click and
--- again 2 s after each drop, so a loot burst (AoE loot, mailbox, bank
--- withdraw) used to rebuild the list dozens of times back to back.
--- ns.RefreshHUD only queues one rebuild for the next frame; any number of
--- requests inside the same frame collapse into it.
+-- It is requested on every loot event, every settings click and again 2 s
+-- after each drop, so ns.RefreshHUD only queues one rebuild for the next frame
+-- and any number of requests within a frame collapse into it.
 ------------------------------------------------------------------------
+local function ItemSort(a, b)
+    if a.gold ~= b.gold then return a.gold > b.gold end
+    if a.data.amount ~= b.data.amount then return a.data.amount > b.data.amount end
+    return a.name < b.name
+end
+
+-- Groups db.count into categories ({ items, totalGold, classID }) and returns
+-- them with the grand total. Quest items (never sellable) and items
+-- blacklisted after they were looted are dropped from the live count too.
+local function CollectCategories(db)
+    local cats, grandTotal = {}, 0
+    for itemID, data in pairs(db.count) do
+        if data.classID == ns.QUEST_CLASS
+           or ns.IsBlacklisted(data.itemID) or ns.IsBlacklistCategory(data) then
+            db.count[itemID] = nil
+        else
+            local cat = ns.CategoryName(data)
+            if not cats[cat] then cats[cat] = {items = {}, totalGold = 0, classID = data.classID} end
+            local c         = cats[cat]
+            local vendorRaw = ns.VendorTotal(data)
+            local ahRaw     = ns.AHTotal(data)
+            local gold      = ns.ItemValue(data, vendorRaw, ahRaw) or 0
+            c.items[#c.items + 1] = {name = data.name, itemID = itemID, data = data, gold = gold,
+                                     vendor = vendorRaw or 0, ah = ahRaw or 0}
+            c.totalGold = c.totalGold + gold
+            grandTotal  = grandTotal + gold
+        end
+    end
+    return cats, grandTotal
+end
+
+-- Junk shows as one "Plunder" row from the very first junk item. Display
+-- only: db.count is untouched, so switching the setting off restores the
+-- per-item list at once.
+local function MergeJunkCategories(cats)
+    for catName, cat in pairs(cats) do
+        if ns.IsJunkCategory(catName) and #cat.items >= 1 then
+            local totalAmount = 0
+            for _, it in ipairs(cat.items) do
+                totalAmount = totalAmount + (it.data.amount or 0)
+            end
+            local merged = ns.JunkMergedRecord(totalAmount, cat.totalGold)
+            cat.items = { {
+                name = merged.name, itemID = "NFT_JUNK_MERGED",
+                data = merged, gold = cat.totalGold,
+                vendor = cat.totalGold, ah = 0,
+            } }
+        end
+    end
+end
+
+-- Valuable-gear sound: independent of category collapse and Junk merging. It
+-- checks the displayed (itemLevel, quality) groups (GroupGearVariantsForDisplay),
+-- because identical-looking rolls can carry different hidden bonus IDs and no
+-- single raw bucket would reach the threshold. It fires once per new copy of a
+-- group whose per-unit AH price reaches the Gear AH Threshold;
+-- thresholdNotifiedCounts remembers the last amount checked per group, so a
+-- second drop alerts again.
+local function PlayGearThresholdSound(db, hasAH)
+    if not (db.gearAHThresholdSound and hasAH) then return end
+    local threshold = db.gearAHThreshold or 0
+    if threshold <= 0 then return end
+    for _, data in pairs(db.count) do
+        if data.variants and ns.IsGearThresholdApplicable(data) and not ns.IsVendorOnly(data) then
+            data.thresholdNotifiedCounts = data.thresholdNotifiedCounts or {}
+            for gKey, gv in pairs(ns.GroupGearVariantsForDisplay(data.variants)) do
+                local prevCount = data.thresholdNotifiedCounts[gKey] or 0
+                if gv.amount > prevCount then
+                    local ap = ns.GetAHPriceForID(data.itemID, gv.itemLink)
+                    if ap and ap >= threshold then
+                        ns.PlayThresholdAlertSound()
+                    end
+                    data.thresholdNotifiedCounts[gKey] = gv.amount
+                end
+            end
+        end
+    end
+end
+
+-- Category header row; returns it so an empty category can be dropped again.
+local function PlaceCategoryHeader(catName, cat, isCollapsed, yOffset)
+    local hdr = AcquireRow()
+    hdr:SetSize(CONTENT_W, CAT_ROW_H)
+    PlaceRow(hdr, yOffset, catName, nil, ns.COL_ACCENT)
+    hdr.icon:Hide(); hdr.iconBorder:Hide()
+    hdr.countText:SetText("")
+    hdr.isCategoryHeader = true; hdr.categoryName = catName
+    hdr.catBg:Show()
+    hdr.catTopSep:Show(); hdr.catBottomSep:Show()
+    hdr.sep:Hide()
+    hdr.nameText:ClearAllPoints()
+    hdr.nameText:SetPoint("LEFT",  4, 0)
+    hdr.nameText:SetPoint("RIGHT", hdr, "RIGHT", -100, 0)
+    hdr.nameText:SetText((isCollapsed and "+ " or "- ") .. catName)
+    hdr.nameText:SetFontHeight(ns.FONT_NORMAL)
+    hdr.goldText:ClearAllPoints()
+    -- same right edge as the item amounts below (they leave room for the AH/V tag)
+    hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", NightsFarmtrackerDB.showPriceSource and (-4 - SRC_SHIFT) or -4, 0)
+    hdr.goldText:SetFontHeight(ns.FONT_NORMAL)
+    hdr.goldText:SetText(cat.totalGold > 0 and ns.FormatGold(cat.totalGold) or "")
+    return hdr
+end
+
+-- Reagent items: one entry per quality tier that has a value.
+local function AddTierEntries(flat, item, hasAH, fv, qAtlas)
+    local d = item.data
+    for tier = 1, 3 do
+        local gv = d.variants[tier]
+        local tc = gv and gv.amount or 0
+        local tid = gv and gv.priceItemID
+        if tc > 0 then
+            local tAH, tV
+            if tid then
+                local ap = ns.GetAHPriceForID(tid)
+                if ap then tAH = ap * tc end
+            end
+            if gv.sellPrice and gv.sellPrice > 0 then tV = gv.sellPrice * tc end
+            local tGold = fv and (tV or 0) or math.max(tAH or 0, tV or 0)
+            if tGold > 0 then
+                local rankIcon = qAtlas[tier]
+                              and CreateAtlasMarkup(qAtlas[tier], ns.RANK_ICON_W, ns.RANK_ICON_H)
+                              or ("|cffaaaaaa R" .. tier .. "|r")
+                flat[#flat + 1] = {
+                    isRank = true, name = item.name, d = d,
+                    tier = tier, tid = tid, tc = tc,
+                    tAH = tAH, tV = tV, tGold = tGold,
+                    rankIcon = rankIcon, fv = fv,
+                }
+            end
+        end
+    end
+end
+
+-- Scaling gear: one entry per displayed (itemLevel, quality) group, so
+-- amounts and prices of different rolls don't mix.
+local function AddGearEntries(flat, item, hasAH)
+    local d = item.data
+    for ilvl, gv in pairs(ns.GroupGearVariantsForDisplay(d.variants)) do
+        if gv.amount > 0 then
+            local sp  = ns.VariantSellPrice(gv, d)
+            local tV  = (sp and sp > 0) and (sp * gv.amount) or nil
+            local ap  = hasAH and ns.GetAHPriceForID(d.itemID, gv.itemLink) or nil
+            local tAH = ap and (ap * gv.amount) or nil
+            -- Decided per variant, not from the item's combined AH total: one
+            -- variant crossing the Gear AH Threshold must not force AH pricing
+            -- onto a cheaper sibling below it.
+            local vfv   = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, tAH)
+            local tGold = vfv and (tV or 0) or math.max(tAH or 0, tV or 0)
+            if tGold > 0 then
+                flat[#flat + 1] = {
+                    isGearVariant = true, name = item.name, d = d,
+                    ilvl = ilvl, gv = gv, tV = tV, tAH = tAH, tGold = tGold, fv = vfv,
+                }
+            end
+        end
+    end
+end
+
+-- Display entries of one category, by gold descending.
+local function BuildFlatList(cat, hasAH, qAtlas)
+    local flat = {}
+    for _, item in ipairs(cat.items) do
+        local d = item.data
+        local fv = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, item.ah)
+        if d.variants and not ns.IsGear(d) then
+            AddTierEntries(flat, item, hasAH, fv, qAtlas)
+        elseif d.variants then
+            AddGearEntries(flat, item, hasAH)
+        else
+            local gold = fv and (item.vendor or 0) or math.max(item.ah or 0, item.vendor or 0)
+            flat[#flat + 1] = {isRank = false, name = item.name, d = d, item = item, gold = gold, fv = fv}
+        end
+    end
+    table.sort(flat, function(a, b)
+        local ga = (a.isRank or a.isGearVariant) and a.tGold or a.gold
+        local gb = (b.isRank or b.isGearVariant) and b.tGold or b.gold
+        if ga ~= gb then return ga > gb end
+        return a.name < b.name
+    end)
+    return flat
+end
+
+local function RenderFlatRow(fi, yOffset)
+    local row = AcquireRow()
+    local d = fi.d
+    row.sep:SetShown(yOffset > 0)
+    row.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
+    row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); row.icon:Show()
+    row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", 4 + CAT_INDENT, 0)
+    row:SetPoint("TOPLEFT", 0, -yOffset)
+    ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality, {1, 1, 1})
+    row.nameText:ClearAllPoints()
+    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
+    row.nameText:SetPoint("RIGHT", row,      "RIGHT", -108, 0)
+
+    if fi.isRank then
+        local key = tostring(d.itemID) .. "_q" .. fi.tier
+        row.itemName = fi.name; row.itemID = fi.tid; row.itemLink = nil; row.baseItemID = d.itemID
+        row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, fi.tid)))
+        row.rankBadge:SetText(fi.rankIcon or "")
+        row.countText:SetText(tostring(fi.tc))
+        ShowGold(row, fi.tAH, fi.tV, fi.fv)
+        itemOrder[#itemOrder + 1] = key; itemRows[key] = row
+    elseif fi.isGearVariant then
+        local gv  = fi.gv
+        local key = tostring(d.itemID) .. "_g" .. tostring(fi.ilvl)
+        row.itemName = fi.name; row.itemID = d.itemID; row.itemLink = gv.itemLink; row.baseItemID = d.itemID
+        row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, gv.itemLink or d.itemID)))
+        row.rankBadge:SetText("")
+        row.countText:SetText(tostring(gv.amount))
+        ShowGold(row, fi.tAH, fi.tV, fi.fv)
+        itemOrder[#itemOrder + 1] = key; itemRows[key] = row
+    else
+        local it = fi.item
+        row.isJunkMerged = d.isJunkMerged
+        row.itemName = fi.name
+        if d.isJunkMerged then
+            row.itemID, row.itemLink, row.baseItemID = nil, nil, nil
+        else
+            row.itemID, row.itemLink, row.baseItemID = d.itemID, d.itemLink, d.itemID
+        end
+        row.nameText:SetText(d.isJunkMerged and ns.TruncateName(fi.name) or ns.TruncateName(ns.DisplayName(fi.name, d.itemID)))
+        row.rankBadge:SetText(ns.RankIconFromLink(d.itemLink) or "")
+        row.countText:SetText(tostring(d.amount))
+        ShowGold(row, it.ah, it.vendor, fi.fv)
+        itemOrder[#itemOrder + 1] = it.itemID; itemRows[it.itemID] = row
+    end
+end
+
 local function BuildHUD()
     local savedScroll = ScrollFrame:GetVerticalScroll()
     for _, row in pairs(itemRows) do ReleaseRow(row) end
     itemRows, itemOrder = {}, {}
 
-    local db     = NightsFarmtrackerDB
-    local cats   = {}
-    local grandTotal = 0
-
-    for itemID, data in pairs(db.count) do
-        if data.classID == ns.QUEST_CLASS then
-            -- Quest items are never sellable - drop any entry tracked before this fix existed
-            db.count[itemID] = nil
-        elseif ns.IsBlacklisted(data.itemID) or ns.IsBlacklistCategory(data) then
-            -- Blacklisted after being looted this session - drop it from the live count too,
-            -- not just from future loot (RefreshHUD runs right after Add/RemoveBlacklist).
-            db.count[itemID] = nil
-        else
-            local cat = ns.CategoryName(data)
-            if not cats[cat] then cats[cat]={items={},totalGold=0,classID=data.classID} end
-            local c         = cats[cat]
-            local vendorRaw = ns.VendorTotal(data)
-            local ahRaw     = ns.AHTotal(data)
-            local vendor    = vendorRaw or 0
-            local ah        = ahRaw     or 0
-            local gold      = ns.ItemValue(data, vendorRaw, ahRaw) or 0
-            c.items[#c.items+1] = {name=data.name,itemID=itemID,data=data,gold=gold,vendor=vendor,ah=ah}
-            c.totalGold   = c.totalGold   + gold
-            grandTotal    = grandTotal    + gold
-        end
-    end
-
-    -- Merge Junk into a single "Plunder" row (display-only - db.count
-    -- itself is untouched, so turning the setting back off restores the
-    -- normal per-item list immediately without any reload).
-    -- Applies from the very first Junk item, not just once a 2nd distinct
-    -- item shows up - otherwise the first item stays shown with its real
-    -- name/icon until something else drops.
-    if NightsFarmtrackerDB.mergeJunkEntries then
-        for catName, cat in pairs(cats) do
-            if ns.IsJunkCategory(catName) and #cat.items >= 1 then
-                local totalAmount = 0
-                for _, it in ipairs(cat.items) do
-                    totalAmount = totalAmount + (it.data.amount or 0)
-                end
-                local merged = ns.JunkMergedRecord(totalAmount, cat.totalGold)
-                cat.items = { {
-                    name = merged.name, itemID = "NFT_JUNK_MERGED",
-                    data = merged, gold = cat.totalGold,
-                    vendor = cat.totalGold, ah = 0,
-                } }
-            end
-        end
-    end
-
-    for _, cat in pairs(cats) do
-        table.sort(cat.items, function(a,b)
-            if a.gold ~= b.gold then return a.gold > b.gold end
-            if a.data.amount ~= b.data.amount then return a.data.amount > b.data.amount end
-            return a.name < b.name
-        end)
-    end
-
-    local sorted = {}
-    for catName, cat in pairs(cats) do sorted[#sorted+1]={name=catName,cat=cat} end
+    local db = NightsFarmtrackerDB
+    local cats, grandTotal = CollectCategories(db)
+    if db.mergeJunkEntries then MergeJunkCategories(cats) end
+    for _, cat in pairs(cats) do table.sort(cat.items, ItemSort) end
 
     -- With no AH source (or "none" selected) every item is valued at vendor price
     local hasAH = ns.HasAnyAH() and db.ahSource ~= "none"
-
-    -- Valuable-gear sound alert: runs independently of category collapse
-    -- state (a collapsed "Equipment" category must not silently suppress
-    -- it) and independently of Junk-merge display grouping. Checked via
-    -- ns.GroupGearVariantsForDisplay, same grouping the item's row itself
-    -- uses (see the flat-list build below). Checking raw per-bonus-ID
-    -- variants instead (as before) under-notified: Adventurer's/scaling
-    -- gear can bake a hidden per-drop bonus-ID component into otherwise
-    -- identical rolls, so a second pickup of what looks like the same item
-    -- landed in its own raw bucket that alone never reached the threshold,
-    -- even though the combined, displayed value did.
-    --
-    -- Fires once per NEW copy added to a DISPLAYED (itemLevel, quality)
-    -- group whose per-unit AH price alone reaches the Gear AH Threshold -
-    -- tracked via thresholdNotifiedCounts (last amount already checked per
-    -- group), so a 2nd/3rd drop of the same valuable item re-alerts instead
-    -- of staying silent after the group's first drop already notified once.
-    if db.gearAHThresholdSound and hasAH then
-        local threshold = db.gearAHThreshold or 0
-        if threshold > 0 then
-            for _, data in pairs(db.count) do
-                if data.variants and ns.IsGearThresholdApplicable(data) and not ns.IsVendorOnly(data) then
-                    data.thresholdNotifiedCounts = data.thresholdNotifiedCounts or {}
-                    for gKey, gv in pairs(ns.GroupGearVariantsForDisplay(data.variants)) do
-                        local prevCount = data.thresholdNotifiedCounts[gKey] or 0
-                        if gv.amount > prevCount then
-                            local ap = ns.GetAHPriceForID(data.itemID, gv.itemLink)
-                            if ap and ap >= threshold then
-                                ns.PlayThresholdAlertSound()
-                            end
-                            data.thresholdNotifiedCounts[gKey] = gv.amount
-                        end
-                    end
-                end
-            end
-        end
-    end
+    PlayGearThresholdSound(db, hasAH)
 
     -- Categories by total gold (the sum of ns.ItemValue, matching the overall
     -- total), ties by item class priority.
-    table.sort(sorted, function(a,b)
+    local sorted = {}
+    for catName, cat in pairs(cats) do sorted[#sorted + 1] = {name = catName, cat = cat} end
+    table.sort(sorted, function(a, b)
         if a.cat.totalGold ~= b.cat.totalGold then return a.cat.totalGold > b.cat.totalGold end
         local oa = (a.cat.classID and ns.CLASS_PRIORITY[a.cat.classID]) or 50
         local ob = (b.cat.classID and ns.CLASS_PRIORITY[b.cat.classID]) or 50
         return oa < ob
     end)
+
     local yOffset = 0
-
     for _, entry in ipairs(sorted) do
-        local catName     = entry.name
-        local cat         = entry.cat
+        local catName, cat = entry.name, entry.cat
         local isCollapsed = db.collapsed[catName]
-
-        local hdr = AcquireRow()
-        hdr:SetSize(CONTENT_W, CAT_ROW_H)
-        PlaceRow(hdr, yOffset, catName, nil, ns.COL_ACCENT)
-        hdr.icon:Hide(); hdr.iconBorder:Hide()
-        hdr.countText:SetText("")
-        hdr.isCategoryHeader=true; hdr.categoryName=catName
-        hdr.catBg:Show()
-        hdr.catTopSep:Show(); hdr.catBottomSep:Show()
-        hdr.sep:Hide()
-        hdr.nameText:ClearAllPoints()
-        hdr.nameText:SetPoint("LEFT",  4, 0)
-        hdr.nameText:SetPoint("RIGHT", hdr, "RIGHT", -100, 0)
-        hdr.nameText:SetText((isCollapsed and "+ " or "- ")..catName)
-        hdr.nameText:SetFontHeight(ns.FONT_NORMAL)
-        hdr.goldText:ClearAllPoints()
-        -- same right edge as the item amounts below (they leave room for the AH/V tag)
-        hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", NightsFarmtrackerDB.showPriceSource and (-4 - SRC_SHIFT) or -4, 0)
-        hdr.goldText:SetFontHeight(ns.FONT_NORMAL)
-
-        hdr.goldText:SetText(cat.totalGold > 0 and ns.FormatGold(cat.totalGold) or "")
+        local hdr = PlaceCategoryHeader(catName, cat, isCollapsed, yOffset)
         yOffset = yOffset + CAT_ROW_H
 
         if not isCollapsed then
-            local qAtlas = NightsFarmtrackerDB.qAtlas or {}
-
-            -- Build flat display list: each quality rank as separate entry
-            local flat = {}
-            for _, item in ipairs(cat.items) do
-                local d = item.data
-                local fv = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, item.ah)
-                if d.variants and not ns.IsGear(d) then
-                    for tier = 1, 3 do
-                        local gv = d.variants[tier]
-                        local tc = gv and gv.amount or 0
-                        local tid = gv and gv.priceItemID
-                        if tc > 0 then
-                            local tAH, tV
-                            if tid then
-                                local ap = ns.GetAHPriceForID(tid)
-                                if ap then tAH = ap * tc end
-                            end
-                            if gv.sellPrice and gv.sellPrice > 0 then tV = gv.sellPrice * tc end
-                            local tGold = fv and (tV or 0) or math.max(tAH or 0, tV or 0)
-                            if tGold > 0 then
-                                local rankIcon = qAtlas[tier]
-                                              and CreateAtlasMarkup(qAtlas[tier],ns.RANK_ICON_W,ns.RANK_ICON_H)
-                                              or ("|cffaaaaaa R"..tier.."|r")
-                                flat[#flat+1] = {
-                                    isRank=true, name=item.name, d=d,
-                                    tier=tier, tid=tid, tc=tc,
-                                    tAH=tAH, tV=tV, tGold=tGold,
-                                    rankIcon=rankIcon, fv=fv,
-                                }
-                            end
-                        end
-                    end
-                elseif d.variants then
-                    -- Scaling/Adventurer's gear: same item ID, different item level
-                    -- and quality per drop - split into one row per variant so
-                    -- amounts and prices don't mix (see ProcessLoot). Grouped by
-                    -- displayed (itemLevel, quality) first so two drops that only
-                    -- differ in a hidden bonus-ID component still show as one
-                    -- summed row (see GroupGearVariantsForDisplay).
-                    for ilvl, gv in pairs(ns.GroupGearVariantsForDisplay(d.variants)) do
-                        if gv.amount > 0 then
-                            local sp  = ns.VariantSellPrice(gv, d)
-                            local tV  = (sp and sp > 0) and (sp * gv.amount) or nil
-                            local ap  = hasAH and ns.GetAHPriceForID(d.itemID, gv.itemLink) or nil
-                            local tAH = ap and (ap * gv.amount) or nil
-                            -- Decided per variant, not from the item's combined AH
-                            -- total (item.ah) - a scaling item's variants can have
-                            -- very different AH prices, so one variant crossing the
-                            -- Gear AH Threshold must not force AH pricing onto a
-                            -- cheaper sibling variant that's still below it.
-                            local vfv   = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, tAH)
-                            local tGold = vfv and (tV or 0) or math.max(tAH or 0, tV or 0)
-
-                            if tGold > 0 then
-                                flat[#flat+1] = {
-                                    isGearVariant=true, name=item.name, d=d,
-                                    ilvl=ilvl, gv=gv, tV=tV, tAH=tAH, tGold=tGold, fv=vfv,
-                                }
-                            end
-                        end
-                    end
-                else
-                    local gold = fv and (item.vendor or 0) or math.max(item.ah or 0, item.vendor or 0)
-                    flat[#flat+1] = {
-                        isRank=false, name=item.name, d=d,
-                        item=item, gold=gold, fv=fv,
-                    }
-                end
-            end
-
-            -- Skip category entirely if no displayable items
+            local flat = BuildFlatList(cat, hasAH, db.qAtlas or {})
             if #flat == 0 then
+                -- nothing displayable: skip the category entirely
                 DropLastHeader(hdr, catName)
                 yOffset = yOffset - CAT_ROW_H
             else
-                -- Sort flat list by gold descending
-                table.sort(flat, function(a,b)
-                    local ga = (a.isRank or a.isGearVariant) and a.tGold or a.gold
-                    local gb = (b.isRank or b.isGearVariant) and b.tGold or b.gold
-                    if ga ~= gb then return ga > gb end
-                    return a.name < b.name
-                end)
-
-                -- Render
                 for _, fi in ipairs(flat) do
-                    local row = AcquireRow()
-                    local d = fi.d
-                    row.sep:SetShown(yOffset > 0)
-                    row.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
-                    row.icon:SetTexCoord(0.08,0.92,0.08,0.92); row.icon:Show()
-                    row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", 4+CAT_INDENT, 0)
-                    row:SetPoint("TOPLEFT", 0, -yOffset)
-                    ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality, {1,1,1})
-                    row.nameText:ClearAllPoints()
-                    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
-                    row.nameText:SetPoint("RIGHT", row,          "RIGHT", -108, 0)
-
-                    if fi.isRank then
-                        local key = tostring(d.itemID).."_q"..fi.tier
-                        row.itemName = fi.name; row.itemID = fi.tid; row.itemLink = nil; row.baseItemID = d.itemID
-                        row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, fi.tid)))
-                        row.rankBadge:SetText(fi.rankIcon or "")
-                        row.countText:SetText(tostring(fi.tc))
-                        ShowGold(row, fi.tAH, fi.tV, fi.fv)
-                        itemOrder[#itemOrder+1] = key; itemRows[key] = row
-                    elseif fi.isGearVariant then
-                        local gv  = fi.gv
-                        local key = tostring(d.itemID).."_g"..tostring(fi.ilvl)
-                        row.itemName = fi.name; row.itemID = d.itemID; row.itemLink = gv.itemLink; row.baseItemID = d.itemID
-                        row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, gv.itemLink or d.itemID)))
-                        row.rankBadge:SetText("")
-                        row.countText:SetText(tostring(gv.amount))
-                        ShowGold(row, fi.tAH, fi.tV, fi.fv)
-                        itemOrder[#itemOrder+1] = key; itemRows[key] = row
-                    else
-                        local it = fi.item
-                        row.isJunkMerged = d.isJunkMerged
-                        row.itemName = fi.name
-                        if d.isJunkMerged then
-                            row.itemID, row.itemLink, row.baseItemID = nil, nil, nil
-                        else
-                            row.itemID, row.itemLink, row.baseItemID = d.itemID, d.itemLink, d.itemID
-                        end
-                        row.nameText:SetText(d.isJunkMerged and ns.TruncateName(fi.name) or ns.TruncateName(ns.DisplayName(fi.name, d.itemID)))
-                        row.rankBadge:SetText(ns.RankIconFromLink(d.itemLink) or "")
-                        row.countText:SetText(tostring(d.amount))
-                        ShowGold(row, it.ah, it.vendor, fi.fv)
-                        itemOrder[#itemOrder+1] = fi.item.itemID; itemRows[fi.item.itemID] = row
-                    end
+                    RenderFlatRow(fi, yOffset)
                     yOffset = yOffset + ROW_H
                 end
             end
@@ -1031,8 +1000,8 @@ function ns.ExcludeItem(categoryName)
 end
 
 -- Item exclusion (Shift+Right-click on an item row). Keyed by itemID so it
--- survives a client-language switch, unlike the old name-based check.
--- Falls back to name if an itemID somehow isn't available.
+-- survives a client-language switch; falls back to the name when no itemID
+-- is available.
 function ns.ExcludeItemByID(itemID, name)
     if itemID then
         NightsFarmtrackerDB.excludedItemIDs[itemID] = true
@@ -1049,37 +1018,33 @@ end
 ------------------------------------------------------------------------
 -- Button scripts
 ------------------------------------------------------------------------
-local function BtnLeave(self)
-    self.tex:SetAlpha(0.75)
-    GameTooltip:Hide()
+-- MakeBtn already dims the icons and nudges them when pressed; this adds
+-- the tooltip. fill(tooltip) writes the lines.
+local function SetBtnTooltip(btn, anchor, fill)
+    btn:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, anchor)
+        fill(GameTooltip)
+        GameTooltip:Show()
+    end)
+    btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
 btnClose:SetScript("OnClick", function()
     SafeHideMainFrame()
     GoldFrame:Hide()
 end)
-btnClose:SetScript("OnEnter", function(self)
-    self.tex:SetAlpha(1)
-    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText(ns.L["close"])
-    GameTooltip:Show()
-end)
-btnClose:SetScript("OnLeave", BtnLeave)
+SetBtnTooltip(btnClose, "ANCHOR_LEFT", function(tip) tip:SetText(ns.L["close"]) end)
 
 btnToggle:SetScript("OnClick", function()
     ns.SetExpanded(not NightsFarmtrackerDB.expanded)
 end)
-btnToggle:SetScript("OnEnter", function(self)
-    self.tex:SetAlpha(1)
-    GameTooltip:SetOwner(self,"ANCHOR_LEFT")
-    GameTooltip:SetText(NightsFarmtrackerDB.expanded and ns.L["collapse"] or ns.L["expand"])
-    GameTooltip:Show()
+SetBtnTooltip(btnToggle, "ANCHOR_LEFT", function(tip)
+    tip:SetText(NightsFarmtrackerDB.expanded and ns.L["collapse"] or ns.L["expand"])
 end)
-btnToggle:SetScript("OnLeave", BtnLeave)
 
 btnPause:SetScript("OnClick", function()
     -- A finished fixed-length session can't be resumed (it would just
-    -- pause again on the next tick) - point to Reset / the setting instead.
+    -- pause again on the next tick): point to Reset / the setting instead.
     if NightsFarmtrackerDB.paused and ns.SessionLimitReached() then
         ns.Print(ns.L["session_length_reached_resume"])
         return
@@ -1088,24 +1053,16 @@ btnPause:SetScript("OnClick", function()
     if NightsFarmtrackerDB.paused then ns.StopTimer() else ns.StartTimer() end
     ns.ApplyPauseVisuals()
 end)
-btnPause:SetScript("OnEnter", function(self)
-    self.tex:SetAlpha(1)
-    GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
-    GameTooltip:SetText(NightsFarmtrackerDB.paused and ns.L["start_tracking"] or ns.L["pause_tracking"])
-    GameTooltip:Show()
+SetBtnTooltip(btnPause, "ANCHOR_RIGHT", function(tip)
+    tip:SetText(NightsFarmtrackerDB.paused and ns.L["start_tracking"] or ns.L["pause_tracking"])
 end)
-btnPause:SetScript("OnLeave", BtnLeave)
 
 btnReset:SetScript("OnClick", function() ns.Reset(IsShiftKeyDown()) end)
-btnReset:SetScript("OnEnter", function(self)
-    self.tex:SetAlpha(1)
-    GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
-    GameTooltip:SetText(ns.L["reset_session"])
-    GameTooltip:AddLine(ns.L["reset_desc"],0.7,0.7,0.7,true)
-    GameTooltip:AddLine(ns.L["reset_shift_hint"],0.5,0.5,0.5,true)
-    GameTooltip:Show()
+SetBtnTooltip(btnReset, "ANCHOR_RIGHT", function(tip)
+    tip:SetText(ns.L["reset_session"])
+    tip:AddLine(ns.L["reset_desc"], 0.7, 0.7, 0.7, true)
+    tip:AddLine(ns.L["reset_shift_hint"], 0.5, 0.5, 0.5, true)
 end)
-btnReset:SetScript("OnLeave", BtnLeave)
 
 -- Left-click: Session History · Right-click: Loot Log
 btnHistory:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -1117,24 +1074,20 @@ btnHistory:SetScript("OnClick", function(_, button)
         if db.sessionHistoryEnabled ~= false then ns.ToggleHistory() end
     end
 end)
-btnHistory:SetScript("OnEnter", function(self)
-    self.tex:SetAlpha(1)
-    local db          = NightsFarmtrackerDB
+SetBtnTooltip(btnHistory, "ANCHOR_RIGHT", function(tip)
+    local db = NightsFarmtrackerDB
     local historyShown = db.sessionHistoryEnabled ~= false
-    local logShown      = db.logWindowEnabled      == true
-    GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
+    local logShown     = db.logWindowEnabled == true
     if historyShown and logShown then
-        GameTooltip:SetText(ns.L["session_history"].." / "..ns.L["log_title"])
-        GameTooltip:AddLine(ns.L["hist_log_left_hint"], 0.7,0.7,0.7)
-        GameTooltip:AddLine(ns.L["hist_log_right_hint"], 0.7,0.7,0.7)
+        tip:SetText(ns.L["session_history"] .. " / " .. ns.L["log_title"])
+        tip:AddLine(ns.L["hist_log_left_hint"], 0.7, 0.7, 0.7)
+        tip:AddLine(ns.L["hist_log_right_hint"], 0.7, 0.7, 0.7)
     elseif logShown then
-        GameTooltip:SetText(ns.L["log_title"])
+        tip:SetText(ns.L["log_title"])
     else
-        GameTooltip:SetText(ns.L["session_history"])
+        tip:SetText(ns.L["session_history"])
     end
-    GameTooltip:Show()
 end)
-btnHistory:SetScript("OnLeave", BtnLeave)
 
 -- Left-click: Vendor-Only Filter · Right-click: Blacklist
 btnFilter:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -1145,293 +1098,26 @@ btnFilter:SetScript("OnClick", function(_, button)
         if NightsFarmtrackerDB.vendorFilterEnabled ~= false then ns.ToggleFilterWindow() end
     end
 end)
-btnFilter:SetScript("OnEnter", function(self)
-    self.tex:SetAlpha(1)
-    local db          = NightsFarmtrackerDB
-    local vendorShown  = db.vendorFilterEnabled ~= false
-    local blackShown   = db.blacklistEnabled    ~= false
-    GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
+SetBtnTooltip(btnFilter, "ANCHOR_RIGHT", function(tip)
+    local db = NightsFarmtrackerDB
+    local vendorShown = db.vendorFilterEnabled ~= false
+    local blackShown  = db.blacklistEnabled ~= false
     if vendorShown and blackShown then
-        GameTooltip:SetText(ns.L["filter_button"])
-        GameTooltip:AddLine(ns.L["filter_left_hint"], 0.7,0.7,0.7)
-        GameTooltip:AddLine(ns.L["filter_right_hint"], 0.7,0.7,0.7)
+        tip:SetText(ns.L["filter_button"])
+        tip:AddLine(ns.L["filter_left_hint"], 0.7, 0.7, 0.7)
+        tip:AddLine(ns.L["filter_right_hint"], 0.7, 0.7, 0.7)
     elseif blackShown then
-        GameTooltip:SetText(ns.L["blacklist_title"])
+        tip:SetText(ns.L["blacklist_title"])
     else
-        GameTooltip:SetText(ns.L["filter_title"])
+        tip:SetText(ns.L["filter_title"])
     end
-    GameTooltip:Show()
 end)
-btnFilter:SetScript("OnLeave", BtnLeave)
 
 btnSettings:SetScript("OnClick", function() ns.ToggleSettings() end)
-btnSettings:SetScript("OnEnter", function(self)
-    self.tex:SetAlpha(1)
-    GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
-    GameTooltip:SetText(ns.L["settings"])
-    GameTooltip:Show()
-end)
-btnSettings:SetScript("OnLeave", BtnLeave)
+SetBtnTooltip(btnSettings, "ANCHOR_RIGHT", function(tip) tip:SetText(ns.L["settings"]) end)
 
--- Hover shows only the essentials; clicking the button opens the full
--- info window (all sections, what Ctrl-click does, slash commands).
--- Built once at load time (static content) instead of on every hover.
-local helpTipSections = {
-    { title = ns.L["help_categories"], lines = { ns.L["help_cat_click"], ns.L["help_cat_rclick"] } },
-    { title = ns.L["help_items"],      lines = { ns.L["help_item_ctrl_lclick"], ns.L["help_item_ctrl_rclick"], ns.L["help_item_rclick"] } },
-}
-
-local helpSections = {
-    { title = ns.L["help_categories"], lines = { ns.L["help_cat_click"], ns.L["help_cat_rclick"] } },
-    { title = ns.L["help_items"],      lines = { ns.L["help_item_hover"], ns.L["help_item_ctrl_lclick"], ns.L["help_item_ctrl_rclick"], ns.L["help_item_rclick"],
-                                                 ns.L["help_detail_vendor"], ns.L["help_detail_blacklist"], ns.L["help_detail_undo"] } },
-    { title = ns.L["help_gold"],       lines = { ns.L["help_gold_click"] } },
-    { title = ns.L["help_reset"],      lines = { ns.L["help_reset_shift"] } },
-    { title = ns.L["help_histlog"],    lines = { ns.L["help_histlog_left"], ns.L["help_histlog_right"] } },
-    { title = ns.L["help_filter"],     lines = { ns.L["help_filter_left"], ns.L["help_filter_right"] } },
-    { title = ns.L["help_fishing"],    lines = { ns.L["help_fishing_hint"] } },
-    { title = ns.L["help_export"],     lines = { ns.L["help_export_hint"] } },
-    { title = ns.L["help_commands"],   lines = { ns.L["help_cmd_nft"], ns.L["help_cmd_filter"], ns.L["help_cmd_hud"], ns.L["help_cmd_export"], ns.L["help_cmd_fishing"] } },
-}
-table.sort(helpSections, function(a,b) return a.title < b.title end)
-
-local HelpFrame
-local function BuildHelpText()
-    local out = {}
-    for _, section in ipairs(helpSections) do
-        out[#out+1] = "|cffffffff" .. section.title .. "|r"
-        for _, line in ipairs(section.lines) do out[#out+1] = "|cffb3b3b3" .. line .. "|r" end
-        out[#out+1] = " "
-    end
-    return table.concat(out, "\n")
-end
-
-local function ToggleHelpWindow()
-    if not HelpFrame then
-        local W = 420
-        HelpFrame = ns.CreateWindowFrame("NightsFarmtrackerHelpWnd", ns.L["help_detail_title"], {width = W, titleColor = ns.COL_ACCENT})
-        HelpFrame:SetPoint("CENTER")
-        -- Above the main window, Venom Tracker and Lure Bar (all MEDIUM) which it can overlap.
-        HelpFrame:SetFrameStrata("HIGH")
-        HelpFrame:SetToplevel(true)
-        local hdrH = ns.WINDOW_HDR_H
-        local sep = HelpFrame:CreateTexture(nil, "ARTWORK")
-        sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
-        sep:SetPoint("TOPLEFT", ns.PAD, -(hdrH - 1)); sep:SetPoint("TOPRIGHT", -ns.PAD, -(hdrH - 1))
-        -- The text scrolls once the window reaches ns.GetMaxHelpH()
-        local textW  = W - 2 * ns.PAD
-        local scroll = CreateFrame("ScrollFrame", nil, HelpFrame)
-        scroll:SetPoint("TOPLEFT", ns.PAD, -(hdrH + 8))
-        scroll:SetWidth(textW)
-        local child = CreateFrame("Frame", nil, scroll)
-        child:SetWidth(textW)
-        scroll:SetScrollChild(child)
-        local fs = child:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        fs:SetPoint("TOPLEFT")
-        fs:SetWidth(textW)
-        fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
-        fs:SetSpacing(2)
-        fs:SetText(BuildHelpText())
-        local textH = math.ceil(fs:GetStringHeight())
-        HelpFrame.fit = function()
-            ns.FitScrollWindow({
-                window = HelpFrame, scroll = scroll, list = child,
-                hdrH = hdrH + 8, ftrH = 8, contentH = textH,
-                maxTotal = ns.GetMaxHelpH(),
-            })
-        end
-        HelpFrame.fit()
-        scroll:EnableMouseWheel(true)
-        scroll:SetScript("OnMouseWheel", ns.MakeWheelHandler(scroll, child, 24))
-    end
-    HelpFrame:SetShown(not HelpFrame:IsShown())
-end
-
--- Re-fit the (already built) Help window after the max window height changed
-function ns.RefitHelpWindow()
-    if HelpFrame and HelpFrame.fit then HelpFrame.fit() end
-end
-
-btnHelp:SetScript("OnClick", ToggleHelpWindow)
-btnHelp:SetScript("OnEnter", function(self)
-    self.tex:SetAlpha(1)
-    GameTooltip:SetOwner(self,"ANCHOR_BOTTOMRIGHT")
-    GameTooltip:AddLine(ns.L["help_title"],unpack(ns.COL_ACCENT))
-    GameTooltip:AddLine(" ")
-    for _,section in ipairs(helpTipSections) do
-        GameTooltip:AddLine(section.title, 1,1,1)
-        for _,line in ipairs(section.lines) do
-            GameTooltip:AddLine(line, 0.7,0.7,0.7)
-        end
-    end
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(ns.L["help_more"], unpack(ns.COL_ACCENT))
-    GameTooltip:Show()
-end)
-btnHelp:SetScript("OnLeave", BtnLeave)
-
-------------------------------------------------------------------------
--- Minimap button (no library): left click toggles the main window, right
--- click the settings, drag moves it (angle saved in db.minimap.minimapPos,
--- same keys the old LibDBIcon button used, so saved positions carry over).
--- Named like a LibDBIcon button ("LibDBIcon10_<name>", .icon / .border /
--- .background) so button collectors (LuckyoneUI, MinimapButtonButton ...)
--- pick it up.
-------------------------------------------------------------------------
-local mmButton
-
--- Places the button on the minimap edge at `angle` degrees (0 = right,
--- counterclockwise); square minimaps (ElvUI) get it on the square edge.
-local function PlaceMinimapButton(angle)
-    if not mmButton then return end
-    -- A collector moved the button into its own bar: leave the layout to it.
-    if mmButton:GetParent() ~= Minimap then return end
-    local rad = math.rad(angle)
-    local dx, dy = math.cos(rad), math.sin(rad)
-    local half = Minimap:GetWidth() / 2 + 5
-    local shape = GetMinimapShape and GetMinimapShape() or "ROUND"
-    if shape ~= "ROUND" then
-        local m = math.max(math.abs(dx), math.abs(dy))
-        dx, dy = dx / m, dy / m
-    end
-    mmButton:ClearAllPoints()
-    mmButton:SetPoint("CENTER", Minimap, "CENTER", dx * half, dy * half)
-end
-
-local function UpdateMinimapAngleFromCursor()
-    local mx, my = Minimap:GetCenter()
-    local cx, cy = GetCursorPosition()
-    local scale = Minimap:GetEffectiveScale()
-    local angle = math.deg(math.atan2(cy / scale - my, cx / scale - mx))
-    NightsFarmtrackerDB.minimap.minimapPos = angle
-    PlaceMinimapButton(angle)
-end
-
-local function ShowMinimapTooltip(owner)
-    GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
-    GameTooltip:AddLine("Night's Farmtracker", unpack(ns.COL_ACCENT))
-    GameTooltip:AddLine(ns.L["mm_toggle"],   1, 1, 1)
-    GameTooltip:AddLine(ns.L["mm_settings"], 0.7, 0.7, 0.7)
-    GameTooltip:AddLine(ns.L["mm_drag"],     0.5, 0.5, 0.5)
-    GameTooltip:Show()
-end
-
-local function OnMinimapClick(mouseButton)
-    if mouseButton == "RightButton" then
-        ns.ToggleSettings()
-    else
-        ns.ToggleMainFrame()
-    end
-end
-
-local function CreateMinimapButton()
-    local b = CreateFrame("Button", "LibDBIcon10_NightsFarmtracker", Minimap)
-    b:SetSize(31, 31)
-    b:SetFrameStrata("MEDIUM")
-    b:SetFrameLevel(8)
-    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    b:RegisterForDrag("LeftButton")
-    b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
-
-    local bg = b:CreateTexture(nil, "BACKGROUND")
-    bg:SetSize(20, 20)
-    bg:SetPoint("TOPLEFT", 7, -5)
-    bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-
-    local icon = b:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(17, 17)
-    icon:SetPoint("TOPLEFT", 7, -6)
-    icon:SetTexture(ART.."Icon")
-    icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-
-    local border = b:CreateTexture(nil, "OVERLAY")
-    border:SetSize(50, 50)
-    border:SetPoint("TOPLEFT")
-    border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    b.icon, b.border, b.background = icon, border, bg
-
-    b:SetScript("OnClick", function(_, mouseButton) OnMinimapClick(mouseButton) end)
-    b:SetScript("OnDragStart", function(self)
-        GameTooltip:Hide()
-        self:SetScript("OnUpdate", UpdateMinimapAngleFromCursor)
-    end)
-    b:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
-    b:SetScript("OnEnter", ShowMinimapTooltip)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    return b
-end
-
--- Shows or hides the button according to the setting (creates it on first need).
-local function ApplyMinimapButton()
-    local mm = NightsFarmtrackerDB.minimap
-    if mm.hide then
-        if mmButton then mmButton:Hide() end
-        return
-    end
-    if not mmButton then mmButton = CreateMinimapButton() end
-    PlaceMinimapButton(mm.minimapPos or 225)
-    mmButton:Show()
-end
-
--- Button bars (LuckyoneUI) re-collect on ElvUI's minimap update; LibDBIcon
--- buttons triggered that through the library's Show/Hide, a plain button has
--- to ask. Without this the gap of a hidden button stays until the next reload.
-local function NotifyButtonBars()
-    local E = ElvUI and ElvUI[1]
-    local minimap = E and E.GetModule and E:GetModule("Minimap", true)
-    if minimap and minimap.UpdateSettings then pcall(minimap.UpdateSettings, minimap) end
-end
-
--- Entry in Blizzard's Addon Compartment (the minimap addon menu). The
--- compartment has no unregister call, so removing means taking our entry
--- out of its list again.
-local compartmentData
-
-local function SetCompartmentEntry(show)
-    local frame = AddonCompartmentFrame
-    if not (frame and frame.registeredAddons) then return end
-    if show and not compartmentData then
-        compartmentData = {
-            text = "Night's Farmtracker",
-            icon = ART.."Icon",
-            func = function(_, menuInputData) OnMinimapClick(menuInputData and menuInputData.buttonName) end,
-            funcOnEnter = function(btn) ShowMinimapTooltip(btn) end,
-            funcOnLeave = function() GameTooltip:Hide() end,
-        }
-        frame:RegisterAddon(compartmentData)
-    elseif not show and compartmentData then
-        for i, data in ipairs(frame.registeredAddons) do
-            if data == compartmentData then table.remove(frame.registeredAddons, i) break end
-        end
-        compartmentData = nil
-        frame:UpdateDisplay()
-    end
-end
-
-function ns.InitMinimapButton()
-    ApplyMinimapButton()
-    SetCompartmentEntry(NightsFarmtrackerDB.minimap.showInCompartment)
-end
-
--- Re-applies the saved position (ElvUI repositions the minimap after login).
-function ns.RefreshMinimapButton()
-    PlaceMinimapButton(NightsFarmtrackerDB.minimap.minimapPos or 225)
-end
-
-function ns.SetMinimapVisible(show)
-    NightsFarmtrackerDB.minimap.hide  = not show
-    ApplyMinimapButton()
-    NotifyButtonBars()
-end
-
-function ns.IsInCompartment()
-    return compartmentData ~= nil
-end
-
-function ns.SetInCompartment(show)
-    NightsFarmtrackerDB.minimap.showInCompartment = show and true or false
-    SetCompartmentEntry(show)
-end
+btnHelp:SetScript("OnClick", function() ns.ToggleHelpWindow() end)
+SetBtnTooltip(btnHelp, "ANCHOR_BOTTOMRIGHT", function(tip) ns.FillHelpTooltip(tip) end)
 
 -- Re-evaluates and re-lays-out the History/Log/Filter/Blacklist buttons.
 -- Called whenever a setting affecting their visibility changes (session

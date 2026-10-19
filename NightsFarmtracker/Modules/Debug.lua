@@ -3,7 +3,7 @@
 -- The debug log and its live window, plus all diagnostic "/nft ..." dump
 -- commands (test, itemdb, monthdump, sessionsdump, venomdump). Everything
 -- goes into the log window (see ns.CreateCopyTextWindow/ns.ShowCopyText
--- in Core/Core.lua) instead of chat - easier to read and to paste into a
+-- in Core/Widgets.lua) instead of chat - easier to read and to paste into a
 -- bug report than a wall of chat messages.
 ------------------------------------------------------------------------
 local _, ns = ...

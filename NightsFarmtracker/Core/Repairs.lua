@@ -1,17 +1,11 @@
 local _, ns = ...
 
--- One-time migration from the old flat sessions array (sessions[1],
--- sessions[2], ...) to the current day-keyed storage
--- (sessions["YYYY-MM-DD"] = { session1, session2, ... }) - makes the raw
--- SavedVariables file readable by calendar day instead of one long
--- undated list, instead of a numeric index per session. Detects the old
--- shape by checking whether sessions[1] looks like a session (has a
--- timestamp) rather than a day's array of sessions; an empty or
--- already-migrated table is left untouched. Mutates the table in place
--- (clears the old numeric keys, adds the new date keys) rather than
--- replacing it, so the change is visible through every existing
--- reference to NightsFarmtrackerAccountDB.sessions. Returns how many
--- sessions were migrated.
+-- Migrates the old flat sessions array (sessions[1], sessions[2], ...) to
+-- day-keyed storage (sessions["YYYY-MM-DD"] = that day's sessions). The old
+-- shape is recognized by sessions[1] having a timestamp; an empty or already
+-- migrated table is left alone. Mutates in place so existing references to
+-- NightsFarmtrackerAccountDB.sessions stay valid. Returns how many sessions
+-- were migrated.
 function ns.MigrateSessionsToDateKeyed(sessions)
     if not sessions then return 0 end
     if sessions[1] == nil or type(sessions[1]) ~= "table" or sessions[1].timestamp == nil then
@@ -38,27 +32,369 @@ function ns.MigrateSessionsToDateKeyed(sessions)
 end
 
 ------------------------------------------------------------------------
--- Central one-time repair registry.
+-- Calls fn(d, itemID, session) for every saved item of every session and adds
+-- up what it returns (a number, or true for 1). Returns the total.
+local function ForEachSavedItem(sessions, fn)
+    if not sessions then return 0 end
+    local total = 0
+    ns.ForEachSession(sessions, function(session)
+        for itemID, d in pairs(session.items or {}) do
+            local r = fn(d, itemID, session)
+            if r == true then total = total + 1 elseif type(r) == "number" then total = total + r end
+        end
+    end)
+    return total
+end
+
+------------------------------------------------------------------------
+-- Clears per-item breakdowns that do not add up to the item's own amount
+-- (reagent tiers q/qIDs/qAHTotal, gearVariants) and recomputes vendorTotal
+-- where it disagreed with sellPrice * amount. Returns how many items changed.
+function ns.RepairCorruptedTierBreakdowns(sessions)
+    return ForEachSavedItem(sessions, function(d)
+        local fixed = 0
+        local amount = d.amount or 0
+        if d.q then
+            local qSum = (d.q[1] or 0) + (d.q[2] or 0) + (d.q[3] or 0)
+            if qSum ~= amount then
+                d.q, d.qIDs, d.qAHTotal = nil, nil, nil
+                fixed = fixed + 1
+            end
+        end
+        if d.gearVariants then
+            local gvSum = 0
+            for _, gv in pairs(d.gearVariants) do gvSum = gvSum + (gv.amount or 0) end
+            if gvSum ~= amount then
+                d.gearVariants = nil
+                if d.sellPrice and d.sellPrice > 0 then d.vendorTotal = d.sellPrice * amount end
+                fixed = fixed + 1
+            end
+        elseif d.sellPrice and d.sellPrice > 0 then
+            local expect = d.sellPrice * amount
+            if d.vendorTotal ~= expect then
+                d.vendorTotal = expect
+                fixed = fixed + 1
+            end
+        end
+        return fixed
+    end)
+end
+
+-- One-time repair for the Bind-on-Use canAH fix (see CanAH in Main.lua):
+-- items saved before the fix with canAH=false purely because of their
+-- bind type (not BoP/BoA, which stay vendor-only) get canAH re-enabled so
+-- they price via AH again. Returns how many items were touched.
+function ns.RepairBindOnUseCanAH(sessions)
+    return ForEachSavedItem(sessions, function(d)
+        if d.canAH == false and not d.isBoP and not d.isBoA then
+            d.canAH = true
+            return true
+        end
+    end)
+end
+
+-- Repairs gear-variant price data. Found in saved data:
+--  1. A variant with the legacy per-unit field `ahPrice` instead of `ahTotal`.
+--  2. A variant with no price field at all.
+--  3. Variant ahTotals that do not sum to the item's own ahTotal (two
+--     independent live AH lookups at save time drifted apart).
+-- For 1-2 the live lookup would target one long-gone bonus-ID roll and usually
+-- return nil, so the row fell back to vendor price. The item-level ahTotal is
+-- frozen at save time and trusted instead: `ahPrice` becomes `ahTotal`, and
+-- what the item total does not already account for is split across the
+-- priceless variants by amount. For 3 every variant is rescaled to sum to the
+-- item total. Reads d.variants, falling back to the pre-migration
+-- d.gearVariants. Returns how many variants changed.
+function ns.RepairGearVariantPricing(sessions)
+    return ForEachSavedItem(sessions, function(d)
+        local variants = d.variants or d.gearVariants
+        if not variants then return 0 end
+        local fixed = 0
+        local knownTotal, missingAmount = 0, 0
+        for _, gv in pairs(variants) do
+            if gv.ahPrice then
+                gv.ahTotal = (gv.ahPrice or 0) * (gv.amount or 0)
+                gv.ahPrice = nil
+                fixed = fixed + 1
+            end
+            if (gv.ahTotal or 0) > 0 then
+                knownTotal = knownTotal + gv.ahTotal
+            else
+                missingAmount = missingAmount + (gv.amount or 0)
+            end
+        end
+        local remaining = (d.ahTotal or 0) - knownTotal
+        if missingAmount > 0 and remaining > 0 then
+            local perUnit = remaining / missingAmount
+            for _, gv in pairs(variants) do
+                if (gv.ahTotal or 0) <= 0 and (gv.amount or 0) > 0 then
+                    gv.ahTotal = perUnit * gv.amount
+                    fixed = fixed + 1
+                end
+            end
+        elseif missingAmount == 0 and knownTotal > 0 and (d.ahTotal or 0) > 0
+        and math.abs(knownTotal - d.ahTotal) > 1 then
+            -- Every variant has a price but they do not add up to the item's
+            -- frozen total: treat the item total as the truth (every other
+            -- total is built from it) and rescale each variant's share.
+            local scale = d.ahTotal / knownTotal
+            for _, gv in pairs(variants) do
+                if (gv.ahTotal or 0) > 0 then
+                    gv.ahTotal = gv.ahTotal * scale
+                end
+            end
+            fixed = fixed + 1
+        end
+        return fixed
+    end)
+end
+
+-- Fills a missing itemLevel on a gear variant (the __novariant__ placeholder,
+-- or old data) from the same item's full saved history: scaling gear ties item
+-- level to quality, so if quality 3 only ever dropped at level 266, a quality-3
+-- bucket without a level was 266 too. A quality seen at several levels is
+-- ambiguous and left alone. Returns how many variants changed.
+function ns.RepairGearVariantItemLevels(sessions)
+    -- Pass 1: itemID -> quality -> itemLevel over every session. A quality
+    -- seen at more than one level is marked ambiguous (false) and never used
+    -- to fill anything in. Reads d.variants, falling back to d.gearVariants.
+    local ilvlByItemQuality = {}
+    ForEachSavedItem(sessions, function(d, itemID)
+        local variants = d.variants or d.gearVariants
+        if variants then
+            local byQuality = ilvlByItemQuality[itemID]
+            if not byQuality then
+                byQuality = {}
+                ilvlByItemQuality[itemID] = byQuality
+            end
+            for _, gv in pairs(variants) do
+                if gv.itemLevel and gv.quality then
+                    local existing = byQuality[gv.quality]
+                    if existing == nil then
+                        byQuality[gv.quality] = gv.itemLevel
+                    elseif existing ~= false and existing ~= gv.itemLevel then
+                        byQuality[gv.quality] = false -- ambiguous, don't guess
+                    end
+                end
+            end
+        end
+    end)
+
+    -- Pass 2: fill in whatever pass 1 resolved unambiguously.
+    return ForEachSavedItem(sessions, function(d, itemID)
+        local variants = d.variants or d.gearVariants
+        local byQuality = variants and ilvlByItemQuality[itemID]
+        if not byQuality then return 0 end
+        local fixed = 0
+        for _, gv in pairs(variants) do
+            if not gv.itemLevel and gv.quality then
+                local ilvl = byQuality[gv.quality]
+                if ilvl and ilvl ~= false then
+                    gv.itemLevel = ilvl
+                    fixed = fixed + 1
+                end
+            end
+        end
+        return fixed
+    end)
+end
+
+-- Recomputes every saved session's totalGold/totalVendor/totalAH from its own
+-- items via BuildSessionCategories, so the session row cannot disagree with the
+-- Detail window (needed for sessions whose frozen totals were inflated by
+-- mis-tagged reagent tiers). It deliberately avoids ns.VendorTotal/AHTotal/
+-- ItemValue, which price gear from a live AH lookup and would replace an old
+-- session's frozen gear value with today's price. Sessions without filterFrozen
+-- are valued with the current Vendor-Only filters.
+function ns.RepairSessionTotals(sessions)
+    if not sessions then return 0 end
+    local fixed = 0
+    ns.ForEachSession(sessions, function(session)
+        local cats = ns.BuildSessionCategories(session)
+        local totalGold = 0
+        for _, cat in pairs(cats) do totalGold = totalGold + cat.gold end
+
+        local totalVendor, totalAH = 0, 0
+        for _, d in pairs(session.items or {}) do
+            totalVendor = totalVendor + (d.vendorTotal or 0)
+            local ah = d.ahTotal
+            if d.q and d.qIDs
+            and ((d.q[1] or 0) + (d.q[2] or 0) + (d.q[3] or 0)) ~= (d.amount or 0) then
+                local p = ns.GetAHPriceForID(d.itemID, d.itemLink)
+                ah = p and (p * (d.amount or 0)) or nil
+            end
+            totalAH = totalAH + (ah or 0)
+        end
+
+        if totalGold   ~= (session.totalGold or 0)
+        or totalVendor ~= (session.totalVendor or 0)
+        or totalAH     ~= (session.totalAH or 0) then
+            session.totalGold   = totalGold
+            session.totalVendor = totalVendor
+            session.totalAH     = totalAH
+            fixed = fixed + 1
+        end
+    end)
+    return fixed
+end
+
+------------------------------------------------------------------------
+-- Collapses the legacy per-item shapes (gearVariants for scaling gear, q/qIDs/
+-- qAHTotal for reagent tiers) into one d.variants field: bonus-ID string keys
+-- for gear, tier number 1-3 for reagents. It runs after the repairs that wipe
+-- corrupted breakdowns, so it only reshapes consistent data. GetVariants in
+-- PriceHelper.lua reads the result. Returns how many items were converted.
+------------------------------------------------------------------------
+function ns.MigrateItemToUnifiedVariants(d)
+    if d.variants then return false end
+    if d.gearVariants then
+        d.variants, d.gearVariants = d.gearVariants, nil
+        return true
+    end
+    if d.q then
+        local variants
+        for tier = 1, 3 do
+            local tc = d.q[tier] or 0
+            if tc > 0 then
+                variants = variants or {}
+                variants[tier] = {
+                    amount = tc, sellPrice = d.sellPrice,
+                    ahTotal = d.qAHTotal and d.qAHTotal[tier],
+                    priceItemID = (d.qIDs and d.qIDs[tier]) or d.itemID,
+                }
+            end
+        end
+        if variants then d.variants = variants end
+        d.q, d.qIDs, d.qAHTotal = nil, nil, nil
+        return true
+    end
+    return false
+end
+
+------------------------------------------------------------------------
+-- Normalizes numeric keys in gear variants to strings (an old remainder bucket
+-- was keyed by quality number), so a gear variants table is uniformly
+-- string-keyed. Reagent tiers (keys 1/2/3) stay numeric, other code looks them
+-- up by number. Returns how many keys changed.
+------------------------------------------------------------------------
+function ns.NormalizeVariantKeys(d)
+    if not d.variants or not ns.IsGear(d) then return 0 end
+    local numericKeys
+    for key in pairs(d.variants) do
+        if type(key) == "number" then
+            numericKeys = numericKeys or {}
+            numericKeys[#numericKeys+1] = key
+        end
+    end
+    if not numericKeys then return 0 end
+    for _, key in ipairs(numericKeys) do
+        local gv = d.variants[key]
+        d.variants[key] = nil
+        local newKey = "legacy_" .. tostring(key)
+        local existing = d.variants[newKey]
+        if not existing then
+            d.variants[newKey] = gv
+        else
+            -- Extremely unlikely collision (a real bonus-ID link string
+            -- can never equal this) - merge instead of overwriting.
+            existing.amount    = (existing.amount or 0) + (gv.amount or 0)
+            existing.ahTotal   = (existing.ahTotal or 0) + (gv.ahTotal or 0)
+            existing.sellPrice = existing.sellPrice or gv.sellPrice
+            existing.itemLink  = existing.itemLink or gv.itemLink
+            existing.itemLevel = existing.itemLevel or gv.itemLevel
+            existing.quality   = existing.quality or gv.quality
+        end
+    end
+    return #numericKeys
+end
+
+------------------------------------------------------------------------
+-- Merges gear variants of the same item that describe the identical roll (same
+-- itemLevel and quality) but got different keys because the bonus-ID tail of
+-- the link came back in a different position between an early and a later
+-- (fully cached) lookup, which split amount and ahTotal across two buckets.
+-- Keyed by (itemLevel, quality), the pairing GroupGearVariantsForDisplay
+-- already uses, instead of re-parsing the link. Reagent tiers and genuinely
+-- different rolls are untouched. Returns how many variant keys were merged.
+------------------------------------------------------------------------
+function ns.MergeDuplicateGearVariants(d)
+    if not d.variants or not ns.IsGear(d) then return 0 end
+
+    local buckets, toMerge = {}, nil
+    for key, gv in pairs(d.variants) do
+        if gv.itemLevel and gv.quality then
+            local bucketKey = gv.itemLevel .. "_" .. gv.quality
+            local existingKey = buckets[bucketKey]
+            if existingKey then
+                toMerge = toMerge or {}
+                toMerge[#toMerge+1] = { from = key, into = existingKey }
+            else
+                buckets[bucketKey] = key
+            end
+        end
+    end
+    if not toMerge then return 0 end
+
+    for _, m in ipairs(toMerge) do
+        local src, dst = d.variants[m.from], d.variants[m.into]
+        if src and dst then
+            dst.amount    = (dst.amount or 0)  + (src.amount or 0)
+            dst.ahTotal   = (dst.ahTotal or 0) + (src.ahTotal or 0)
+            dst.sellPrice = dst.sellPrice or src.sellPrice
+            dst.itemLink  = dst.itemLink  or src.itemLink
+        end
+        d.variants[m.from] = nil
+    end
+
+    -- Resync the top-level mirror fields from the surviving variant with
+    -- the largest amount, so d.itemLink/quality/sellPrice reflect an
+    -- actually-existing bucket instead of a stale copy from whichever
+    -- variant last happened to write them (see the Main.lua ProcessLoot/
+    -- UpdatePricesFromBags comments on why this mirror exists at all).
+    local best, bestAmount
+    for _, gv in pairs(d.variants) do
+        if not bestAmount or (gv.amount or 0) > bestAmount then
+            best, bestAmount = gv, gv.amount or 0
+        end
+    end
+    if best then
+        d.itemLink  = best.itemLink  or d.itemLink
+        d.quality   = best.quality   or d.quality
+        d.sellPrice = best.sellPrice or d.sellPrice
+    end
+
+    return #toMerge
+end
+
+------------------------------------------------------------------------
+-- Clears the top-level itemLink of gear items that have variants: it only
+-- copied whichever variant was written last and goes stale with the next
+-- different roll (display code reads gv.itemLink). New loot no longer writes
+-- it. Non-gear items and gear without variants keep it as their only copy.
+-- Returns how many items were cleared.
+------------------------------------------------------------------------
+function ns.StripRedundantGearItemLink(d)
+    if d.itemLink and d.variants and ns.IsGear(d) then
+        d.itemLink = nil
+        return true
+    end
+    return false
+end
+
+------------------------------------------------------------------------
+-- Central one-time repair registry. Account-wide (NightsFarmtrackerAccountDB)
+-- and per-character (NightsFarmtrackerDB) repairs each run once, tracked by an
+-- incrementing "repairVersion" per scope: ns.RunAccountRepairs and
+-- ns.RunCharacterRepairs run every entry newer than the stored version, in
+-- order.
 --
--- Account-wide (NightsFarmtrackerAccountDB) and per-character
--- (NightsFarmtrackerDB) one-time data repairs used to each track their
--- own boolean "somethingRepaired" flag, checked and run individually in
--- Core.lua. That grew unwieldy fast - this file replaces all of them
--- with a single incrementing "repairVersion" per scope: each repair is
--- registered below with the next sequential number, and ns.RunAccountRepairs
--- / ns.RunCharacterRepairs run every entry newer than what's already been
--- applied, in order, exactly once.
---
--- To add a new one-time repair: append an entry to the relevant list
--- below with the NEXT number after the current highest one and a short
--- name, and write the repair function itself wherever makes sense
--- (History.lua for anything touching saved sessions). Never reuse, skip,
--- or renumber an existing entry - already-repaired accounts key off these
--- numbers to know what they've already run.
+-- To add a repair, append an entry with the next number and a short name. Never
+-- reuse, skip or renumber an entry: already repaired accounts key off the
+-- numbers.
 ------------------------------------------------------------------------
 
 -- Account-wide repairs, applied to NightsFarmtrackerAccountDB.sessions.
--- Repairs 1-5 all use ns.ForEachSession (History.lua) so they work
+-- Repairs 1-5 all use ns.ForEachSession (Sessions.lua) so they work
 -- unchanged on either the old flat array or the current day-keyed
 -- storage - only the migration itself (6) cares which shape it finds.
 ns.ACCOUNT_REPAIRS = {
@@ -68,10 +404,10 @@ ns.ACCOUNT_REPAIRS = {
     { 4, "gearVariantPricing",    function() return ns.RepairGearVariantPricing(NightsFarmtrackerAccountDB.sessions) end },
     { 5, "gearVariantItemLevels", function() return ns.RepairGearVariantItemLevels(NightsFarmtrackerAccountDB.sessions) end },
     { 6, "sessionsDateKeyed",     function() return ns.MigrateSessionsToDateKeyed(NightsFarmtrackerAccountDB.sessions) end },
-    { 7, "unifiedVariants",      function() return ns.MigrateItemsToUnifiedVariants(NightsFarmtrackerAccountDB.sessions) end },
-    { 8, "normalizeVariantKeys", function() return ns.NormalizeVariantKeysInSessions(NightsFarmtrackerAccountDB.sessions) end },
-    { 9, "mergeDuplicateGearVariants", function() return ns.MergeDuplicateGearVariantsInSessions(NightsFarmtrackerAccountDB.sessions) end },
-    { 10, "stripRedundantGearItemLink", function() return ns.StripRedundantGearItemLinkInSessions(NightsFarmtrackerAccountDB.sessions) end },
+    { 7, "unifiedVariants",      function() return ForEachSavedItem(NightsFarmtrackerAccountDB.sessions, ns.MigrateItemToUnifiedVariants) end },
+    { 8, "normalizeVariantKeys", function() return ForEachSavedItem(NightsFarmtrackerAccountDB.sessions, ns.NormalizeVariantKeys) end },
+    { 9, "mergeDuplicateGearVariants", function() return ForEachSavedItem(NightsFarmtrackerAccountDB.sessions, ns.MergeDuplicateGearVariants) end },
+    { 10, "stripRedundantGearItemLink", function() return ForEachSavedItem(NightsFarmtrackerAccountDB.sessions, ns.StripRedundantGearItemLink) end },
     -- Re-run of #5 with the field-name bug fixed (it checked the legacy
     -- d.gearVariants field and had been a no-op since #7 renamed it to
     -- d.variants) - registered as a new number so it actually runs again
@@ -109,7 +445,7 @@ ns.CHARACTER_REPAIRS = {
             end
         end
     end },
-    -- Live-count counterpart of account repair #7 (History.lua) - collapses
+    -- Live-count counterpart of account repair #7 - collapses
     -- gearVariants/q+qIDs+qAHTotal into the unified d.variants field on the
     -- current (unsaved) session too, so it self-heals immediately.
     { 3, "unifiedVariants", function()
@@ -124,14 +460,14 @@ ns.CHARACTER_REPAIRS = {
             ns.NormalizeVariantKeys(d)
         end
     end },
-    -- Live-count counterpart of account repair #9 (History.lua).
+    -- Live-count counterpart of account repair #9.
     { 5, "mergeDuplicateGearVariants", function()
         local db = NightsFarmtrackerDB
         for _, d in pairs(db.count) do
             ns.MergeDuplicateGearVariants(d)
         end
     end },
-    -- Live-count counterpart of account repair #10 (History.lua).
+    -- Live-count counterpart of account repair #10.
     { 6, "stripRedundantGearItemLink", function()
         local db = NightsFarmtrackerDB
         for _, d in pairs(db.count) do
