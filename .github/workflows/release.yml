@@ -1,7 +1,7 @@
 # Builds the addon zip and uploads it to CurseForge when a tag is pushed.
 # The tag name is the version (e.g. 1.2.1, no "v"); a tag containing "alpha" or "beta"
 # is uploaded as such, anything else as a release. Needs the repository secret
-# CURSEFORGE (GITHUB_TOKEN is provided by GitHub). The project ID comes from the TOC.
+# NIGHTSFARMTRACKER (GITHUB_TOKEN is provided by GitHub). The project ID comes from the TOC.
 name: Package and release
 
 on:
@@ -16,7 +16,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      CF_API_KEY: ${{ secrets.CURSEFORGE }}
+      CF_API_KEY: ${{ secrets.NIGHTSFARMTRACKER }}
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Clone project
