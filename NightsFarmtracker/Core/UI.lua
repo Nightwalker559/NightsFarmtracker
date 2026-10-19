@@ -108,7 +108,7 @@ local watermark = BtnBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 watermark:SetPoint("CENTER", BtnBar, "CENTER", 0, 0)
 -- SetFont instead of SetFontHeight: the size change did not show up with
 -- SetFontHeight on this template font. Same font file, explicit size.
-watermark:SetFont((GameFontNormal:GetFont()), 22, "")
+watermark:SetFont((GameFontNormal:GetFont()), 16, "")
 watermark:SetText("NFT")
 watermark:SetAlpha(0.6)
 ns.RegisterTintTex(watermark)
