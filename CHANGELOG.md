@@ -15,6 +15,7 @@
 
 - Session History detail window no longer overlaps the history window near the screen bottom
 - Session History month header stayed white after hovering it
+- Settings: reset link text was cut off; shorter label, button fits the text
 
 ## 1.7.7
 

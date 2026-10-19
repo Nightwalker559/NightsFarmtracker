@@ -1779,9 +1779,10 @@ local function EnsureSettingsFrame()
     SListFrame:SetScript("OnMouseWheel", OnWheel)
 
     local resetBtn = CreateFrame("Button", nil, SF)
-    resetBtn:SetSize(110,18); resetBtn:SetPoint("BOTTOMRIGHT",-S_PAD,6)
+    resetBtn:SetHeight(18); resetBtn:SetPoint("BOTTOMRIGHT",-S_PAD,6)
     local resetLabel = resetBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    resetLabel:SetAllPoints(); resetLabel:SetJustifyH("RIGHT"); resetLabel:SetText(ns.L["reset_addon"])
+    resetLabel:SetPoint("RIGHT"); resetLabel:SetJustifyH("RIGHT"); resetLabel:SetText(ns.L["reset_addon"])
+    resetBtn:SetWidth(math.ceil(resetLabel:GetStringWidth()) + 6)  -- fit the label, whatever the language
     resetLabel:SetTextColor(0.50,0.22,0.22)
     resetBtn:SetScript("OnClick", function() StaticPopup_Show("NFT_CONFIRM_RESET_ADDON") end)
     resetBtn:SetScript("OnEnter", function() resetLabel:SetTextColor(1,0.4,0.4) end)
