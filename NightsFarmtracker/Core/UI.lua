@@ -106,7 +106,7 @@ btnSettings:SetPoint("RIGHT", btnHelp, "LEFT", -6, 0)
 -- (gray by default, theme accent with the themed-buttons option).
 local watermark = BtnBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 watermark:SetPoint("CENTER", BtnBar, "CENTER", 0, 0)
-watermark:SetFontHeight(ns.FONT_HEADER)
+watermark:SetFontHeight(18)
 watermark:SetText("NFT")
 watermark:SetAlpha(0.6)
 ns.RegisterTintTex(watermark)
