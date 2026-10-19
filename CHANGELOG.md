@@ -13,6 +13,7 @@
 ### Fixed
 
 - Session History detail window no longer overlaps the history window near the screen bottom
+- Session History month header stayed white after hovering it
 
 ## 1.7.7
 

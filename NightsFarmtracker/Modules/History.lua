@@ -808,8 +808,9 @@ local function AcquireMonthRow()
     return r
 end
 local function ReleaseMonthRow(r)
+    -- OnEnter is replaced per rebuild, but OnLeave (reset color, hide
+    -- tooltip) is only set once at creation, so it must survive pooling.
     r:Hide(); r:ClearAllPoints(); r:SetScript("OnMouseUp",nil)
-    r:SetScript("OnEnter",nil); r:SetScript("OnLeave",nil)
     r.delBtn:SetScript("OnClick",nil)
     r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
     monthPool[#monthPool+1]=r
