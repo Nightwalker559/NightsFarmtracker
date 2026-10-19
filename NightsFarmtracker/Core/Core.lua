@@ -1588,7 +1588,8 @@ local tintTextures = {}
 function ns.ApplyButtonTint(tex)
     local db = NightsFarmtrackerDB
     local c = (db and db.themedButtons == true and ns.COL_ACCENT) or ns.BTN_GRAY
-    tex:SetVertexColor(c[1], c[2], c[3])
+    if tex.SetVertexColor then tex:SetVertexColor(c[1], c[2], c[3])
+    else tex:SetTextColor(c[1], c[2], c[3]) end  -- FontString (header watermark)
 end
 
 function ns.RegisterTintTex(tex)

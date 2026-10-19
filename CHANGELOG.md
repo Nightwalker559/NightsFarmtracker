@@ -5,6 +5,7 @@
 ### New
 
 - Option: toolbar icons in theme color (Settings, Colors); default stays gray, Close stays red
+- Dimmed "NFT" watermark in the main window header
 
 ### Changed
 

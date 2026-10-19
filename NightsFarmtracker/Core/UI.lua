@@ -101,6 +101,16 @@ btnHelp:SetPoint("RIGHT", btnToggle, "LEFT", -6, 0)
 local btnSettings = MakeBtn(BtnBar, 18, "btn_settings.png")
 btnSettings:SetPoint("RIGHT", btnHelp, "LEFT", -6, 0)
 
+-- "NFT" watermark between the two button groups: readable, but dimmed
+-- far enough not to compete with the buttons. Tinted like the icons
+-- (gray by default, theme accent with the themed-buttons option).
+local watermark = BtnBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+watermark:SetPoint("CENTER", BtnBar, "CENTER", 0, 0)
+watermark:SetFontHeight(ns.FONT_HEADER)
+watermark:SetText("NFT")
+watermark:SetAlpha(0.6)
+ns.RegisterTintTex(watermark)
+
 -- Separator below BtnBar
 local hdrSep = MainFrame:CreateTexture(nil, "ARTWORK")
 hdrSep:SetHeight(1)
