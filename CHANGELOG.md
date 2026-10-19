@@ -2,6 +2,10 @@
 
 ## 1.7.8
 
+### New
+
+- Option: toolbar icons in theme color (Settings, Colors); default stays gray, Close stays red
+
 ### Changed
 
 - Button icons redrawn as original artwork

@@ -52,7 +52,7 @@ Every item is valued at the higher of its AH and vendor price. Vendor-only items
 
 ## Look
 
-- 13 color themes plus a custom color (Settings → Colors), with preview and an optional header gradient.
+- 13 color themes plus a custom color (Settings → Colors), with preview, an optional header gradient and optional theme-colored toolbar icons.
 - Draggable, repositionable minimap button.
 
 ---

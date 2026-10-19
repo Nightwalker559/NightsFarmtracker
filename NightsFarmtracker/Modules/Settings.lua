@@ -456,6 +456,7 @@ local function MakeGearThresholdEB(parent, yOff)
     cfgTex:SetAllPoints()
     cfgTex:SetTexture(ns.ART.."btn_settings.png")
     cfgTex:SetAlpha(0.75)
+    ns.RegisterTintTex(cfgTex)
     cfgBtn:SetScript("OnEnter", function(self)
         cfgTex:SetAlpha(1)
         GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
@@ -1454,6 +1455,15 @@ function ns.RebuildSettingsContent()
                 db.headerGradient = v
                 customColorRow:Refresh()
                 StaticPopup_Show("NFT_RELOAD")
+            end)
+        y = y - 38
+
+        local btnRow = track(AcquireCheckbox(SListFrame), "checkbox")
+        ConfigureCheckbox(btnRow, ns.L["themed_buttons"], y,
+            function() return db.themedButtons == true end,
+            function(v)
+                db.themedButtons = v
+                ns.RefreshButtonTint()
             end)
         y = y - 38
 

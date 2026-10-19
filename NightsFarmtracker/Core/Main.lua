@@ -616,6 +616,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         -- in - refresh them now.
         ns.RefreshFrameStyle(MainFrame)
         ns.RefreshFrameStyle(ns.GoldFrame)
+        ns.RefreshButtonTint()
 
         local p = NightsFarmtrackerDB.pos
         MainFrame:ClearAllPoints()

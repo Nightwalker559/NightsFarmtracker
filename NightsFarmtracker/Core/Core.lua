@@ -767,7 +767,7 @@ ns.PROFILE_KEYS = {
     vendorFilterEnabled=true, blacklistEnabled=true, mergeDaily=true,
     splitTradeGoods=true, splitGearByBinding=true, ahSource=true,
     gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
-    tsmCustomSource=true, colorTheme=true, customAccent=true, headerGradient=true,
+    tsmCustomSource=true, colorTheme=true, customAccent=true, headerGradient=true, themedButtons=true,
     maxWindowHeight=true,
     venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
@@ -796,6 +796,7 @@ local function NewProfileDefaults()
         tsmCustomSource       = "",
         colorTheme            = "default",
         headerGradient        = false,
+        themedButtons         = false,
         maxWindowHeight       = ns.DEFAULT_MAX_WINDOW_H,
         venomTrackerEnabled   = false,
         baitFrameEnabled      = false,
@@ -1578,6 +1579,27 @@ end
 -- hovered, nudged while pressed. Shared by the main window and the
 -- Venom Tracker / Fishing Lure Bar overlays.
 ------------------------------------------------------------------------
+-- Toolbar icon tint. The icon PNGs are white; by default they are tinted
+-- the old fixed gray, or - with the "themedButtons" option - the active
+-- theme's accent color.
+ns.BTN_GRAY = {115/255, 115/255, 115/255}
+local tintTextures = {}
+
+function ns.ApplyButtonTint(tex)
+    local db = NightsFarmtrackerDB
+    local c = (db and db.themedButtons == true and ns.COL_ACCENT) or ns.BTN_GRAY
+    tex:SetVertexColor(c[1], c[2], c[3])
+end
+
+function ns.RegisterTintTex(tex)
+    tintTextures[#tintTextures + 1] = tex
+    ns.ApplyButtonTint(tex)
+end
+
+function ns.RefreshButtonTint()
+    for _, tex in ipairs(tintTextures) do ns.ApplyButtonTint(tex) end
+end
+
 function ns.MakeBtn(parent, size, artFile)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(size, size)
@@ -1585,6 +1607,9 @@ function ns.MakeBtn(parent, size, artFile)
     btn.tex:SetAllPoints()
     btn.tex:SetTexture(ns.ART .. artFile)
     btn.tex:SetAlpha(0.75)
+    -- Close keeps its own red artwork; every other icon is white artwork
+    -- tinted gray (default) or with the theme accent (see ns.ApplyButtonTint).
+    if artFile ~= "btn_close.png" then ns.RegisterTintTex(btn.tex) end
     btn:SetScript("OnMouseDown", function(self)
         self.tex:ClearAllPoints()
         self.tex:SetSize(size - 3, size - 3)
