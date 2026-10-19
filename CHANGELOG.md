@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Reset button icon updated
+- Button icons redrawn as original artwork
 
 ### Fixed
 

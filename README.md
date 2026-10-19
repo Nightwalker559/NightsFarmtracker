@@ -106,10 +106,4 @@ Debug commands for bug reports: `/nft debug` opens a live debug log window (copy
 
 ---
 
-## Credits
-
-- **Button icons** (`Media/btn_*.png`): [Icons8](https://icons8.com), style "Glyph Neue", used under the Icons8 free license. Not made by the author of this addon.
-
----
-
 The full version history is in the [changelog](https://github.com/Nightwalker559/NightsFarmtracker/blob/main/CHANGELOG.md). Bugs and suggestions: [GitHub Issues](https://github.com/Nightwalker559/NightsFarmtracker/issues), CurseForge or Wago.
