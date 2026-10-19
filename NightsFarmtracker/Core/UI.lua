@@ -243,10 +243,27 @@ function ns.UpdateGoldFrame()
     GoldFrame.totalVal:SetText( cachedGold > 0 and ns.FormatGold(cachedGold) or "0")
 end
 
+-- Gold Overview and Lockout frame hang below the main window. Near the bottom
+-- of the screen they would be clamped on top of it, so the window moves up by
+-- the missing space instead (only on screen, the saved position stays).
+function ns.KeepStackOnScreen()
+    local bottom = MainFrame:GetBottom()
+    if not bottom or not MainFrame:IsShown() then return end
+    if InCombatLockdown() and ns.BaitDependsOnMainFrame and ns.BaitDependsOnMainFrame() then return end
+    local below = 0
+    if GoldFrame:IsShown() then below = below + GoldFrame:GetHeight() + 2 end
+    local lockout = ns.LockoutFrame
+    if lockout and lockout:IsShown() then below = below + lockout:GetHeight() + 2 end
+    local missing = below - bottom
+    if missing <= 0 then return end
+    local x, y = ns.AnchorToTop(MainFrame)
+    if x then MainFrame:SetPoint("TOP", UIParent, "TOP", x, y + missing) end
+end
+
 function ns.ToggleGoldFrame()
     if ns.DeferInCombat(ns.ToggleGoldFrame) then return end
     if GoldFrame:IsShown() then GoldFrame:Hide()
-    else GoldFrame:Show(); ns.UpdateGoldFrame() end
+    else GoldFrame:Show(); ns.UpdateGoldFrame(); ns.KeepStackOnScreen() end
     -- GoldFrame always sits directly below MainFrame; when MainFrame is
     -- collapsed, LogFrame also wants that spot, so it needs to know
     -- whether to chain below GoldFrame instead (avoids overlap).
@@ -335,6 +352,7 @@ local function SafeSetMainHeight(height)
         return
     end
     MainFrame:SetHeight(height)
+    ns.KeepStackOnScreen()
 end
 
 local function UpdateFrameHeight()

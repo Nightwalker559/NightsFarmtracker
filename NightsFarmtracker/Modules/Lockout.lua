@@ -145,7 +145,7 @@ local function EnsureFrame()
     end
     local ticker
     LockoutFrame:HookScript("OnShow", function()
-        Reanchor(); UpdateText()
+        Reanchor(); UpdateText(); ns.KeepStackOnScreen()
         if not ticker then ticker = C_Timer.NewTicker(1, UpdateText) end
         ReanchorLog()
     end)

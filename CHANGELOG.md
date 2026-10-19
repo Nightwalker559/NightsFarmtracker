@@ -15,6 +15,7 @@
 ### Fixed
 
 - Session History detail window no longer overlaps the history window near the screen bottom
+- Gold Overview and Lockout frame overlapped the main window near the screen bottom; the main window now moves up
 - Session History month header stayed white after hovering it
 - Settings: reset link text was cut off; shorter label, button fits the text
 - Saved sessions with old name-keyed items were never migrated to item IDs
