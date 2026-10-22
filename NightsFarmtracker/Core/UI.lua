@@ -669,7 +669,7 @@ local function ShowGold(row, ah, vendor, forceVendor)
 end
 
 -- Value bars: every item row's value relative to the most valuable row, in
--- the item's name color, from just right of the icon to the AH/V column. The
+-- the theme's accent color, from just right of the icon to the AH/V column. The
 -- merged junk row is a category sum, so it is left out of the scale (and
 -- capped at full length) unless it is all there is.
 -- The icon border sticks out 1 px on every side (ns.AddRowIcon), so the gap
@@ -706,7 +706,7 @@ local function ApplyValueBars()
                     goalReached = true
                     DrawBar(row, 1, unpack(GOAL_COL))
                 else
-                    DrawBar(row, c / goal, row.nameText:GetTextColor())
+                    DrawBar(row, c / goal, unpack(ns.COL_ACCENT))
                 end
             end
         end
@@ -725,7 +725,7 @@ local function ApplyValueBars()
     for _, row in pairs(itemRows) do
         local v = row.barValue
         if v and v > 0 and maxValue > 0 then
-            DrawBar(row, v / maxValue, row.nameText:GetTextColor())
+            DrawBar(row, v / maxValue, unpack(ns.COL_ACCENT))
         end
     end
 end
