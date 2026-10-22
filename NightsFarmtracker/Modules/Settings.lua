@@ -65,6 +65,9 @@ local S_SCROLL_STEP = 22
 -- a run (before a section title or a block of other widgets).
 local CTRL_SIZE, CTRL_GAP = 14, ns.CTRL_GAP
 local CHECK_RUN_TAIL = 18
+-- Distance from a section title to its first row: checkboxes and radio dots sit
+-- 4 px inside their row, so a section that starts with one uses the smaller step.
+local TITLE_STEP, TITLE_STEP_CTRL = 26, 22
 
 ------------------------------------------------------------------------
 -- Radio button row — pooled (built once, reconfigured on reuse) so
@@ -1276,8 +1279,9 @@ function ns.RebuildSettingsContent()
             end)
     end
 
-    -- Radio group, one row per { labelKey, value }; `after` is the space below
-    -- the last row. Returns the new y and the rows.
+    -- Radio group, one row per { labelKey, value }; `after` is the distance from
+    -- the last row to whatever follows (default: the usual row step, for a
+    -- checkbox or radio below). Returns the new y and the rows.
     local function radioGroup(y, options, current, set, after)
         local rows = {}
         for i, opt in ipairs(options) do
@@ -1285,7 +1289,7 @@ function ns.RebuildSettingsContent()
             ConfigureRadio(row, ns.L[opt[1]], y, opt[2], set)
             row:SetSelected(current == opt[2]); row:SetEnabled(true)
             rows[i] = row
-            y = y - (i < #options and CTRL_SIZE + CTRL_GAP or after)
+            y = y - (i < #options and CTRL_SIZE + CTRL_GAP or after or CTRL_SIZE + CTRL_GAP)
         end
         return y, rows
     end
@@ -1295,7 +1299,7 @@ function ns.RebuildSettingsContent()
     -- which has no header of its own and always follows this section)
     -- ----------------------------------------------------------------
     addSection("ah_source", function(y)
-        y = sectionTitle(y, "ah_source", 22)
+        y = sectionTitle(y, "ah_source", TITLE_STEP_CTRL)
 
         local ahOptions = {
             {label=ns.L["ah_auctionator"], value="auctionator", avail=ns.HasAuctionator()},
@@ -1325,7 +1329,7 @@ function ns.RebuildSettingsContent()
 
         -- Gear AH Threshold: below this price Equipment skips the AH lookup
         -- and uses its vendor price (0 = off).
-        y = y - 4
+        y = y - 8
         local threshHint = wrappedHint(y, ns.L["gear_ah_threshold_hint"])
         y = y - math.max(28, math.ceil(threshHint:GetStringHeight()) + 6)
 
@@ -1364,7 +1368,7 @@ function ns.RebuildSettingsContent()
     -- Section: Display
     -- ----------------------------------------------------------------
     addSection("display", function(y)
-        y = sectionTitle(y, "display", 26)
+        y = sectionTitle(y, "display", TITLE_STEP_CTRL)
 
         y = radioGroup(y, { {"gold_per_hour", "hour"}, {"gold_per_min", "min"} },
             db.goldRateMode == "min" and "min" or "hour",
@@ -1404,7 +1408,7 @@ function ns.RebuildSettingsContent()
 
         y = radioGroup(y, { {"gold_display_classic", "classic"}, {"gold_display_modern", "modern"} },
             db.goldDisplayMode == "modern" and "modern" or "classic",
-            function(v) db.goldDisplayMode = v; ns.RefreshHUD() end, 28)
+            function(v) db.goldDisplayMode = v; ns.RefreshHUD() end)
 
         y = flag(y, "show_price_source", "showPriceSource", false, function() ns.RefreshHUD() end)
         y = flag(y, "show_value_bar", "showValueBar", true, function() ns.RefreshHUD() end)
@@ -1429,7 +1433,7 @@ function ns.RebuildSettingsContent()
     -- Section: Colors (theme, custom color, header gradient, button tint)
     -- ----------------------------------------------------------------
     addSection("sec_colors", function(y)
-        y = sectionTitle(y, "sec_colors", 26)
+        y = sectionTitle(y, "sec_colors", TITLE_STEP)
 
         themeDropdown = PlaceWidget(themeDropdown, MakeThemeDropdown, y)
         themeDropdown:Refresh()
@@ -1454,7 +1458,7 @@ function ns.RebuildSettingsContent()
     -- Section: Profiles
     -- ----------------------------------------------------------------
     addSection("sec_profiles", function(y)
-        y = sectionTitle(y, "sec_profiles", 26)
+        y = sectionTitle(y, "sec_profiles", TITLE_STEP)
 
         profileDropdown = PlaceWidget(profileDropdown, MakeProfileDropdown, y)
         profileDropdown:Refresh()
@@ -1480,7 +1484,7 @@ function ns.RebuildSettingsContent()
     -- Section: Session History
     -- ----------------------------------------------------------------
     addSection("session_history", function(y)
-        y = sectionTitle(y, "session_history", 26)
+        y = sectionTitle(y, "session_history", TITLE_STEP_CTRL)
 
         y = flag(y, "session_history_enabled", "sessionHistoryEnabled", true, function() ns.RefreshLeftButtons() end)
         y = y - CHECK_RUN_TAIL
@@ -1492,7 +1496,7 @@ function ns.RebuildSettingsContent()
         local rows
         y, rows = radioGroup(y,
             { {"session_history_mode_full", "full"}, {"session_history_mode_compact", "compact"} },
-            getHistMode(), function(v) db.sessionHistoryMode = v end, 30)
+            getHistMode(), function(v) db.sessionHistoryMode = v end)
         -- "compact" folds past months irreversibly: ask first instead of
         -- switching on click.
         rows[2]:SetScript("OnMouseUp", function()
@@ -1510,7 +1514,7 @@ function ns.RebuildSettingsContent()
     -- Section: Categories & Grouping
     -- ----------------------------------------------------------------
     addSection("sec_categories", function(y)
-        y = sectionTitle(y, "sec_categories", 26)
+        y = sectionTitle(y, "sec_categories", TITLE_STEP_CTRL)
 
         y = flag(y, "split_trade_goods", "splitTradeGoods", false, function() ns.RefreshHUD() end)
         y = flag(y, "split_gear_by_binding", "splitGearByBinding", false, function() ns.RefreshHUD() end)
@@ -1523,7 +1527,7 @@ function ns.RebuildSettingsContent()
     -- Section: Filters
     -- ----------------------------------------------------------------
     addSection("sec_filters", function(y)
-        y = sectionTitle(y, "sec_filters", 26)
+        y = sectionTitle(y, "sec_filters", TITLE_STEP_CTRL)
 
         local function filterChanged() ns.RefreshLeftButtons(); ns.RefreshHUD() end
         y = flag(y, "vendor_filter_enabled", "vendorFilterEnabled", true, filterChanged)
@@ -1536,7 +1540,7 @@ function ns.RebuildSettingsContent()
     -- Section: Fishing
     -- ----------------------------------------------------------------
     addSection("sec_fishing", function(y)
-        y = sectionTitle(y, "sec_fishing", 26)
+        y = sectionTitle(y, "sec_fishing", TITLE_STEP_CTRL)
 
         y = checkbox(y, "venom_tracker_enabled",
             function() return db.venomTrackerEnabled == true end,
@@ -1552,7 +1556,7 @@ function ns.RebuildSettingsContent()
     -- Section: Minimap HUD
     -- ----------------------------------------------------------------
     addSection("sec_hud", function(y)
-        y = sectionTitle(y, "sec_hud", 26)
+        y = sectionTitle(y, "sec_hud", TITLE_STEP_CTRL)
 
         y = checkbox(y, "hud_enabled",
             function() return db.hudEnabled == true end,
@@ -1568,7 +1572,7 @@ function ns.RebuildSettingsContent()
     -- Section: Data Export
     -- ----------------------------------------------------------------
     addSection("sec_export", function(y)
-        y = sectionTitle(y, "sec_export", 26)
+        y = sectionTitle(y, "sec_export", TITLE_STEP)
 
         local exportHint = wrappedHint(y, ns.L["export_hint"])
         -- Button sits 2 px below the (wrapped) hint, however many lines it takes.

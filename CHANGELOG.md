@@ -14,7 +14,7 @@
 - Item rows: icons flush with the header edge, no divider lines, 2 px spacing
 - Exactly one line between neighbouring headers and above the footer
 - Session History separators use the theme color
-- Settings, Filter and Blacklist: checkboxes and radio buttons have an even 6 px spacing
+- Settings, Filter and Blacklist: checkboxes and radio buttons have an even 6 px spacing, also between groups; section titles use one distance to the first row
 
 ## 1.7.8
 
