@@ -8,9 +8,6 @@ local _, ns = ...
 local PAD         = ns.PAD
 local FRAME_W     = ns.FRAME_W
 local FOOTER_H    = ns.FOOTER_H
--- Item rows carry a value bar right of the icon border (1 px gap), its bottom
--- edge flush with the border's bottom edge so it never reaches the row border.
-local BAR_H, BAR_GAP = 2, 1
 local ROW_H       = ns.ROW_H
 local CAT_ROW_H   = ns.CAT_ROW_H
 local CAT_GAP     = ns.CAT_GAP
@@ -18,6 +15,16 @@ local ICON_X      = ns.ICON_X
 local ICON_SIZE   = ns.ICON_SIZE
 local CONTENT_W   = ns.CONTENT_W
 local SCROLL_STEP = ns.SCROLL_STEP
+
+-- Value bar of an item row: right of the icon border (1 px gap), its bottom
+-- edge flush with the border's bottom edge, running to the row's right edge
+-- (the category header's right edge). The border sticks out 1 px on every
+-- side of the icon (ns.AddRowIcon), hence the extra pixel.
+local BAR_H      = 2
+local BAR_LEFT   = ICON_X + ICON_SIZE + 1 + 1
+local BAR_BOTTOM = (ROW_H - ICON_SIZE) / 2 - 1
+local BAR_FULL_W = CONTENT_W - BAR_LEFT
+local GOAL_COL   = {0.2, 0.85, 0.2}
 
 local ART     = ns.ART
 local MakeBtn = ns.MakeBtn
@@ -598,12 +605,15 @@ local function AcquireRow()
     row.srcText:SetJustifyH("LEFT")
     row.srcText:SetFontHeight(ns.FONT_SMALL)
 
-    -- Value bar: track and fill along the bottom edge, sized in SetValueBar.
+    -- Value bar: track plus fill; only the fill's width and color change (DrawBar).
     row.barBg = row:CreateTexture(nil, "ARTWORK")
     row.barBg:SetHeight(BAR_H)
     row.barBg:SetColorTexture(1, 1, 1, 0.08)
-    row.bar =row:CreateTexture(nil, "OVERLAY")
+    row.barBg:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", BAR_LEFT, BAR_BOTTOM)
+    row.barBg:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, BAR_BOTTOM)
+    row.bar = row:CreateTexture(nil, "OVERLAY")
     row.bar:SetHeight(BAR_H)
+    row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", BAR_LEFT, BAR_BOTTOM)
     row.barBg:Hide(); row.bar:Hide()
     row.barValue, row.barCount = false, false
 
@@ -669,23 +679,11 @@ local function ShowGold(row, ah, vendor, forceVendor)
 end
 
 -- Value bars: every item row's value relative to the most valuable row, in
--- the theme's accent color, from just right of the icon to the AH/V column. The
--- merged junk row is a category sum, so it is left out of the scale (and
--- capped at full length) unless it is all there is.
--- The icon border sticks out 1 px on every side (ns.AddRowIcon), so the gap
--- and the flush bottom edge are measured from the border, not the icon.
-local BAR_LEFT   = ICON_X + ICON_SIZE + 1 + BAR_GAP
-local BAR_BOTTOM = (ROW_H - ICON_SIZE) / 2 - 1
-local BAR_FULL_W   = CONTENT_W - BAR_LEFT   -- ends flush with the category header's right edge
-local GOAL_COL      = {0.2, 0.85, 0.2}
-local goalReached   = false
+-- the theme's accent color. The merged junk row is a category sum, so it is
+-- left out of the scale (and capped at full length) unless it is all there is.
+local goalReached = false
 
 local function DrawBar(row, frac, r, g, b)
-    row.barBg:ClearAllPoints()
-    row.barBg:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", BAR_LEFT, BAR_BOTTOM)
-    row.barBg:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, BAR_BOTTOM)
-    row.bar:ClearAllPoints()
-    row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", BAR_LEFT, BAR_BOTTOM)
     row.bar:SetWidth(math.max(1, math.floor(BAR_FULL_W * math.min(1, frac))))
     row.bar:SetColorTexture(r, g, b, 0.85)
     row.barBg:Show(); row.bar:Show()
@@ -1021,13 +1019,14 @@ local function BuildHUD()
         end
     end
 
+    local wasReached = goalReached
     ApplyValueBars()
     if goalReached and not db.paused then
         db.paused = true
         ns.StopTimer()
         ns.Print(ns.L["item_goal_reached"])
     end
-    ns.ApplyPauseVisuals()
+    if goalReached ~= wasReached then ns.ApplyPauseVisuals() end
 
     totalH = yOffset
     local maxScroll = math.max(0, totalH - ScrollFrame:GetHeight())

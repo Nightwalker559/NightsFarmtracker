@@ -161,7 +161,7 @@ local function AcquireDetRow()
     r:SetSize(DET_CONT_W, DET_ROW_H)
     r:EnableMouse(true)
 
-    ns.AddRowIcon(r):SetPoint("LEFT", 4, 0)
+    ns.AddRowIcon(r):SetPoint("LEFT", ns.ICON_X, 0)
     r.rankBadge = ns.CreateIconBadge(r, r.icon)
 
     -- Single-line: icon | name | count | gold (y=0 = centered with icon)
@@ -423,10 +423,6 @@ local function RebuildDetailContent(session)
                 yOff = yOff + ns.CAT_GAP
                 for _, entry in ipairs(cat.items) do
                     local ir = AcquireDetRow(); ir:SetWidth(DET_CONT_W); ir:SetPoint("TOPLEFT",0,-yOff)
-                    ir.icon:ClearAllPoints(); ir.icon:SetPoint("LEFT", ns.ICON_X, 0)
-                    ir.nameText:ClearAllPoints()
-                    ir.nameText:SetPoint("LEFT",  ir.icon, "RIGHT", 4, 0)
-                    ir.nameText:SetPoint("RIGHT", ir,           "RIGHT", -128, 0)
                     FillDetailRow(ir, entry)
                     activeDetRows[#activeDetRows+1]=ir; yOff = yOff + DET_ROW_H
                 end

@@ -8,13 +8,13 @@ local _, ns = ...
 
 ------------------------------------------------------------------------
 -- Shared collapsible section header (category/expansion-style headers).
--- One recipe for the frame + full-width background + bottom separator +
--- accent-colored label used by the Filter and Blacklist windows (and
--- matching History's month header), so all of them share one height/font
--- setup instead of each file rebuilding slightly different versions that
--- can drift out of sync (that mismatch is what caused the header text to
--- render off-center in 1.4.x). Caller still positions it (SetPoint) and
--- wires OnMouseUp/OnEnter/OnLeave for its own collapse/tooltip behavior.
+-- One recipe for the frame + header band (ns.AddHeaderBand) + accent-colored
+-- label used by the Filter and Blacklist windows (and matching History's month
+-- header), so all of them share one height/font setup instead of each file
+-- rebuilding slightly different versions that can drift out of sync (that
+-- mismatch is what caused the header text to render off-center in 1.4.x).
+-- Caller still positions it (SetPoint) and wires OnMouseUp/OnEnter/OnLeave
+-- for its own collapse/tooltip behavior.
 ------------------------------------------------------------------------
 function ns.CreateSectionHeader(parent, width)
     local header = CreateFrame("Frame", nil, parent)
@@ -76,7 +76,7 @@ function ns.CreateCheckboxRow(parent, width, height)
 end
 
 ------------------------------------------------------------------------
--- Shared "drop-list" item row — icon + name + bottom separator, item
+-- Shared "drop-list" item row — icon + name, item
 -- tooltip on hover, Shift+Right-click removes it via the given callback.
 -- Used by the Vendor-Only Filter and Blacklist item lists (identical row
 -- shape; only the removal/rebuild behavior differs between the two).
@@ -173,9 +173,9 @@ end
 -- Collapsible checkbox section: a header above one pooled checkbox row per
 -- entry. Arguments: frame (parent of the rows), header (from
 -- CreateSectionHeader), pool/rows (this section's row pool and active rows),
--- padX, secTop (Y where the section starts), titleText, collapsed, entries ({ key, label } list), isEnabled(key) and
--- setEnabled(key, value), onChanged() (optional). Returns the Y where the
--- next section starts.
+-- padX, secTop (Y where the section starts), titleText, collapsed, entries
+-- ({ key, label } list), isEnabled(key) and setEnabled(key, value),
+-- onChanged() (optional). Returns the Y where the next section starts.
 ------------------------------------------------------------------------
 function ns.RebuildCheckboxSection(frame, header, pool, rows, padX, secTop, titleText, collapsed, entries, isEnabled, setEnabled, onChanged)
     for _, r in ipairs(rows) do

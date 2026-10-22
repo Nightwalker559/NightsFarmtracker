@@ -128,9 +128,9 @@ function ns.ApplyQualityColor(nameText, iconBorder, quality, fallbackColor)
 end
 
 ------------------------------------------------------------------------
--- Item-row furniture shared by the HUD, History, Log and the drop lists:
--- bottom separator line, and item icon plus its quality border (the caller
--- anchors the icon).
+-- Row furniture: a bottom separator line (Export picker rows) and the item
+-- icon plus its quality border shared by the HUD, History, Log and the drop
+-- lists (the caller anchors the icon).
 ------------------------------------------------------------------------
 function ns.AddRowSeparator(row, r, g, b, a)
     local sep = row:CreateTexture(nil, "ARTWORK")
@@ -206,8 +206,9 @@ end
 -- when a line already sits right above it (the window's title separator, or
 -- the previous header's bottom line). Create one per list build, call
 -- flow.header(frame) for every header in order and flow.rows() once rows were
--- placed below a header; afterLine (default true) says whether a line sits above the
--- first header. flow.after can be saved and restored when a header is dropped.
+-- placed below a header. afterLine (default true) says whether a line sits
+-- above the first header. flow.after can be saved and restored when a header
+-- is dropped again.
 function ns.NewHeaderFlow(afterLine)
     local flow = { after = afterLine ~= false }
     function flow.header(frame)

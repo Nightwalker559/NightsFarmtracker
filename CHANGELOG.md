@@ -12,6 +12,7 @@
 
 - Item rows: icons flush with the header edge, no divider lines, 2 px spacing
 - Exactly one line between neighbouring headers and above the footer
+- Session History separators use the theme color
 
 ## 1.7.8
 
