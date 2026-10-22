@@ -40,8 +40,6 @@ local function AcquireRow()
     r = CreateFrame("Frame", nil, LListFrame)
     r:SetSize(ns.CONTENT_W, ROW_H)
 
-    ns.AddRowSeparator(r)
-
     r.timeText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.timeText:SetPoint("LEFT", 4, 0)
     r.timeText:SetWidth(TIME_W)
@@ -91,7 +89,6 @@ local function RebuildLogList()
     for _, e in ipairs(NightsFarmtrackerDB.logEntries or {}) do
         local r = AcquireRow()
         r:SetPoint("TOPLEFT", 0, -yOff)
-        r.sep:SetShown(yOff > 0)
         r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
         r.timeText:SetText(date("%H:%M", e.timestamp or time()))
         r.nameText:SetText(ns.TruncateName(ns.DisplayName(e.name, e.itemLink)))

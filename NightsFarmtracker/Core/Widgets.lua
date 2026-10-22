@@ -155,6 +155,77 @@ function ns.AddRowIcon(row)
 end
 
 ------------------------------------------------------------------------
+-- Header band (category, month and day rows of every list): gradient/flat
+-- background plus a top and a bottom line. Creates frame.bg, frame.topSep and
+-- frame.bottomSep; the caller adds its own texts and sets the size.
+------------------------------------------------------------------------
+function ns.AddHeaderBand(frame)
+    local bg = frame:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    ns.PaintCatBg(bg)
+    frame.bg = bg
+
+    local top = frame:CreateTexture(nil, "ARTWORK")
+    top:SetHeight(1)
+    top:SetColorTexture(unpack(ns.COL_BORDER))
+    top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT")
+    frame.topSep = top
+
+    local bottom = frame:CreateTexture(nil, "ARTWORK")
+    bottom:SetHeight(1)
+    bottom:SetColorTexture(unpack(ns.COL_BORDER))
+    bottom:SetPoint("BOTTOMLEFT"); bottom:SetPoint("BOTTOMRIGHT")
+    frame.bottomSep = bottom
+    return frame
+end
+
+-- For pooled rows that are a header only some of the time.
+function ns.ShowHeaderBand(frame, shown)
+    frame.bg:SetShown(shown); frame.topSep:SetShown(shown); frame.bottomSep:SetShown(shown)
+    if frame.headerArrow and not shown then frame.headerArrow:Hide() end
+end
+
+-- Collapse/expand arrow at the left of a collapsible header (replaces the old
+-- "+" / "-" text prefix). Header texts start at ns.HEADER_TEXT_X, right of it.
+ns.HEADER_ARROW_SIZE = 10
+ns.HEADER_TEXT_X     = 4 + ns.HEADER_ARROW_SIZE + 4
+function ns.SetHeaderArrow(frame, collapsed)
+    local arrow = frame.headerArrow
+    if not arrow then
+        arrow = frame:CreateTexture(nil, "OVERLAY")
+        arrow:SetSize(ns.HEADER_ARROW_SIZE, ns.HEADER_ARROW_SIZE)
+        arrow:SetPoint("LEFT", 4, 0)
+        frame.headerArrow = arrow
+    end
+    arrow:SetTexture(ns.ART .. (collapsed and "btn_arrow_right.png" or "btn_arrow_down.png"))
+    arrow:SetVertexColor(unpack(ns.COL_ACCENT))
+    arrow:Show()
+end
+
+-- Exactly one line between neighbouring headers: a header skips its top line
+-- when a line already sits right above it (the window's title separator, or
+-- the previous header's bottom line). Create one per list build, call
+-- flow.header(frame) for every header in order and flow.rows() once rows were
+-- placed below a header; afterLine (default true) says whether a line sits above the
+-- first header. flow.after can be saved and restored when a header is dropped.
+function ns.NewHeaderFlow(afterLine)
+    local flow = { after = afterLine ~= false }
+    function flow.header(frame)
+        frame.topSep:SetShown(not flow.after)
+        flow.after = true
+    end
+    function flow.rows() flow.after = false end
+    return flow
+end
+
+-- Footer separator of a list window: not needed while the list ends in a
+-- header (its bottom line already sits right above) and nothing scrolls out
+-- behind it. showAnyway covers scrolling lists and empty/collapsed states.
+function ns.SetFooterLine(sep, flow, showAnyway)
+    sep:SetShown(showAnyway or not flow.after)
+end
+
+------------------------------------------------------------------------
 -- Small red close "x": dimmed until hovered. With `tooltip` (text) it also
 -- shows that on hover.
 ------------------------------------------------------------------------

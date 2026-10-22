@@ -68,10 +68,11 @@ ns.CLASS_PRIORITY = {
 -- UI layout
 ns.FRAME_W     = 330
 ns.PAD         = 10
-ns.ROW_H       = 34
+ns.ROW_H       = 34   -- 30 px icon + 1 px border each side: 2 px between the borders of adjacent rows
+ns.CAT_GAP     = 1    -- extra space above/below a category's rows: 2 px between header and icon border
 ns.CAT_ROW_H   = 22
 ns.CHECKBOX_ROW_H = 16  -- row height for checkbox-list sections (category filters, AH-by-expansion)
-ns.CAT_INDENT  = 8
+ns.ICON_X      = 1    -- row icon offset: its 1 px border then sits flush with the row/header edge
 ns.FOOTER_H    = 32
 ns.ICON_SIZE   = 30
 ns.RANK_ICON_W = 20   -- width of the R1/R2/R3 atlas markup (CreateAtlasMarkup)

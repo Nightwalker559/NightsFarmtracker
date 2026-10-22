@@ -8,9 +8,13 @@ local _, ns = ...
 local PAD         = ns.PAD
 local FRAME_W     = ns.FRAME_W
 local FOOTER_H    = ns.FOOTER_H
+-- Item rows carry a value bar right of the icon border (1 px gap), its bottom
+-- edge flush with the border's bottom edge so it never reaches the row border.
+local BAR_H, BAR_GAP = 2, 1
 local ROW_H       = ns.ROW_H
 local CAT_ROW_H   = ns.CAT_ROW_H
-local CAT_INDENT  = ns.CAT_INDENT
+local CAT_GAP     = ns.CAT_GAP
+local ICON_X      = ns.ICON_X
 local ICON_SIZE   = ns.ICON_SIZE
 local CONTENT_W   = ns.CONTENT_W
 local SCROLL_STEP = ns.SCROLL_STEP
@@ -289,9 +293,16 @@ end)
 ------------------------------------------------------------------------
 -- Timer / rate
 ------------------------------------------------------------------------
+-- Optional item goal (db.itemGoal pieces per item, 0 = off): see ApplyValueBars.
+function ns.GetItemGoal()
+    local goal = tonumber(NightsFarmtrackerDB.itemGoal) or 0
+    return goal > 0 and goal or nil
+end
+
 -- Optional fixed session length (db.sessionLength minutes, 0 = off): the
 -- timer then counts down and the session pauses itself at 0.
 function ns.GetSessionLimit()
+    if ns.GetItemGoal() then return nil end   -- a goal runs the normal count-up timer
     local minutes = tonumber(NightsFarmtrackerDB.sessionLength) or 0
     return minutes > 0 and minutes * 60 or nil
 end
@@ -367,6 +378,14 @@ local function UpdateFrameHeight()
     end
 end
 
+-- The footer line is dropped while the list ends in a collapsed header and
+-- nothing scrolls (see ns.SetFooterLine); BuildHUD feeds the list state.
+local listFlow, listScrolls = ns.NewHeaderFlow(), false
+local function UpdateFooterLine()
+    ns.SetFooterLine(footerSep, listFlow,
+        listScrolls or #itemOrder == 0 or not NightsFarmtrackerDB.expanded)
+end
+
 function ns.SetExpanded(expand)
     NightsFarmtrackerDB.expanded = expand
     if expand then
@@ -377,6 +396,7 @@ function ns.SetExpanded(expand)
         btnToggle.tex:SetTexture(ART.."btn_expand.png")
         SafeSetMainHeight(COLLAPSED_H)
     end
+    UpdateFooterLine()
     if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
         ns.ReanchorLogFrame()
     end
@@ -466,7 +486,7 @@ end
 local function ResetRowLayout(row)
     row:SetSize(CONTENT_W, ROW_H)
     row.icon:ClearAllPoints()
-    row.icon:SetPoint("LEFT", 4, 0)
+    row.icon:SetPoint("LEFT", ICON_X, 0)
     row.nameText:ClearAllPoints()
     row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
     row.nameText:SetPoint("RIGHT", row,      "RIGHT", -128, 0)
@@ -485,12 +505,12 @@ local function AcquireRow()
     row = CreateFrame("Frame", nil, ListFrame)
     row:SetSize(CONTENT_W, ROW_H)
 
-    row.catBg = row:CreateTexture(nil,"BACKGROUND")
-    row.catBg:SetAllPoints()
-    ns.PaintCatBg(row.catBg)
-    -- Show/Hide rather than SetAlpha: a gradient texture doesn't reliably
-    -- honor region alpha, so item rows would still draw the header gradient.
-    row.catBg:Hide()
+    -- Header band (background + top/bottom line), only shown on category
+    -- headers. Show/Hide rather than SetAlpha: a gradient texture doesn't
+    -- reliably honor region alpha, so item rows would still draw the header
+    -- gradient.
+    ns.AddHeaderBand(row)
+    ns.ShowHeaderBand(row, false)
 
     row:EnableMouse(true); row:EnableMouseWheel(true)
     row:SetScript("OnMouseWheel", OnWheel)
@@ -552,24 +572,6 @@ local function AcquireRow()
         if GameTooltip:GetOwner()==self then GameTooltip:Hide() end
     end)
 
-    ns.AddRowSeparator(row)
-
-    -- Category header only: proper top+bottom border (matches the
-    -- Filter/Blacklist/History header style) instead of relying on the
-    -- faint item-list divider above, so each header reads as a clean
-    -- "line - background - line" block.
-    row.catTopSep = row:CreateTexture(nil,"ARTWORK")
-    row.catTopSep:SetHeight(1)
-    row.catTopSep:SetColorTexture(unpack(ns.COL_BORDER))
-    row.catTopSep:SetPoint("TOPLEFT"); row.catTopSep:SetPoint("TOPRIGHT")
-    row.catTopSep:Hide()
-
-    row.catBottomSep = row:CreateTexture(nil,"ARTWORK")
-    row.catBottomSep:SetHeight(1)
-    row.catBottomSep:SetColorTexture(unpack(ns.COL_BORDER))
-    row.catBottomSep:SetPoint("BOTTOMLEFT"); row.catBottomSep:SetPoint("BOTTOMRIGHT")
-    row.catBottomSep:Hide()
-
     ns.AddRowIcon(row)
     row.rankBadge = ns.CreateIconBadge(row, row.icon)
 
@@ -596,17 +598,25 @@ local function AcquireRow()
     row.srcText:SetJustifyH("LEFT")
     row.srcText:SetFontHeight(ns.FONT_SMALL)
 
+    -- Value bar: track and fill along the bottom edge, sized in SetValueBar.
+    row.barBg = row:CreateTexture(nil, "ARTWORK")
+    row.barBg:SetHeight(BAR_H)
+    row.barBg:SetColorTexture(1, 1, 1, 0.08)
+    row.bar =row:CreateTexture(nil, "OVERLAY")
+    row.bar:SetHeight(BAR_H)
+    row.barBg:Hide(); row.bar:Hide()
+    row.barValue, row.barCount = false, false
+
     ResetRowLayout(row)
     return row
 end
 
 local function ReleaseRow(row)
     row:Hide(); row:ClearAllPoints()
+    row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false
     row.itemName=nil; row.itemLink=nil; row.itemID=nil; row.baseItemID=nil
     row.isCategoryHeader=nil; row.categoryName=nil; row.isJunkMerged=nil
-    row.catBg:Hide()
-    row.catTopSep:Hide(); row.catBottomSep:Hide()
-    row.sep:Show()
+    ns.ShowHeaderBand(row, false)
     ResetRowLayout(row)
     row.icon:Show()
     row.srcText:SetText("")
@@ -620,7 +630,6 @@ local function PlaceRow(row, yOff, name, icon, nameColor, quality)
     row.icon:SetTexture(icon or ns.FALLBACK_ICON)
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); row.icon:Show()
     row.nameText:SetText(name)
-    row.sep:SetShown(yOff > 0)
     if nameColor then
         row.nameText:SetTextColor(unpack(nameColor)); row.iconBorder:Hide()
     else
@@ -645,6 +654,7 @@ end
 local SRC_SHIFT = 24
 local function ShowGold(row, ah, vendor, forceVendor)
     local shown = forceVendor and (vendor or 0) or math.max(ah or 0, vendor or 0)
+    row.barValue = shown
     row.goldText:SetText(shown > 0 and ns.FormatGold(shown) or "")
     if NightsFarmtrackerDB.showPriceSource and shown > 0 then
         local fromAH = not forceVendor and (ah or 0) >= (vendor or 0)
@@ -657,6 +667,70 @@ local function ShowGold(row, ah, vendor, forceVendor)
         row.srcText:SetText("")
     end
 end
+
+-- Value bars: every item row's value relative to the most valuable row, in
+-- the item's name color, from just right of the icon to the AH/V column. The
+-- merged junk row is a category sum, so it is left out of the scale (and
+-- capped at full length) unless it is all there is.
+-- The icon border sticks out 1 px on every side (ns.AddRowIcon), so the gap
+-- and the flush bottom edge are measured from the border, not the icon.
+local BAR_LEFT   = ICON_X + ICON_SIZE + 1 + BAR_GAP
+local BAR_BOTTOM = (ROW_H - ICON_SIZE) / 2 - 1
+local BAR_FULL_W   = CONTENT_W - BAR_LEFT   -- ends flush with the category header's right edge
+local GOAL_COL      = {0.2, 0.85, 0.2}
+local goalReached   = false
+
+local function DrawBar(row, frac, r, g, b)
+    row.barBg:ClearAllPoints()
+    row.barBg:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", BAR_LEFT, BAR_BOTTOM)
+    row.barBg:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, BAR_BOTTOM)
+    row.bar:ClearAllPoints()
+    row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", BAR_LEFT, BAR_BOTTOM)
+    row.bar:SetWidth(math.max(1, math.floor(BAR_FULL_W * math.min(1, frac))))
+    row.bar:SetColorTexture(r, g, b, 0.85)
+    row.barBg:Show(); row.bar:Show()
+end
+
+-- With an item goal (db.itemGoal) the bar is the item's count relative to the
+-- goal instead, and turns green once it is reached; goalReached then tells
+-- BuildHUD to pause the session. The merged junk row is a sum of many items,
+-- so it has no goal bar.
+local function ApplyValueBars()
+    local goal = ns.GetItemGoal()
+    goalReached = false
+    if goal then
+        for _, row in pairs(itemRows) do
+            local c = row.barCount
+            if c and c > 0 and not row.isJunkMerged then
+                if c >= goal then
+                    goalReached = true
+                    DrawBar(row, 1, unpack(GOAL_COL))
+                else
+                    DrawBar(row, c / goal, row.nameText:GetTextColor())
+                end
+            end
+        end
+        return
+    end
+
+    local maxValue, maxMerged = 0, 0
+    for _, row in pairs(itemRows) do
+        local v = row.barValue
+        if v then
+            if row.isJunkMerged then maxMerged = math.max(maxMerged, v)
+            else maxValue = math.max(maxValue, v) end
+        end
+    end
+    if maxValue == 0 then maxValue = maxMerged end
+    for _, row in pairs(itemRows) do
+        local v = row.barValue
+        if v and v > 0 and maxValue > 0 then
+            DrawBar(row, v / maxValue, row.nameText:GetTextColor())
+        end
+    end
+end
+
+function ns.GoalReached() return goalReached end
 
 ------------------------------------------------------------------------
 -- RefreshHUD
@@ -745,20 +819,21 @@ local function PlayGearThresholdSound(db, hasAH)
 end
 
 -- Category header row; returns it so an empty category can be dropped again.
-local function PlaceCategoryHeader(catName, cat, isCollapsed, yOffset)
+-- flow (ns.NewHeaderFlow) decides whether the header draws its top line.
+local function PlaceCategoryHeader(catName, cat, isCollapsed, yOffset, flow)
     local hdr = AcquireRow()
     hdr:SetSize(CONTENT_W, CAT_ROW_H)
     PlaceRow(hdr, yOffset, catName, nil, ns.COL_ACCENT)
     hdr.icon:Hide(); hdr.iconBorder:Hide()
     hdr.countText:SetText("")
     hdr.isCategoryHeader = true; hdr.categoryName = catName
-    hdr.catBg:Show()
-    hdr.catTopSep:Show(); hdr.catBottomSep:Show()
-    hdr.sep:Hide()
+    ns.ShowHeaderBand(hdr, true)
+    flow.header(hdr)
+    ns.SetHeaderArrow(hdr, isCollapsed)
     hdr.nameText:ClearAllPoints()
-    hdr.nameText:SetPoint("LEFT",  4, 0)
+    hdr.nameText:SetPoint("LEFT",  ns.HEADER_TEXT_X, 0)
     hdr.nameText:SetPoint("RIGHT", hdr, "RIGHT", -100, 0)
-    hdr.nameText:SetText((isCollapsed and "+ " or "- ") .. catName)
+    hdr.nameText:SetText(catName)
     hdr.nameText:SetFontHeight(ns.FONT_NORMAL)
     hdr.goldText:ClearAllPoints()
     -- same right edge as the item amounts below (they leave room for the AH/V tag)
@@ -850,10 +925,9 @@ end
 local function RenderFlatRow(fi, yOffset)
     local row = AcquireRow()
     local d = fi.d
-    row.sep:SetShown(yOffset > 0)
     row.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); row.icon:Show()
-    row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", 4 + CAT_INDENT, 0)
+    row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", ICON_X, 0)
     row:SetPoint("TOPLEFT", 0, -yOffset)
     ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality, {1, 1, 1})
     row.nameText:ClearAllPoints()
@@ -865,7 +939,7 @@ local function RenderFlatRow(fi, yOffset)
         row.itemName = fi.name; row.itemID = fi.tid; row.itemLink = nil; row.baseItemID = d.itemID
         row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, fi.tid)))
         row.rankBadge:SetText(fi.rankIcon or "")
-        row.countText:SetText(tostring(fi.tc))
+        row.countText:SetText(tostring(fi.tc)); row.barCount = fi.tc
         ShowGold(row, fi.tAH, fi.tV, fi.fv)
         itemOrder[#itemOrder + 1] = key; itemRows[key] = row
     elseif fi.isGearVariant then
@@ -874,7 +948,7 @@ local function RenderFlatRow(fi, yOffset)
         row.itemName = fi.name; row.itemID = d.itemID; row.itemLink = gv.itemLink; row.baseItemID = d.itemID
         row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, gv.itemLink or d.itemID)))
         row.rankBadge:SetText("")
-        row.countText:SetText(tostring(gv.amount))
+        row.countText:SetText(tostring(gv.amount)); row.barCount = gv.amount
         ShowGold(row, fi.tAH, fi.tV, fi.fv)
         itemOrder[#itemOrder + 1] = key; itemRows[key] = row
     else
@@ -888,7 +962,7 @@ local function RenderFlatRow(fi, yOffset)
         end
         row.nameText:SetText(d.isJunkMerged and ns.TruncateName(fi.name) or ns.TruncateName(ns.DisplayName(fi.name, d.itemID)))
         row.rankBadge:SetText(ns.RankIconFromLink(d.itemLink) or "")
-        row.countText:SetText(tostring(d.amount))
+        row.countText:SetText(tostring(d.amount)); row.barCount = d.amount
         ShowGold(row, it.ah, it.vendor, fi.fv)
         itemOrder[#itemOrder + 1] = it.itemID; itemRows[it.itemID] = row
     end
@@ -920,10 +994,12 @@ local function BuildHUD()
     end)
 
     local yOffset = 0
+    local flow = ns.NewHeaderFlow()
     for _, entry in ipairs(sorted) do
         local catName, cat = entry.name, entry.cat
         local isCollapsed = db.collapsed[catName]
-        local hdr = PlaceCategoryHeader(catName, cat, isCollapsed, yOffset)
+        local lineAbove = flow.after
+        local hdr = PlaceCategoryHeader(catName, cat, isCollapsed, yOffset, flow)
         yOffset = yOffset + CAT_ROW_H
 
         if not isCollapsed then
@@ -932,19 +1008,34 @@ local function BuildHUD()
                 -- nothing displayable: skip the category entirely
                 DropLastHeader(hdr, catName)
                 yOffset = yOffset - CAT_ROW_H
+                flow.after = lineAbove
             else
+                yOffset = yOffset + CAT_GAP
                 for _, fi in ipairs(flat) do
                     RenderFlatRow(fi, yOffset)
                     yOffset = yOffset + ROW_H
                 end
+                yOffset = yOffset + CAT_GAP
+                flow.rows()
             end
         end
     end
+
+    ApplyValueBars()
+    if goalReached and not db.paused then
+        db.paused = true
+        ns.StopTimer()
+        ns.Print(ns.L["item_goal_reached"])
+    end
+    ns.ApplyPauseVisuals()
 
     totalH = yOffset
     local maxScroll = math.max(0, totalH - ScrollFrame:GetHeight())
     ScrollFrame:SetVerticalScroll(math.min(savedScroll, maxScroll))
     UpdateFrameHeight()
+    listFlow = flow
+    listScrolls = ns.VisibleListHeight(totalH, SCROLL_TOP + 1, FOOTER_H) < totalH
+    UpdateFooterLine()
     UpdateSummary(grandTotal)
 
     if ns.FilterFrame and ns.FilterFrame:IsShown() then
@@ -983,6 +1074,7 @@ function ns.Reset(skipSave)
     for _, row in pairs(itemRows) do ReleaseRow(row) end
     itemRows, itemOrder = {}, {}
     cachedGold = 0
+    goalReached = false
     ns.UpdateTimerDisplay()
     MainFrame.totalGoldText:SetText("")
     btnRate.text:SetText("")
@@ -994,8 +1086,8 @@ end
 function ns.ApplyPauseVisuals()
     if NightsFarmtrackerDB.paused then
         btnPause.tex:SetTexture(ART.."btn_play.png")
-        if ns.SessionLimitReached() then
-            MainFrame.TimerText:SetTextColor(0.85, 0.3, 0.3)   -- session length used up
+        if ns.SessionLimitReached() or ns.GoalReached() then
+            MainFrame.TimerText:SetTextColor(0.85, 0.3, 0.3)   -- session length used up / goal reached
         else
             MainFrame.TimerText:SetTextColor(0.65, 0.70, 0.72)
         end
@@ -1065,6 +1157,10 @@ btnPause:SetScript("OnClick", function()
     -- pause again on the next tick): point to Reset / the setting instead.
     if NightsFarmtrackerDB.paused and ns.SessionLimitReached() then
         ns.Print(ns.L["session_length_reached_resume"])
+        return
+    end
+    if NightsFarmtrackerDB.paused and ns.GoalReached() then
+        ns.Print(ns.L["item_goal_reached_resume"])
         return
     end
     NightsFarmtrackerDB.paused = not NightsFarmtrackerDB.paused

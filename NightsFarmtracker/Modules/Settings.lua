@@ -224,6 +224,7 @@ local tsmCustomEB
 local themeDropdown
 local gearThresholdEB
 local sessionLengthEB
+local itemGoalEB
 local maxHeightEB
 local profileDropdown
 local profileButtons
@@ -526,6 +527,31 @@ local function MakeSessionLengthEB(parent, yOff)
         NightsFarmtrackerDB.sessionLength = tonumber(self:GetText()) or 0
         ns.UpdateTimerDisplay()
         ns.ApplyPauseVisuals()
+    end)
+    return frame
+end
+
+-- Session length has no meaning while an item goal runs the count-up timer.
+local function UpdateSessionLengthLock()
+    if not sessionLengthEB then return end
+    local locked = ns.GetItemGoal() ~= nil
+    sessionLengthEB.eb:SetEnabled(not locked)
+    sessionLengthEB:SetAlpha(locked and 0.4 or 1)
+    sessionLengthEB.unitLbl:SetAlpha(locked and 0.4 or 1)
+end
+
+-- Item goal (pieces per item, 0 = off). Applied when the field loses focus /
+-- Enter is pressed, not per keystroke - typing "5" on the way to "500" would
+-- otherwise reach the goal and pause the session on the first digit.
+local function MakeItemGoalEB(parent, yOff)
+    local frame, eb = MakeNumberBox(parent, yOff, 6, ns.L["pieces_suffix"])
+    eb:HookScript("OnEditFocusLost", function(self)
+        local v = tonumber(self:GetText()) or 0
+        self:SetText(v > 0 and tostring(v) or "")
+        NightsFarmtrackerDB.itemGoal = v
+        UpdateSessionLengthLock()
+        ns.UpdateTimerDisplay()
+        ns.RefreshHUD()
     end)
     return frame
 end
@@ -1345,6 +1371,17 @@ function ns.RebuildSettingsContent()
         local lenMin = tonumber(db.sessionLength) or 0
         sessionLengthEB.eb:SetText(lenMin > 0 and tostring(lenMin) or "")
         track(sessionLengthEB, "other")
+        UpdateSessionLengthLock()
+        y = y - 40
+
+        -- Item goal: per-item progress bar, green and timer stop at the goal.
+        local goalHint = wrappedHint(y, ns.L["item_goal_hint"])
+        y = y - math.ceil(goalHint:GetStringHeight()) - 6
+
+        itemGoalEB = PlaceWidget(itemGoalEB, MakeItemGoalEB, y)
+        local goal = tonumber(db.itemGoal) or 0
+        itemGoalEB.eb:SetText(goal > 0 and tostring(goal) or "")
+        track(itemGoalEB, "other")
         y = y - 40
 
         -- Max window height: windows grow up to this, then their lists scroll.

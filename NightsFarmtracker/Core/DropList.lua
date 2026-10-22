@@ -21,23 +21,10 @@ function ns.CreateSectionHeader(parent, width)
     header:SetSize(width, ns.CAT_ROW_H)
     header:EnableMouse(true)
 
-    local bg = header:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    ns.PaintCatBg(bg)
-    header.bg = bg
-
-    local topSep = header:CreateTexture(nil, "ARTWORK"); topSep:SetHeight(1)
-    topSep:SetColorTexture(unpack(ns.COL_BORDER))
-    topSep:SetPoint("TOPLEFT"); topSep:SetPoint("TOPRIGHT")
-    header.topSep = topSep
-
-    local sep = header:CreateTexture(nil, "ARTWORK"); sep:SetHeight(1)
-    sep:SetColorTexture(unpack(ns.COL_BORDER))
-    sep:SetPoint("BOTTOMLEFT"); sep:SetPoint("BOTTOMRIGHT")
-    header.sep = sep
+    ns.AddHeaderBand(header)
 
     local text = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    text:SetPoint("LEFT", 4, 0)
+    text:SetPoint("LEFT", ns.HEADER_TEXT_X, 0)
     text:SetFontHeight(ns.FONT_NORMAL)
     text:SetTextColor(unpack(ns.COL_ACCENT))
     header.text = text
@@ -99,8 +86,7 @@ function ns.CreateDropListItemRow(parent, onShiftRemove)
     r:SetSize(ns.CONTENT_W, ns.ROW_H)
     r:EnableMouse(true)
 
-    ns.AddRowSeparator(r)
-    ns.AddRowIcon(r):SetPoint("LEFT", 4, 0)
+    ns.AddRowIcon(r):SetPoint("LEFT", ns.ICON_X, 0)
 
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 8, 0)
@@ -187,8 +173,7 @@ end
 -- Collapsible checkbox section: a header above one pooled checkbox row per
 -- entry. Arguments: frame (parent of the rows), header (from
 -- CreateSectionHeader), pool/rows (this section's row pool and active rows),
--- padX, secTop (Y where the section starts), titleText (without the "+"/"-"
--- prefix), collapsed, entries ({ key, label } list), isEnabled(key) and
+-- padX, secTop (Y where the section starts), titleText, collapsed, entries ({ key, label } list), isEnabled(key) and
 -- setEnabled(key, value), onChanged() (optional). Returns the Y where the
 -- next section starts.
 ------------------------------------------------------------------------
@@ -201,7 +186,8 @@ function ns.RebuildCheckboxSection(frame, header, pool, rows, padX, secTop, titl
 
     header:ClearAllPoints()
     header:SetPoint("TOPLEFT", padX, -secTop)
-    header.text:SetText((collapsed and "+ " or "- ") .. titleText)
+    ns.SetHeaderArrow(header, collapsed)
+    header.text:SetText(titleText)
 
     local n = 0
     if not collapsed then
@@ -328,6 +314,7 @@ function ns.RebuildDropItemList(cfg)
     end)
 
     local yOff = cfg.itemsTop
+    local flow = ns.NewHeaderFlow(false)   -- the drop zone above has no line of its own
     for _, exp in ipairs(order) do
         local list = groups[exp]
         table.sort(list, function(a, b) return (a.name or "") < (b.name or "") end)
@@ -340,7 +327,9 @@ function ns.RebuildDropItemList(cfg)
         if h then h:SetParent(cfg.listFrame); h:Show()
         else h = CreateItemGroupHeader(cfg.listFrame) end
         h:SetPoint("TOPLEFT", 0, -yOff)
-        h.text:SetText((collapsed and "+ " or "- ") .. groupName .. " (" .. #list .. ")")
+        flow.header(h)
+        ns.SetHeaderArrow(h, collapsed)
+        h.text:SetText(groupName .. " (" .. #list .. ")")
         h.groupKey, h.groupName, h.collapsed, h.rebuild, h.onRemove = exp, groupName, cfg.collapsed, cfg.rebuild, cfg.onRemoveGroup
         local ids = {}
         for i, e in ipairs(list) do ids[i] = e.itemID end
@@ -349,12 +338,12 @@ function ns.RebuildDropItemList(cfg)
         yOff = yOff + ns.CAT_ROW_H
 
         if not collapsed then
-            for i, e in ipairs(list) do
+            yOff = yOff + ns.CAT_GAP
+            for _, e in ipairs(list) do
                 local r = table.remove(pool)
                 if r then r:SetParent(cfg.listFrame); r:Show()
                 else r = ns.CreateDropListItemRow(cfg.listFrame, cfg.onShiftRemove) end
                 r:SetPoint("TOPLEFT", 0, -yOff)
-                r.sep:SetShown(i > 1)
                 r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
                 r.nameText:SetText(ns.TruncateName(ns.DisplayName(e.name, e.itemID) or ("Item " .. e.itemID)))
                 r.itemID = e.itemID
@@ -362,6 +351,8 @@ function ns.RebuildDropItemList(cfg)
                 rows[#rows + 1] = r
                 yOff = yOff + ns.ROW_H
             end
+            yOff = yOff + ns.CAT_GAP
+            flow.rows()
         end
     end
 

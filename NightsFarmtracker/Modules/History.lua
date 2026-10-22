@@ -45,7 +45,7 @@ local function AcquireSessRow()
     r=CreateFrame("Frame",nil,HListFrame); r:SetHeight(SESS_H); r:EnableMouse(true)
     r.bg=r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); r.bg:SetColorTexture(1,1,1,0.05); r.bg:Hide()
     r.sep=r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1)
-    r.sep:SetColorTexture(0.18,0.28,0.30,0.55); r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
+    r.sep:SetColorTexture(ns.COL_BORDER[1],ns.COL_BORDER[2],ns.COL_BORDER[3],0.55); r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
     -- Single-line: [Dauer] [Gold] [X]
     r.dateText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.dateText:SetPoint("LEFT",6,0); r.dateText:SetTextColor(0.9,0.9,0.9); r.dateText:SetFontHeight(ns.FONT_NORMAL)
@@ -78,11 +78,7 @@ local function AcquireDayRow()
     local r=table.remove(dayPool)
     if r then r:SetParent(HListFrame); r:Show(); return r end
     r=CreateFrame("Frame",nil,HListFrame); r:SetHeight(DAY_H); r:EnableMouse(true)
-    r.bg=r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); ns.PaintCatBg(r.bg)
-    r.topSep=r:CreateTexture(nil,"ARTWORK"); r.topSep:SetHeight(1); r.topSep:SetColorTexture(unpack(ns.COL_BORDER))
-    r.topSep:SetPoint("TOPLEFT"); r.topSep:SetPoint("TOPRIGHT")
-    r.sep=r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1); r.sep:SetColorTexture(unpack(ns.COL_BORDER))
-    r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
+    ns.AddHeaderBand(r)
     r.dateText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.dateText:SetPoint("LEFT",4,0); r.dateText:SetFontHeight(ns.FONT_NORMAL); r.dateText:SetTextColor(unpack(ns.COL_ACCENT))
     r.infoText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -125,15 +121,9 @@ local function AcquireMonthRow()
     local r=table.remove(monthPool)
     if r then r:SetParent(HListFrame); r:Show(); return r end
     r=CreateFrame("Frame",nil,HListFrame); r:SetHeight(MONTH_H); r:EnableMouse(true)
-    r.bg=r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); ns.PaintCatBg(r.bg)
-    r.topSep=r:CreateTexture(nil,"ARTWORK"); r.topSep:SetHeight(1); r.topSep:SetColorTexture(unpack(ns.COL_BORDER))
-    r.topSep:SetPoint("TOPLEFT"); r.topSep:SetPoint("TOPRIGHT")
-    r.sep=r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1); r.sep:SetColorTexture(unpack(ns.COL_BORDER))
-    r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
-    r.arrow = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.arrow:SetPoint("LEFT",4,0); r.arrow:SetFontHeight(ns.FONT_NORMAL); r.arrow:SetTextColor(unpack(ns.COL_ACCENT))
+    ns.AddHeaderBand(r)
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.nameText:SetPoint("LEFT",r.arrow,"RIGHT",4,0); r.nameText:SetFontHeight(ns.FONT_NORMAL)
+    r.nameText:SetPoint("LEFT",ns.HEADER_TEXT_X,0); r.nameText:SetFontHeight(ns.FONT_NORMAL)
     r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
     r.delBtn = ns.CreateCloseButton(r, 18, 0.5, ns.L["delete_month"]); r.delBtn:SetPoint("RIGHT",-2,0)
     r.goldText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -171,7 +161,6 @@ local function AcquireDetRow()
     r:SetSize(DET_CONT_W, DET_ROW_H)
     r:EnableMouse(true)
 
-    ns.AddRowSeparator(r)
     ns.AddRowIcon(r):SetPoint("LEFT", 4, 0)
     r.rankBadge = ns.CreateIconBadge(r, r.icon)
 
@@ -245,7 +234,7 @@ end
 local function ReleaseDetRow(r)
     r:Hide(); r:ClearAllPoints(); r.itemID=nil; r.itemLink=nil; r.classID=nil; r.itemName=nil; r.iconBorder:Hide()
     r.breakdown=nil; r.goldHit:Hide()
-    r.icon:ClearAllPoints(); r.icon:SetPoint("LEFT", 4, 0)
+    r.icon:ClearAllPoints(); r.icon:SetPoint("LEFT", ns.ICON_X, 0)
     r.goldText:SetTextColor(unpack(ns.COL_GOLD))
     r.rankBadge:SetText("")
     detRowPool[#detRowPool+1]=r
@@ -256,13 +245,9 @@ local function AcquireDetCat()
     if r then r:SetParent(DListFrame); r:Show(); return r end
     r = CreateFrame("Frame", nil, DListFrame); r:SetHeight(DET_CAT_H)
     r:EnableMouse(true)
-    r.bg = r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); ns.PaintCatBg(r.bg)
-    r.topSep = r:CreateTexture(nil,"ARTWORK"); r.topSep:SetHeight(1); r.topSep:SetColorTexture(unpack(ns.COL_BORDER))
-    r.topSep:SetPoint("TOPLEFT"); r.topSep:SetPoint("TOPRIGHT")
-    r.sep = r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1); r.sep:SetColorTexture(unpack(ns.COL_BORDER))
-    r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
+    ns.AddHeaderBand(r)
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.nameText:SetPoint("LEFT",4,0); r.nameText:SetPoint("RIGHT",r,"RIGHT",-100,0)
+    r.nameText:SetPoint("LEFT",ns.HEADER_TEXT_X,0); r.nameText:SetPoint("RIGHT",r,"RIGHT",-100,0)
     r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(ns.FONT_NORMAL); r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
     r.goldText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.goldText:SetPoint("RIGHT",r,"RIGHT",-4,0); r.goldText:SetJustifyH("RIGHT")
@@ -418,12 +403,15 @@ local function RebuildDetailContent(session)
     detailStats = { kinds = kinds, qty = qty }
 
     local yOff = 0
+    local flow = ns.NewHeaderFlow()
     for _, catName in ipairs(catOrder) do
         local cat = cats[catName]
         if #cat.items > 0 then
             local ch = AcquireDetCat(); ch:SetSize(DET_CONT_W, DET_CAT_H); ch:SetPoint("TOPLEFT",0,-yOff)
+            flow.header(ch)
             local isCollapsed = detCollapsed[catName]
-            ch.nameText:SetText((isCollapsed and "+ " or "- ")..catName)
+            ns.SetHeaderArrow(ch, isCollapsed)
+            ch.nameText:SetText(catName)
             ch.goldText:SetText(cat.gold > 0 and ns.FormatGold(cat.gold) or "")
             ch:SetScript("OnMouseUp", function()
                 detCollapsed[catName] = not detCollapsed[catName]
@@ -432,18 +420,18 @@ local function RebuildDetailContent(session)
             activeDetCats[#activeDetCats+1]=ch; yOff = yOff + DET_CAT_H
 
             if not isCollapsed then
+                yOff = yOff + ns.CAT_GAP
                 for _, entry in ipairs(cat.items) do
                     local ir = AcquireDetRow(); ir:SetWidth(DET_CONT_W); ir:SetPoint("TOPLEFT",0,-yOff)
-                    ir.sep:SetShown(yOff > 0)
-                    -- Indent icon like in the main frame
-                    ir.icon:ClearAllPoints(); ir.icon:SetPoint("LEFT", 4 + ns.CAT_INDENT, 0)
+                    ir.icon:ClearAllPoints(); ir.icon:SetPoint("LEFT", ns.ICON_X, 0)
                     ir.nameText:ClearAllPoints()
                     ir.nameText:SetPoint("LEFT",  ir.icon, "RIGHT", 4, 0)
                     ir.nameText:SetPoint("RIGHT", ir,           "RIGHT", -128, 0)
                     FillDetailRow(ir, entry)
                     activeDetRows[#activeDetRows+1]=ir; yOff = yOff + DET_ROW_H
                 end
-                yOff = yOff + 2
+                yOff = yOff + ns.CAT_GAP
+                flow.rows()
             end
         end
     end
@@ -563,13 +551,15 @@ function ns.RebuildHistory()
     accDB.collapsedMonths=accDB.collapsedMonths or {}
 
     local yOffset=0
+    local flow=ns.NewHeaderFlow()
     for _,mKey in ipairs(monthOrder) do
         local month=months[mKey]
         -- default: current month expanded, past months collapsed — user choice wins
         local collapsed=accDB.collapsedMonths[mKey]
         if collapsed==nil then collapsed=not month.isCurrent end
         local mrow=AcquireMonthRow(); mrow:SetSize(ns.CONTENT_W, MONTH_H); mrow:SetPoint("TOPLEFT",0,-yOffset)
-        mrow.arrow:SetText(collapsed and "+" or "-")
+        flow.header(mrow)
+        ns.SetHeaderArrow(mrow, collapsed)
         mrow.nameText:SetText(month.label)
         local monthCombined = (month.totalGold or 0) + (month.lootedGold or 0)
         mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
@@ -611,6 +601,7 @@ function ns.RebuildHistory()
                 local skipDayRow = (not month.isCurrent) and #month.dayList==1 and #day.sessions==1
                 if not skipDayRow then
                     local drow=AcquireDayRow(); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
+                    flow.header(drow)
                     drow.dateText:SetText(dStr)
                     drow.goldText:SetText("")
                     if #day.sessions > 1 then
@@ -624,9 +615,10 @@ function ns.RebuildHistory()
                     end
                     activeDayRows[#activeDayRows+1]=drow; yOffset=yOffset+DAY_H
                 end
-                for _,entry in ipairs(day.sessions) do
+                for si,entry in ipairs(day.sessions) do
                     local session=entry.session
                     local row=AcquireSessRow(); row:SetWidth(ns.CONTENT_W); row:SetPoint("TOPLEFT",0,-yOffset)
+                    row.sep:SetShown(si < #day.sessions)   -- only between sessions; a header line follows the last one
                     row.session=session
                     local combinedGold = (session.totalGold or 0) + (session.lootedGold or 0)
                     row.dateText:SetText(ns.FormatTime(session.duration))
@@ -650,15 +642,19 @@ function ns.RebuildHistory()
                         ns.RebuildHistory()
                     end)
                     activeSessRows[#activeSessRows+1]=row; yOffset=yOffset+SESS_H
+                    flow.rows()
                 end
             end
         end
     end
-    ns.FitScrollWindow({
+    local visH = ns.FitScrollWindow({
         window=HistFrame, scroll=HScrollFrame, list=HListFrame, anchored=true,
         hdrH=H_HDR_H, ftrH=H_FTR_H, contentH=yOffset,
         minH=yOffset==0 and 44 or nil,   -- empty: room for the "no sessions" label
     })
+    if HistFrame.footerSep then
+        ns.SetFooterLine(HistFrame.footerSep, flow, yOffset == 0 or visH < yOffset)
+    end
     -- nTotal already counted above while grouping by day
     if nTotal==0 then
         HistFrame.countLabel:SetText("")
@@ -725,6 +721,7 @@ local function EnsureHistFrame()
     local fSep=HistFrame:CreateTexture(nil,"ARTWORK"); fSep:SetHeight(1)
     fSep:SetColorTexture(unpack(ns.COL_BORDER))
     fSep:SetPoint("BOTTOMLEFT",H_PAD,H_FTR_H-2); fSep:SetPoint("BOTTOMRIGHT",-H_PAD,H_FTR_H-2)
+    HistFrame.footerSep = fSep
 
     HistFrame.countLabel = HistFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     HistFrame.countLabel:SetPoint("BOTTOMLEFT",H_PAD,8); HistFrame.countLabel:SetTextColor(0.40,0.40,0.40)

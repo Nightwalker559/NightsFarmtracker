@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.7.9
+
+### New
+
+- Value bar under every item row (share of the most valuable item)
+- Item goal (Settings, Display): bar shows progress, turns green at the goal and pauses the timer; replaces Session length
+- Own arrow icons for collapsing and expanding headers
+
+### Changed
+
+- Item rows: icons flush with the header edge, no divider lines, 2 px spacing
+- Exactly one line between neighbouring headers and above the footer
+
 ## 1.7.8
 
 ### New
