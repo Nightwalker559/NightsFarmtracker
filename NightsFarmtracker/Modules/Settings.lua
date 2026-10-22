@@ -63,7 +63,7 @@ local S_SCROLL_STEP = 22
 -- Checkboxes and radio dots are CTRL_SIZE squares with CTRL_GAP between the
 -- rows of a group. CHECK_RUN_TAIL is the extra space after the last checkbox of
 -- a run (before a section title or a block of other widgets).
-local CTRL_SIZE, CTRL_GAP = 14, 6
+local CTRL_SIZE, CTRL_GAP = 14, ns.CTRL_GAP
 local CHECK_RUN_TAIL = 18
 
 ------------------------------------------------------------------------
@@ -1316,7 +1316,7 @@ function ns.RebuildSettingsContent()
             ConfigureRadio(row, opt.label, y, opt.value, setAH)
             row:SetSelected(getAH() == opt.value)
             row:SetEnabled(opt.avail)
-            y = y - 24
+            y = y - CTRL_SIZE - CTRL_GAP
             if opt.value == "auto" and availableCount > 1 then
                 hintLabel(S_PAD + 22, y, ns.L["ah_auto_info"], 0.38)
                 y = y - 16
