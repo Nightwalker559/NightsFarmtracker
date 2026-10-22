@@ -682,8 +682,10 @@ end
 -- the theme's accent color. The merged junk row is a category sum, so it is
 -- left out of the scale (and capped at full length) unless it is all there is.
 local goalReached = false
+local barsShown   = true   -- db.showValueBar, read once per ApplyValueBars
 
 local function DrawBar(row, frac, r, g, b)
+    if not barsShown then return end
     row.bar:SetWidth(math.max(1, math.floor(BAR_FULL_W * math.min(1, frac))))
     row.bar:SetColorTexture(r, g, b, 0.85)
     row.barBg:Show(); row.bar:Show()
@@ -691,11 +693,12 @@ end
 
 -- With an item goal (db.itemGoal) the bar is the item's count relative to the
 -- goal instead, and turns green once it is reached; goalReached then tells
--- BuildHUD to pause the session. The merged junk row is a sum of many items,
--- so it has no goal bar.
+-- BuildHUD to pause the session (also with the bars switched off). The merged
+-- junk row is a sum of many items, so it has no goal bar.
 local function ApplyValueBars()
     local goal = ns.GetItemGoal()
     goalReached = false
+    barsShown = NightsFarmtrackerDB.showValueBar ~= false
     if goal then
         for _, row in pairs(itemRows) do
             local c = row.barCount
@@ -710,6 +713,7 @@ local function ApplyValueBars()
         end
         return
     end
+    if not barsShown then return end
 
     local maxValue, maxMerged = 0, 0
     for _, row in pairs(itemRows) do

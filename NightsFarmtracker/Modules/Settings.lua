@@ -1399,6 +1399,7 @@ function ns.RebuildSettingsContent()
             function(v) db.goldDisplayMode = v; ns.RefreshHUD() end, 28)
 
         y = flag(y, "show_price_source", "showPriceSource", false, function() ns.RefreshHUD() end)
+        y = flag(y, "show_value_bar", "showValueBar", true, function() ns.RefreshHUD() end)
         y = checkbox(y, "minimap_button",
             function() return not db.minimap.hide end,
             function(v) ns.SetMinimapVisible(v) end)

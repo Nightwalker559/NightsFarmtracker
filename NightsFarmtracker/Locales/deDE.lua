@@ -133,6 +133,7 @@ L["session_length_reached_resume"] = "Session-Länge erreicht. Zurücksetzen fü
 L["gold_display_classic"] = "Klassische Gold-Anzeige (Icons)"
 L["gold_display_modern"]  = "Moderne Gold-Anzeige (farbiger Text)"
 L["show_price_source"]    = "Preisquelle vor dem Itemwert anzeigen (AH / V)"
+L["show_value_bar"]       = "Balken unter jeder Itemzeile anzeigen"
 -- Modern gold display suffixes
 L["coin_gold"]   = "g"
 L["coin_silver"] = "s"

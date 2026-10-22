@@ -7,6 +7,7 @@
 - Value bar under every item row (share of the most valuable item)
 - Item goal (Settings, Display): bar shows progress, turns green at the goal and pauses the timer; replaces Session length
 - Own arrow icons for collapsing and expanding headers
+- Option to hide the item bars (Settings, Display)
 
 ### Changed
 

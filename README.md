@@ -44,7 +44,7 @@ Rows show icon, name, amount and value, colored by item quality. Hover an item f
 - Crafting reagents show their quality tier (R1/R2/R3) with a price per tier.
 - Scaling gear is listed per item level and quality, so rolls of different value never mix.
 - Gold dropped directly by mobs is tracked separately.
-- Every item row has a thin value bar showing its share of the most valuable item, in the theme color.
+- Every item row has a thin value bar showing its share of the most valuable item, in the theme color (can be switched off in the settings).
 - The session timer can run for a fixed length: it counts down and pauses itself at 0.
 - Alternatively set an **item goal** (pieces per item): the bars then show the progress to it, turn green when an item reaches it, and the session pauses. The timer counts up in that case, so the fixed length is not available.
 - `/reload` pauses the session; a relog saves it to the history and starts fresh.

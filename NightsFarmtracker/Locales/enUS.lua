@@ -140,6 +140,7 @@ L["session_length_reached_resume"] = "Session length reached. Reset to start a n
 L["gold_display_classic"] = "Classic gold display (icons)"
 L["gold_display_modern"]  = "Modern gold display (colored text)"
 L["show_price_source"]    = "Show price source before item value (AH / V)"
+L["show_value_bar"]       = "Show the bar under each item row"
 -- Modern gold display suffixes
 L["coin_gold"]   = "g"
 L["coin_silver"] = "s"
