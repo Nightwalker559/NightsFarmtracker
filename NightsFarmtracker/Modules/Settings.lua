@@ -60,6 +60,12 @@ local S_HDR_H      = ns.WINDOW_HDR_H
 local S_FTR_H       = 26   -- footer strip height (Reset to Default button)
 local S_SCROLL_STEP = 22
 
+-- Checkboxes and radio dots are CTRL_SIZE squares with CTRL_GAP between the
+-- rows of a group. CHECK_RUN_TAIL is the extra space after the last checkbox of
+-- a run (before a section title or a block of other widgets).
+local CTRL_SIZE, CTRL_GAP = 14, 6
+local CHECK_RUN_TAIL = 18
+
 ------------------------------------------------------------------------
 -- Radio button row — pooled (built once, reconfigured on reuse) so
 -- RebuildSettingsContent doesn't leak new Frame/FontString objects on
@@ -77,11 +83,11 @@ local function AcquireRadio(parent)
     end
 
     row = CreateFrame("Frame", nil, parent)
-    row:SetSize(S_W - S_PAD*2, 22)
+    row:SetSize(S_W - S_PAD*2, CTRL_SIZE + CTRL_GAP)
 
     local dot = CreateFrame("Frame", nil, row, "BackdropTemplate")
-    dot:SetSize(14, 14)
-    dot:SetPoint("LEFT", 0, 0)
+    dot:SetSize(CTRL_SIZE, CTRL_SIZE)
+    dot:SetPoint("TOPLEFT", 0, -4)
     ns.StyleBackdropBox(dot)
 
     local fill = dot:CreateTexture(nil,"ARTWORK")
@@ -1020,10 +1026,10 @@ local function AcquireCheckbox(parent)
     end
 
     row = CreateFrame("Frame", nil, parent)
-    row:SetSize(S_W - S_PAD*2, 36)
+    row:SetSize(S_W - S_PAD*2, CTRL_SIZE + CTRL_GAP)
 
     local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
-    box:SetSize(14, 14); box:SetPoint("TOPLEFT", 0, -4)
+    box:SetSize(CTRL_SIZE, CTRL_SIZE); box:SetPoint("TOPLEFT", 0, -4)
     ns.StyleBackdropBox(box)
 
     local check = box:CreateTexture(nil,"ARTWORK")
@@ -1033,7 +1039,7 @@ local function AcquireCheckbox(parent)
 
     local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     lbl:SetPoint("TOPLEFT", box, "TOPRIGHT", 8, 0)
-    lbl:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    lbl:SetWidth(S_W - S_PAD*2 - CTRL_SIZE - 8)   -- fixed width: GetStringHeight of a wrapped label is exact
     lbl:SetJustifyH("LEFT")
     lbl:SetWordWrap(true)
     row.label = lbl
@@ -1046,6 +1052,7 @@ end
 local function ConfigureCheckbox(row, label, yOff, getValue, setValue)
     row:SetPoint("TOPLEFT", S_PAD, yOff)
     row.label:SetText(label)
+    row:SetHeight(4 + math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())))   -- hit area follows a wrapped label
 
     local function Refresh()
         if getValue() then row.check:Show(); row.label:SetTextColor(1,0.82,0)
@@ -1248,10 +1255,11 @@ function ns.RebuildSettingsContent()
         fs:SetText(text)
     end
 
-    -- Checkbox row at y; returns the y below it.
+    -- Checkbox row at y; returns the y below it: CTRL_GAP below the box or
+    -- the (possibly wrapped) label, whichever is taller.
     local function checkbox(y, labelKey, get, set)
-        ConfigureCheckbox(track(AcquireCheckbox(SListFrame), "checkbox"), ns.L[labelKey], y, get, set)
-        return y - 38
+        local row = ConfigureCheckbox(track(AcquireCheckbox(SListFrame), "checkbox"), ns.L[labelKey], y, get, set)
+        return y - math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())) - CTRL_GAP
     end
 
     -- Checkbox bound to db[key]. With defaultOn an unset value counts as
@@ -1277,7 +1285,7 @@ function ns.RebuildSettingsContent()
             ConfigureRadio(row, ns.L[opt[1]], y, opt[2], set)
             row:SetSelected(current == opt[2]); row:SetEnabled(true)
             rows[i] = row
-            y = y - (i < #options and 24 or after)
+            y = y - (i < #options and CTRL_SIZE + CTRL_GAP or after)
         end
         return y, rows
     end
@@ -1331,7 +1339,7 @@ function ns.RebuildSettingsContent()
 
         -- TSM source block, only if TSM is installed.
         if ns.HasTSM() then
-            y = y - 4
+            y = y - CHECK_RUN_TAIL - 4
             wrappedHint(y, ns.L["tsm_hint"])
             y = y - 28
 
@@ -1475,6 +1483,7 @@ function ns.RebuildSettingsContent()
         y = sectionTitle(y, "session_history", 26)
 
         y = flag(y, "session_history_enabled", "sessionHistoryEnabled", true, function() ns.RefreshLeftButtons() end)
+        y = y - CHECK_RUN_TAIL
 
         hintLabel(S_PAD, y, ns.L["session_history_mode"], 0.6)
         y = y - 18
@@ -1590,6 +1599,8 @@ function ns.RebuildSettingsContent()
     for _, sec in ipairs(sections) do
         jumpTargets[#jumpTargets + 1] = {title = sec.title, y = -y}
         y = sec.builder(y)
+        local last = settingsContent[#settingsContent]
+        if last and last.kind == "checkbox" then y = y - CHECK_RUN_TAIL end   -- air before the next section title
     end
     RebuildSidebar(jumpTargets)
 
