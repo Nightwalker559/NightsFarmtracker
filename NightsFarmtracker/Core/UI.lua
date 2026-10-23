@@ -115,7 +115,9 @@ watermark:SetAlpha(0.6)
 ns.RegisterTintTex(watermark)
 
 -- Theme decoration: a pumpkin on each side of the watermark (Hallow's End
--- theme). Built hidden, shown by ns.ApplyThemeDecor once the saved theme is known.
+-- theme). White artwork (same pumpkin as in Aureole Cursor), tinted with the
+-- theme accent. Built hidden, shown by ns.ApplyThemeDecor once the saved
+-- theme is known.
 local decorLeft  = BtnBar:CreateTexture(nil, "OVERLAY")
 local decorRight = BtnBar:CreateTexture(nil, "OVERLAY")
 for _, tex in ipairs({ decorLeft, decorRight }) do
@@ -129,7 +131,10 @@ decorRight:SetPoint("LEFT", watermark, "RIGHT", 6, 0)
 
 function ns.ApplyThemeDecor()
     local shown = ns.THEME_DECOR == "pumpkin"
-    decorLeft:SetShown(shown); decorRight:SetShown(shown)
+    for _, tex in ipairs({ decorLeft, decorRight }) do
+        tex:SetVertexColor(unpack(ns.COL_ACCENT))
+        tex:SetShown(shown)
+    end
 end
 
 -- Separator below BtnBar
