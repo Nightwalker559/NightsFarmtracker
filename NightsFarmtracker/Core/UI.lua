@@ -389,9 +389,12 @@ end
 -- nothing scrolls (see ns.SetFooterLine); BuildHUD feeds the list state.
 local listFlow, listScrolls = ns.NewHeaderFlow(), false
 local function UpdateFooterLine()
+    local expanded = NightsFarmtrackerDB.expanded
     ns.SetFooterLine(footerSep, listFlow,
-        listScrolls or #itemOrder == 0 or not NightsFarmtrackerDB.expanded)
+        listScrolls or #itemOrder == 0 or not expanded,
+        listScrolls and expanded and ns.ScrolledToEnd(ScrollFrame, ListFrame))
 end
+ScrollFrame:SetScript("OnVerticalScroll", UpdateFooterLine)
 
 function ns.SetExpanded(expand)
     NightsFarmtrackerDB.expanded = expand

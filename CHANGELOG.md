@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.10
+
+### Changed
+
+- Footer line is hidden when a scrolled list ends flush on a header (Main window and Session History), no more double line
+
+
 ## 1.7.9
 
 ### New

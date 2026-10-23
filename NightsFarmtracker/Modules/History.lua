@@ -32,6 +32,14 @@ local DET_ROW_H  = ns.ROW_H
 -- Frame references
 ------------------------------------------------------------------------
 local HistFrame, HScrollFrame, HListFrame
+
+-- Footer line state of the list (see ns.SetFooterLine); also refreshed on scroll.
+local histFlow, histScrolls
+local function UpdateHistFooterLine()
+    if not (histFlow and HistFrame and HistFrame.footerSep) then return end
+    ns.SetFooterLine(HistFrame.footerSep, histFlow, histScrolls,
+        histScrolls and ns.ScrolledToEnd(HScrollFrame, HListFrame))
+end
 local DetailFrame, DScrollFrame, DListFrame
 
 ------------------------------------------------------------------------
@@ -648,9 +656,8 @@ function ns.RebuildHistory()
         hdrH=H_HDR_H, ftrH=H_FTR_H, contentH=yOffset,
         minH=yOffset==0 and 44 or nil,   -- empty: room for the "no sessions" label
     })
-    if HistFrame.footerSep then
-        ns.SetFooterLine(HistFrame.footerSep, flow, yOffset == 0 or visH < yOffset)
-    end
+    histFlow, histScrolls = flow, yOffset == 0 or visH < yOffset
+    UpdateHistFooterLine()
     -- nTotal already counted above while grouping by day
     if nTotal==0 then
         HistFrame.countLabel:SetText("")
@@ -707,6 +714,7 @@ local function EnsureHistFrame()
     HScrollFrame=CreateFrame("ScrollFrame",nil,HistFrame)
     HScrollFrame:SetPoint("TOPLEFT",H_PAD,-H_HDR_H); HScrollFrame:SetPoint("BOTTOMRIGHT",-H_PAD,H_FTR_H)
     HScrollFrame:EnableMouseWheel(true)
+    HScrollFrame:SetScript("OnVerticalScroll", UpdateHistFooterLine)
     HListFrame=CreateFrame("Frame",nil,HScrollFrame)
     HListFrame:SetWidth(ns.CONTENT_W); HListFrame:SetHeight(1)
     HScrollFrame:SetScrollChild(HListFrame)

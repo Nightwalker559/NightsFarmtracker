@@ -222,8 +222,14 @@ end
 -- Footer separator of a list window: not needed while the list ends in a
 -- header (its bottom line already sits right above) and nothing scrolls out
 -- behind it. showAnyway covers scrolling lists and empty/collapsed states.
-function ns.SetFooterLine(sep, flow, showAnyway)
-    sep:SetShown(showAnyway or not flow.after)
+-- atEnd (scroll position, see ns.ScrolledToEnd) drops it again once a
+-- scrolling list sits flush on its last header.
+function ns.SetFooterLine(sep, flow, showAnyway, atEnd)
+    sep:SetShown(not flow.after or (showAnyway and not atEnd))
+end
+
+function ns.ScrolledToEnd(scroll, list)
+    return scroll:GetVerticalScroll() >= list:GetHeight() - scroll:GetHeight() - 1.5
 end
 
 ------------------------------------------------------------------------
