@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.7.10
+## 1.8.0
 
 ### Changed
 
