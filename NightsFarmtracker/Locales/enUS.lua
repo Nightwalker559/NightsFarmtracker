@@ -141,6 +141,7 @@ L["gold_display_classic"] = "Classic gold display (icons)"
 L["gold_display_modern"]  = "Modern gold display (colored text)"
 L["show_price_source"]    = "Show price source before item value (AH / V)"
 L["show_value_bar"]       = "Show the bar under each item row"
+L["lock_main_frame"]      = "Lock the main window position"
 -- Modern gold display suffixes
 L["coin_gold"]   = "g"
 L["coin_silver"] = "s"

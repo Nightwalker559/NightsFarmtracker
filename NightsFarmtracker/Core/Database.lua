@@ -5,6 +5,8 @@
 ------------------------------------------------------------------------
 local _, ns = ...
 
+local DEFAULT_MAIN_POS = {"TOP", "TOP", 0, -150}
+
 ------------------------------------------------------------------------
 -- Item key migration (name-keyed -> itemID-keyed)
 ------------------------------------------------------------------------
@@ -152,9 +154,9 @@ end
 ------------------------------------------------------------------------
 -- These keys live in the active profile (NightsFarmtrackerAccountDB.
 -- profiles[key]) instead of directly on NightsFarmtrackerDB, so switching
--- profile switches all of them at once. Everything else (session/tracking
--- state, window positions, UI collapse flags, minimap) stays character-
--- local, unchanged. A metatable installed in InitDB() transparently
+-- profile switches all of them at once (the main window position included).
+-- Everything else (session/tracking state, other window positions, UI
+-- collapse flags, minimap) stays character-local, unchanged. A metatable installed in InitDB() transparently
 -- redirects reads/writes of these keys - no other file needs to change.
 ns.PROFILE_KEYS = {
     goldRateMode=true, sessionLength=true, sessionHistoryEnabled=true, logWindowEnabled=true,
@@ -167,6 +169,7 @@ ns.PROFILE_KEYS = {
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
     showPriceSource=true, showValueBar=true, itemGoal=true,
+    pos=true, mainLocked=true,
 }
 
 ns.DEFAULT_PROFILE = "Default"
@@ -200,6 +203,8 @@ local function NewProfileDefaults()
         showPriceSource       = false,
         showValueBar          = true,
         itemGoal              = 0,
+        pos                   = { unpack(DEFAULT_MAIN_POS) },
+        mainLocked            = false,
     }
 end
 
@@ -250,10 +255,12 @@ function ns.CopyProfile(name, sourceName)
     local src = profiles[sourceName] or ActiveProfileTable()
     local copy = {}
     for k, v in pairs(src) do copy[k] = v end
-    -- gearThresholdOff is a table - copy it so the two profiles don't share it
-    if type(src.gearThresholdOff) == "table" then
-        copy.gearThresholdOff = {}
-        for k, v in pairs(src.gearThresholdOff) do copy.gearThresholdOff[k] = v end
+    -- gearThresholdOff and pos are tables - copy them so the two profiles don't share them
+    for _, key in ipairs({ "gearThresholdOff", "pos" }) do
+        if type(src[key]) == "table" then
+            copy[key] = {}
+            for k, v in pairs(src[key]) do copy[key][k] = v end
+        end
     end
     profiles[name] = copy
     return true
@@ -338,6 +345,15 @@ function ns.InitDB()
     -- ns.RunCharacterRepairs / ns.CHARACTER_REPAIRS in Repairs.lua.
     ns.RunCharacterRepairs()
 
+    -- The main window position used to be character-local (plain db.pos).
+    -- Hand it to the active profile unless that already has one, then drop it.
+    local oldPos = rawget(db, "pos")
+    if oldPos ~= nil then
+        local profile = ActiveProfileTable()
+        if profile.pos == nil then profile.pos = oldPos end
+        rawset(db, "pos", nil)
+    end
+
     -- Profile settings: fill in whatever the active profile lacks (keys added
     -- by an update, profiles created before them).
     for key, default in pairs(NewProfileDefaults()) do
@@ -355,7 +371,6 @@ function ns.InitDB()
     for _, key in ipairs({ "qAtlas", "collapsed", "excludedNames", "excludedItemIDs", "logEntries" }) do
         if db[key] == nil then db[key] = {} end
     end
-    if db.pos == nil then db.pos = {"TOP", "TOP", 0, -150} end
     -- Minimap button: minimapPos, hide, showInCompartment. The first two used
     -- to be plain keys on db (pre-LibDBIcon saves).
     if db.minimap == nil then

@@ -1412,6 +1412,7 @@ function ns.RebuildSettingsContent()
 
         y = flag(y, "show_price_source", "showPriceSource", false, function() ns.RefreshHUD() end)
         y = flag(y, "show_value_bar", "showValueBar", true, function() ns.RefreshHUD() end)
+        y = flag(y, "lock_main_frame", "mainLocked", false)
         y = checkbox(y, "minimap_button",
             function() return not db.minimap.hide end,
             function(v) ns.SetMinimapVisible(v) end)

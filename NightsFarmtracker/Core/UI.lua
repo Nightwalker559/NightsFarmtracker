@@ -57,8 +57,11 @@ MainFrame:SetFrameStrata("MEDIUM")
 MainFrame:SetMovable(true); MainFrame:EnableMouse(true); MainFrame:SetClampedToScreen(true)
 ns.ApplyFrameStyle(MainFrame)
 MainFrame:RegisterForDrag("LeftButton")
-MainFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+MainFrame:SetScript("OnDragStart", function(self)
+    if not NightsFarmtrackerDB.mainLocked then self:StartMoving() end
+end)
 MainFrame:SetScript("OnDragStop", function(self)
+    if NightsFarmtrackerDB.mainLocked then return end
     self:StopMovingOrSizing()
     local x, y = ns.AnchorToTop(self)
     if x then NightsFarmtrackerDB.pos = {"TOP", "TOP", x, y} end

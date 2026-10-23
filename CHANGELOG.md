@@ -2,9 +2,14 @@
 
 ## 1.8.0
 
+### New
+
+- Option to lock the main window position (Settings, Display)
+
 ### Changed
 
 - Footer line is hidden when a scrolled list ends flush on a header (Main window and Session History), no more double line
+- The main window position is saved per profile instead of per character (existing positions carry over once)
 
 
 ## 1.7.9
