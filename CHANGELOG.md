@@ -5,6 +5,7 @@
 ### New
 
 - Option to lock the main window position (Settings, Display)
+- Color theme "Hallow's End" (German: Schlotternächte): pumpkin orange with a pumpkin on each side of the "NFT" header mark
 
 ### Changed
 

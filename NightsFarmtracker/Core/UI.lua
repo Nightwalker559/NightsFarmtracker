@@ -114,6 +114,24 @@ watermark:SetText("NFT")
 watermark:SetAlpha(0.6)
 ns.RegisterTintTex(watermark)
 
+-- Theme decoration: a pumpkin on each side of the watermark (Hallow's End
+-- theme). Built hidden, shown by ns.ApplyThemeDecor once the saved theme is known.
+local decorLeft  = BtnBar:CreateTexture(nil, "OVERLAY")
+local decorRight = BtnBar:CreateTexture(nil, "OVERLAY")
+for _, tex in ipairs({ decorLeft, decorRight }) do
+    tex:SetSize(20, 20)
+    tex:SetTexture(ART .. "pumpkin.png")
+    tex:SetAlpha(0.95)
+    tex:Hide()
+end
+decorLeft:SetPoint("RIGHT", watermark, "LEFT", -6, 0)
+decorRight:SetPoint("LEFT", watermark, "RIGHT", 6, 0)
+
+function ns.ApplyThemeDecor()
+    local shown = ns.THEME_DECOR == "pumpkin"
+    decorLeft:SetShown(shown); decorRight:SetShown(shown)
+end
+
 -- Separator below BtnBar
 local hdrSep = MainFrame:CreateTexture(nil, "ARTWORK")
 hdrSep:SetHeight(1)

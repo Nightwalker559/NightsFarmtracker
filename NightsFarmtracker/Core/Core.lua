@@ -243,12 +243,24 @@ ns.COLOR_THEMES = {
         catBg  = {0.15, 0.13, 0.09, 0.80},
         accent = {0.95, 0.90, 0.70},
     },
+    -- Hallow's End: `decor` also puts a pumpkin left and right of the "NFT"
+    -- watermark (ns.ApplyThemeDecor).
+    halloween = {
+        name     = "Hallow's End",
+        labelKey = "theme_halloween",
+        descKey  = "theme_halloween_desc",
+        bg     = {0.07, 0.04, 0.09, 0.92},
+        border = {0.50, 0.26, 0.08, 0.85},
+        catBg  = {0.14, 0.08, 0.13, 0.80},
+        accent = {1.00, 0.50, 0.08},
+        decor  = "pumpkin",
+    },
 }
 -- Display order for the Settings dropdown
 ns.COLOR_THEME_ORDER = {
     "default", "void", "silvermoon", "fel", "frost", "bloodmoon",
     "molten", "emerald", "arcane", "bronze", "plague", "nether", "argent",
-    "custom",
+    "halloween", "custom",
 }
 ns.COL_GOLD = {1.00, 0.82, 0.00}
 
@@ -330,7 +342,9 @@ function ns.ApplyColorTheme(themeKey)
     ns.COL_BORDER = theme.border
     ns.COL_CAT_BG = theme.catBg
     ns.COL_ACCENT = theme.accent
+    ns.THEME_DECOR = theme.decor
     ns.COL_CAT_GRAD_L, ns.COL_CAT_GRAD_R = ns.CatGradient(theme)
+    if ns.ApplyThemeDecor then ns.ApplyThemeDecor() end   -- not there yet during the early apply
 end
 
 -- Paints a header/category background texture: flat COL_CAT_BG, or a
