@@ -224,6 +224,23 @@ function ns.ReapplyBaitPosition()
     if ns.RepositionVenomTracker then ns.RepositionVenomTracker() end
 end
 
+-- The bar is not anchored to MainFrame (see ApplyBaitPosition), so it follows
+-- MainFrame's corner itself: a cheap per-frame compare that only re-anchors
+-- when the corner actually moved (drag, ElvUI re-anchor). Runs only while the
+-- bar is shown (its OnShow/OnHide switch the script), and does nothing with a
+-- custom position (db.baitPos); in combat the re-anchor is skipped and
+-- retried every frame until it is allowed again.
+local follower = CreateFrame("Frame")
+
+local function FollowMainFrame()
+    if NightsFarmtrackerDB.baitPos then return end
+    local main = ns.MainFrame
+    local top, right = main:GetTop(), main:GetRight()
+    if top and (top ~= syncedTop or right ~= syncedRight) then
+        ns.ReapplyBaitPosition()
+    end
+end
+
 local function AcquireButton(index)
     local btn = buttonPool[index]
     if btn then return btn end
@@ -271,15 +288,11 @@ end
 local function EnsureBaitFrame()
     if BaitFrame then return end
 
-    BaitFrame = CreateFrame("Frame", "NightsFarmtrackerBaitFrame", UIParent, "BackdropTemplate")
+    -- The X fully disables the bar, keeping the Settings checkbox in sync
+    -- instead of just hiding it for the session.
+    BaitFrame = ns.CreateOverlayFrame("NightsFarmtrackerBaitFrame", "baitPos",
+        function() ns.SetBaitFrameEnabled(false) end)
     BaitFrame:SetSize(ns.FRAME_W, BUFF_ROW_H + BTN_SIZE + 24)
-    BaitFrame:SetFrameStrata("MEDIUM")
-    BaitFrame:SetClampedToScreen(true)
-    BaitFrame:SetMovable(true)
-    BaitFrame:EnableMouse(true)
-    BaitFrame:RegisterForDrag("LeftButton")
-    ns.ApplyFrameStyle(BaitFrame)
-    BaitFrame:Hide()
     ns.BaitFrame = BaitFrame
 
     -- Give it a valid anchor immediately, don't rely solely on the
@@ -292,6 +305,8 @@ local function EnsureBaitFrame()
     -- as the Vendor-Only Filter / Blacklist drop zones -- both the real
     -- drag-hold-release gesture and the click-to-pick-up/click-to-place one.
     BaitFrame:SetScript("OnReceiveDrag", HandleDrop)
+    BaitFrame:SetScript("OnShow", function() follower:SetScript("OnUpdate", FollowMainFrame) end)
+    BaitFrame:SetScript("OnHide", function() follower:SetScript("OnUpdate", nil) end)
 
     BaitFrame.emptyText = BaitFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     BaitFrame.emptyText:SetPoint("CENTER")
@@ -308,21 +323,6 @@ local function EnsureBaitFrame()
     BaitFrame.buffText:SetWidth(ns.FRAME_W - 40)
     BaitFrame.buffText:SetWordWrap(true)
     BaitFrame.buffText:SetJustifyH("CENTER")
-
-    BaitFrame.closeButton = ns.MakeBtn(BaitFrame, 14, "btn_close.png")
-    BaitFrame.closeButton:SetPoint("TOPRIGHT", -4, -4)
-    BaitFrame.closeButton:SetScript("OnClick", function()
-        -- Closing via X fully disables the bar, keeping the Settings
-        -- checkbox in sync instead of just hiding it for the session.
-        ns.SetBaitFrameEnabled(false)
-    end)
-
-    BaitFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    BaitFrame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local x, y = ns.AnchorToTop(self)
-        if x then NightsFarmtrackerDB.baitPos = { "TOP", x, y } end
-    end)
 
     BaitFrame:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" then
@@ -509,22 +509,6 @@ end)
 
 if ns.MainFrame then
     ns.MainFrame:HookScript("OnShow", RefreshBaitFrame)
-    -- The bar is not anchored to MainFrame (see ApplyBaitPosition), so it
-    -- follows MainFrame's corner itself: a cheap per-frame compare that only
-    -- re-anchors when the corner actually moved (drag, ElvUI re-anchor).
-    -- Idle while the bar uses a custom position (db.baitPos) or is hidden;
-    -- in combat the re-anchor is skipped and retried every frame until it
-    -- is allowed again.
-    local follower = CreateFrame("Frame")
-    follower:SetScript("OnUpdate", function()
-        if not BaitFrame or not BaitFrame:IsShown() then return end
-        if NightsFarmtrackerDB.baitPos then return end
-        local main = ns.MainFrame
-        local top, right = main:GetTop(), main:GetRight()
-        if top and (top ~= syncedTop or right ~= syncedRight) then
-            ns.ReapplyBaitPosition()
-        end
-    end)
 end
 
 ------------------------------------------------------------------------

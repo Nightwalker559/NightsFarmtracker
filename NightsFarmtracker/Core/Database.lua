@@ -66,90 +66,6 @@ local function MigrateItemKeys(items)
 end
 
 ------------------------------------------------------------------------
--- One-time repair for gear looted this session before variants existed: it was
--- merged into one db.count entry per item ID, mixing item levels and qualities.
--- Rebuilds the variant buckets from the items still in the bags; whatever was
--- already sold, mailed or banked stays in one fallback bucket (last known
--- quality and link) instead of being lost.
-function ns.MigrateGearVariantsFromBags(items)
-    if not items then return end
-    local targets = {}
-    for itemID, d in pairs(items) do
-        if ns.IsGearClass(d.classID) and not d.variants then
-            targets[itemID] = d
-        end
-    end
-    if not next(targets) then return end
-
-    for bag = 0, 5 do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            local ci = C_Container.GetContainerItemInfo(bag, slot)
-            if ci and targets[ci.itemID] then
-                local d    = targets[ci.itemID]
-                local link = C_Container.GetContainerItemLink(bag, slot)
-                if link then
-                    local _, _, iQuality, iLevel, _, _, _, _, _, _, sp = C_Item.GetItemInfo(link)
-                    local vKey = ns.GearVariantKey(link)
-                    d.variants  = d.variants or {}
-                    local gv    = d.variants[vKey]
-                    if not gv then
-                        gv = { amount = 0 }
-                        d.variants[vKey] = gv
-                    end
-                    gv.amount    = gv.amount + (ci.stackCount or 1)
-                    gv.quality   = iQuality
-                    gv.itemLevel = iLevel
-                    gv.itemLink  = link
-                    if sp and sp > 0 then gv.sellPrice = sp end
-                end
-            end
-        end
-    end
-
-    for _, d in pairs(targets) do
-        local found = 0
-        if d.variants then
-            for _, gv in pairs(d.variants) do found = found + gv.amount end
-        end
-        local remainder = (d.amount or 0) - found
-        if remainder > 0 then
-            d.variants = d.variants or {}
-            -- String key, never a bare number: a numeric key mixed into an
-            -- otherwise bonus-ID-string-keyed variants table would make
-            -- key-type checks depend on Lua's undefined pairs() order.
-            local key = "legacy_q" .. tostring(d.quality or 0)
-            local gv  = d.variants[key]
-            if not gv then
-                gv = { amount = 0, quality = d.quality, itemLink = d.itemLink, sellPrice = d.sellPrice }
-                d.variants[key] = gv
-            end
-            gv.amount = gv.amount + remainder
-        end
-    end
-end
-
--- Most recently saved session = the first (newest) entry of the newest day
--- key. ISO-format day keys ("YYYY-MM-DD") sort correctly as plain strings.
--- Returns session, dayKey (nothing if there is no saved session).
-function ns.GetNewestSession()
-    local sessions = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions
-    local latestKey
-    for k in pairs(sessions or {}) do
-        if type(k) == "string" and (not latestKey or k > latestKey) then latestKey = k end
-    end
-    local session = latestKey and sessions[latestKey] and sessions[latestKey][1]
-    if session then return session, latestKey end
-end
-
--- Same repair as above, applied to the most recently saved session (rather
--- than the live/current one) - for when a session was already closed before
--- this fix was installed, but the items are still sitting in bags.
-function ns.RepairLastSessionGearVariants()
-    local session = ns.GetNewestSession()
-    if session then ns.MigrateGearVariantsFromBags(session.items) end
-end
-
-------------------------------------------------------------------------
 -- Profiles
 ------------------------------------------------------------------------
 -- These keys live in the active profile (NightsFarmtrackerAccountDB.
@@ -169,7 +85,7 @@ ns.PROFILE_KEYS = {
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
     showPriceSource=true, showValueBar=true, itemGoal=true,
-    pos=true, mainLocked=true,
+    pos=true, mainLocked=true, gearAHThresholdSound=true, sessionHistoryMode=true,
 }
 
 ns.DEFAULT_PROFILE = "Default"
@@ -205,6 +121,8 @@ local function NewProfileDefaults()
         itemGoal              = 0,
         pos                   = { unpack(DEFAULT_MAIN_POS) },
         mainLocked            = false,
+        gearAHThresholdSound  = false,
+        sessionHistoryMode    = "full",
     }
 end
 
@@ -345,13 +263,17 @@ function ns.InitDB()
     -- ns.RunCharacterRepairs / ns.CHARACTER_REPAIRS in Repairs.lua.
     ns.RunCharacterRepairs()
 
-    -- The main window position used to be character-local (plain db.pos).
-    -- Hand it to the active profile unless that already has one, then drop it.
-    local oldPos = rawget(db, "pos")
-    if oldPos ~= nil then
-        local profile = ActiveProfileTable()
-        if profile.pos == nil then profile.pos = oldPos end
-        rawset(db, "pos", nil)
+    -- Keys that became profile settings after a character had saved them as
+    -- plain fields (e.g. the main window position): hand the value to the
+    -- active profile unless that already has one, then drop the plain copy -
+    -- it would shadow the profile value, the metatable only sees absent keys.
+    local profile = ActiveProfileTable()
+    for key in pairs(ns.PROFILE_KEYS) do
+        local old = rawget(db, key)
+        if old ~= nil then
+            if profile[key] == nil then profile[key] = old end
+            rawset(db, key, nil)
+        end
     end
 
     -- Profile settings: fill in whatever the active profile lacks (keys added

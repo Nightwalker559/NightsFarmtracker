@@ -25,16 +25,31 @@ end
 ------------------------------------------------------------------------
 -- Category names
 ------------------------------------------------------------------------
+-- Equipment category name: Cosmetic, or the single combined "Equipment"
+-- category, optionally split into BoE / BoA / Soulbound (data.isBoP =
+-- Soulbound) sub-categories via the "splitGearByBinding" setting. Falls back
+-- to the combined category when the setting is off or an item's binding
+-- isn't known yet.
+-- data.isWarbound is a legacy field name (pre-1.3) for the same BoA/
+-- Warband flag - checked as a fallback so old saved session data keeps
+-- categorizing correctly after the isBoA rename.
+local function GearCategoryName(data)
+    if data.isCosmetic then return ns.L["cat_gear_cosmetic"] end
+    if NightsFarmtrackerDB and NightsFarmtrackerDB.splitGearByBinding then
+        if data.isBoA or data.isWarbound then return ns.L["cat_gear_boa"] end
+        if data.isBoP then return ns.L["cat_gear_soul"] end
+        if data.isBoE then return ns.L["cat_gear_boe"] end
+    end
+    return ns.L["cat_gear"]
+end
+
 function ns.CategoryName(data)
     if data.isVendorTrash or (data.quality == 0) then
         return ns.L["cat_junk"]
     end
     if data.classID then
         if ns.IsGearClass(data.classID) then
-            if data.isCosmetic then
-                return ns.L["cat_gear_cosmetic"]
-            end
-            return ns.GearCategoryName(data)
+            return GearCategoryName(data)
         end
         -- Mounts / Companion Pets always get their own category (classID 15, Miscellaneous)
         if data.classID == Enum.ItemClass.Miscellaneous and data.subClassID then
@@ -69,28 +84,9 @@ function ns.CategoryName(data)
         if name and name ~= "" then return name end
     end
     if data.isBoE or data.isBoP or data.isBoA or data.isWarbound then
-        if data.isCosmetic then
-            return ns.L["cat_gear_cosmetic"]
-        end
-        return ns.GearCategoryName(data)
+        return GearCategoryName(data)
     end
     return C_Item.GetItemClassInfo(Enum.ItemClass.Tradegoods) or "Tradeskill"
-end
-
--- Equipment category name, optionally split into BoE / BoA / Soulbound
--- (data.isBoP = Soulbound) sub-categories via the "splitGearByBinding"
--- setting. Falls back to the single combined "Equipment" category when
--- the setting is off or an item's binding isn't known yet.
--- data.isWarbound is a legacy field name (pre-1.3) for the same BoA/
--- Warband flag - checked as a fallback so old saved session data keeps
--- categorizing correctly after the isBoA rename.
-function ns.GearCategoryName(data)
-    if NightsFarmtrackerDB and NightsFarmtrackerDB.splitGearByBinding then
-        if data.isBoA or data.isWarbound then return ns.L["cat_gear_boa"] end
-        if data.isBoP then return ns.L["cat_gear_soul"] end
-        if data.isBoE then return ns.L["cat_gear_boe"] end
-    end
-    return ns.L["cat_gear"]
 end
 
 ------------------------------------------------------------------------
@@ -98,7 +94,7 @@ end
 ------------------------------------------------------------------------
 
 -- True if this item counts as Equipment for GearAHThreshold purposes
--- (same binding flags used by GearCategoryName above, plus classID 2/4
+-- (same binding flags used by CategoryName above, plus classID 2/4
 -- as a fallback for cosmetic/unbound gear that has no bind flags yet -
 -- keeps this in sync with CategoryName's cosmetic detection).
 function ns.IsGear(data)
@@ -166,14 +162,25 @@ function ns.IsVendorOnly(data)
         or ns.IsForceVendorCategory(data) or ns.IsForceVendorExpansion(data)
 end
 
+-- Value of one item (or variant) from its vendor and AH totals (either may
+-- be nil): the higher of the two, but vendor where the Gear AH Threshold
+-- says so - Equipment only uses its AH price once that price reaches the
+-- configured gold threshold; below it (or with no AH price at all) vendor
+-- price is used. Shared by the live value, the frozen session value and the
+-- per-variant sums so a row always agrees with its category header.
+function ns.PickValue(data, vendor, ah)
+    if ns.IsGearThresholdVendorOnly(data, ah) then return vendor or ah end
+    if ah and vendor then return math.max(ah, vendor) end
+    return ah or vendor
+end
+
 -- Scaling/Adventurer's gear (see GearVariantKey) can drop the same item ID
 -- at very different item levels, so each variant's own AH price can sit on
 -- either side of the Gear AH Threshold independently. Deciding vendor-vs-AH
--- once from the combined AHTotal() of all variants (old behavior) meant one
--- expensive variant crossing the threshold forced AH pricing onto a much
--- cheaper sibling variant that was still below it, and vice versa. So this
--- picks vendor/AH per variant, then sums - kept in sync with the per-variant
--- row logic in UI.lua's flat-list build.
+-- once from the combined AHTotal() of all variants would let one expensive
+-- variant crossing the threshold force AH pricing onto a much cheaper sibling
+-- below it. So this picks vendor/AH per variant, then sums - kept in sync
+-- with the per-variant row logic in UI.lua's flat-list build.
 function ns.GearVariantItemValue(data)
     local total, any = 0, false
     for _, gv in pairs(ns.GetVariants(data)) do
@@ -181,14 +188,7 @@ function ns.GearVariantItemValue(data)
         local v = (sp and sp > 0) and (sp * gv.amount) or nil
         local ap = ns.GetAHPriceForID(data.itemID, gv.itemLink)
         local a = ap and (ap * gv.amount) or nil
-        local value
-        if ns.IsGearThresholdVendorOnly(data, a) then
-            value = v or a
-        elseif a and v then
-            value = math.max(a, v)
-        else
-            value = a or v
-        end
+        local value = ns.PickValue(data, v, a)
         if value then total = total + value; any = true end
     end
     return any and total or nil
@@ -197,27 +197,43 @@ end
 -- vendor/ah are optional precomputed values (avoids recalculating
 -- VendorTotal/AHTotal when the caller already has them, e.g. RefreshHUD).
 function ns.ItemValue(data, vendor, ah)
-    if data.itemID and ns.IsForceVendor(data.itemID) then return vendor or ns.VendorTotal(data) end
-    if ns.IsForceVendorCategory(data) then return vendor or ns.VendorTotal(data) end
-    if ns.IsForceVendorExpansion(data) then return vendor or ns.VendorTotal(data) end
-    if data.isBoP or data.canAH == false then return vendor or ns.VendorTotal(data) end
+    if ns.IsVendorOnly(data) then return vendor or ns.VendorTotal(data) end
     -- Per-variant vendor-vs-AH threshold decision only applies to scaling
     -- gear (see GearVariantItemValue) - reagent quality tiers also use
     -- data.variants (see GetVariants in PriceHelper.lua) but keep the
     -- combined item-level decision below, matching pre-unification behavior.
     if data.variants and ns.IsGear(data) then return ns.GearVariantItemValue(data) end
-    local v = vendor or ns.VendorTotal(data)
-    local a = ah     or ns.AHTotal(data)
+    return ns.PickValue(data, vendor or ns.VendorTotal(data), ah or ns.AHTotal(data))
+end
 
-    -- Gear AH threshold: Equipment only uses its AH price once that price
-    -- reaches the configured gold threshold; below it (or with no AH price
-    -- at all), vendor price is used instead.
-    if ns.IsGearThresholdVendorOnly(data, a) then
-        return v or a
-    end
+-- Sort rule of every category list (HUD and History): most gold first, ties
+-- by item class priority.
+function ns.CategoryBefore(goldA, classIDA, goldB, classIDB)
+    if goldA ~= goldB then return goldA > goldB end
+    local prioA = (classIDA and ns.CLASS_PRIORITY[classIDA]) or 50
+    local prioB = (classIDB and ns.CLASS_PRIORITY[classIDB]) or 50
+    return prioA < prioB
+end
 
-    if a and v then return math.max(a, v) end
-    return a or v
+------------------------------------------------------------------------
+-- Rank badge from a saved item link: some reagents (e.g. per-rank ore) carry
+-- their quality tier as atlas markup in their own name
+-- ("|A:Professions-ChatIcon-Quality-12-Tier1:17:15::1|a"), fixed at link time.
+-- Used as the fallback badge for entries whose tier breakdown is missing or
+-- failed the consistency check.
+------------------------------------------------------------------------
+function ns.RankIconFromLink(link)
+    if not link then return nil end
+    local atlasName = link:match("|A:(.-):")
+    if not atlasName or not atlasName:find("Tier%d") then return nil end
+    return CreateAtlasMarkup(atlasName, ns.RANK_ICON_W, ns.RANK_ICON_H)
+end
+
+-- Crafting-reagent quality badge (R1/R2/R3): the quality atlas as inline
+-- markup, or a gray "R<tier>" text while the atlas is not known.
+function ns.RankBadgeMarkup(atlas, tier)
+    if atlas then return CreateAtlasMarkup(atlas, ns.RANK_ICON_W, ns.RANK_ICON_H) end
+    return "|cffaaaaaa R" .. tier .. "|r"
 end
 
 ------------------------------------------------------------------------
@@ -310,7 +326,7 @@ end
 ns.JUNK_MERGED_ICON = "Interface\\Icons\\INV_Misc_Coin_02"
 
 function ns.IsJunkCategory(catName)
-    return catName == (ns.L["cat_junk"])
+    return catName == ns.L["cat_junk"]
 end
 
 -- Builds the pseudo-item record standing in for every Junk item once

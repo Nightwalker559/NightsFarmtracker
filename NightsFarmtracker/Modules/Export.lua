@@ -218,9 +218,7 @@ local function EnsurePickFrame()
     ns.ExportPickFrame = PickFrame
     PickFrame:SetScript("OnHide", function() ns.RefreshWindowChain("left") end)
 
-    local sep = PickFrame:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
-    sep:SetPoint("TOPLEFT", ns.PAD, -(ns.WINDOW_HDR_H - 1)); sep:SetPoint("TOPRIGHT", -ns.PAD, -(ns.WINDOW_HDR_H - 1))
+    ns.AddHLine(PickFrame, "TOP", ns.PAD, -(ns.WINDOW_HDR_H - 1))
 
     local scroll = CreateFrame("ScrollFrame", nil, PickFrame)
     scroll:SetPoint("TOPLEFT", ns.PAD, -(ns.WINDOW_HDR_H + 4))

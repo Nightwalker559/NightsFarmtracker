@@ -45,12 +45,10 @@ local DetailFrame, DScrollFrame, DListFrame
 ------------------------------------------------------------------------
 -- History list row pools
 ------------------------------------------------------------------------
-local activeSessRows={} local activeDayRows={} local sessPool={} local dayPool={}
+local activeSessRows, activeDayRows = {}, {}
 
-local function AcquireSessRow()
-    local r=table.remove(sessPool)
-    if r then r:SetParent(HListFrame); r:Show(); return r end
-    r=CreateFrame("Frame",nil,HListFrame); r:SetHeight(SESS_H); r:EnableMouse(true)
+local sessPool = ns.NewPool(function(parent)
+    local r=CreateFrame("Frame",nil,parent); r:SetHeight(SESS_H); r:EnableMouse(true)
     r.bg=r:CreateTexture(nil,"BACKGROUND"); r.bg:SetAllPoints(); r.bg:SetColorTexture(1,1,1,0.05); r.bg:Hide()
     r.sep=r:CreateTexture(nil,"ARTWORK"); r.sep:SetHeight(1)
     r.sep:SetColorTexture(ns.COL_BORDER[1],ns.COL_BORDER[2],ns.COL_BORDER[3],0.55); r.sep:SetPoint("BOTTOMLEFT"); r.sep:SetPoint("BOTTOMRIGHT")
@@ -77,15 +75,10 @@ local function AcquireSessRow()
     end)
     r:SetScript("OnLeave",function(self) self.bg:Hide(); self.dateText:SetTextColor(0.9,0.9,0.9); GameTooltip:Hide() end)
     return r
-end
-local function ReleaseSessRow(r)
-    r:Hide(); r:ClearAllPoints(); r.session=nil; r:SetScript("OnMouseUp",nil); sessPool[#sessPool+1]=r
-end
+end, function(r) r.session=nil; r:SetScript("OnMouseUp",nil) end)
 
-local function AcquireDayRow()
-    local r=table.remove(dayPool)
-    if r then r:SetParent(HListFrame); r:Show(); return r end
-    r=CreateFrame("Frame",nil,HListFrame); r:SetHeight(DAY_H); r:EnableMouse(true)
+local dayPool = ns.NewPool(function(parent)
+    local r=CreateFrame("Frame",nil,parent); r:SetHeight(DAY_H); r:EnableMouse(true)
     ns.AddHeaderBand(r)
     r.dateText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.dateText:SetPoint("LEFT",4,0); r.dateText:SetFontHeight(ns.FONT_NORMAL); r.dateText:SetTextColor(unpack(ns.COL_ACCENT))
@@ -111,24 +104,21 @@ local function AcquireDayRow()
     end)
     r.mergeBtn:Hide()
     return r
-end
-local function ReleaseDayRow(r)
-    r:Hide(); r:ClearAllPoints()
+end, function(r)
     r:SetScript("OnMouseUp",nil); r:SetScript("OnEnter",nil); r:SetScript("OnLeave",nil)
     r.dateText:SetTextColor(unpack(ns.COL_ACCENT))
     r.mergeBtn:Hide(); r.mergeBtn:SetScript("OnClick", nil)
-    dayPool[#dayPool+1]=r
-end
+end)
 
 ------------------------------------------------------------------------
 -- Month header row pool (collapsible grouping for past months)
 ------------------------------------------------------------------------
-local activeMonthRows={} local monthPool={}
+local activeMonthRows = {}
 
-local function AcquireMonthRow()
-    local r=table.remove(monthPool)
-    if r then r:SetParent(HListFrame); r:Show(); return r end
-    r=CreateFrame("Frame",nil,HListFrame); r:SetHeight(MONTH_H); r:EnableMouse(true)
+-- OnEnter is replaced per rebuild, but OnLeave (reset color, hide tooltip) is
+-- only set once at creation, so it must survive pooling.
+local monthPool = ns.NewPool(function(parent)
+    local r=CreateFrame("Frame",nil,parent); r:SetHeight(MONTH_H); r:EnableMouse(true)
     ns.AddHeaderBand(r)
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.nameText:SetPoint("LEFT",ns.HEADER_TEXT_X,0); r.nameText:SetFontHeight(ns.FONT_NORMAL)
@@ -140,32 +130,24 @@ local function AcquireMonthRow()
     r:SetScript("OnEnter",function(self) self.nameText:SetTextColor(1,1,1) end)
     r:SetScript("OnLeave",function(self) self.nameText:SetTextColor(unpack(ns.COL_ACCENT)); GameTooltip:Hide() end)
     return r
-end
-local function ReleaseMonthRow(r)
-    -- OnEnter is replaced per rebuild, but OnLeave (reset color, hide
-    -- tooltip) is only set once at creation, so it must survive pooling.
-    r:Hide(); r:ClearAllPoints(); r:SetScript("OnMouseUp",nil)
+end, function(r)
+    r:SetScript("OnMouseUp",nil)
     r.delBtn:SetScript("OnClick",nil)
     r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
-    monthPool[#monthPool+1]=r
-end
+end)
 
 ------------------------------------------------------------------------
 -- Detail row pools — single-line, same as main frame
 ------------------------------------------------------------------------
 local activeDetRows = {}
 local activeDetCats = {}
-local detRowPool    = {}
-local detCatPool    = {}
 local detCollapsed  = {}
 local currentDetailSession = nil
 local historyTotals = nil -- {items, looted} gold over all saved months, shown in the History title hover
 local detailStats = nil   -- {kinds = distinct item rows, qty = total amount} of currentDetailSession, shown in the header hover
 
-local function AcquireDetRow()
-    local r = table.remove(detRowPool)
-    if r then r:SetParent(DListFrame); r:Show(); return r end
-    r = CreateFrame("Frame", nil, DListFrame)
+local detRowPool = ns.NewPool(function(parent)
+    local r = CreateFrame("Frame", nil, parent)
     r:SetSize(DET_CONT_W, DET_ROW_H)
     r:EnableMouse(true)
 
@@ -237,21 +219,16 @@ local function AcquireDetRow()
     end)
     r.goldHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return r
-end
-
-local function ReleaseDetRow(r)
-    r:Hide(); r:ClearAllPoints(); r.itemID=nil; r.itemLink=nil; r.classID=nil; r.itemName=nil; r.iconBorder:Hide()
+end, function(r)
+    r.itemID=nil; r.itemLink=nil; r.classID=nil; r.itemName=nil; r.iconBorder:Hide()
     r.breakdown=nil; r.goldHit:Hide()
     r.icon:ClearAllPoints(); r.icon:SetPoint("LEFT", ns.ICON_X, 0)
     r.goldText:SetTextColor(unpack(ns.COL_GOLD))
     r.rankBadge:SetText("")
-    detRowPool[#detRowPool+1]=r
-end
+end)
 
-local function AcquireDetCat()
-    local r = table.remove(detCatPool)
-    if r then r:SetParent(DListFrame); r:Show(); return r end
-    r = CreateFrame("Frame", nil, DListFrame); r:SetHeight(DET_CAT_H)
+local detCatPool = ns.NewPool(function(parent)
+    local r = CreateFrame("Frame", nil, parent); r:SetHeight(DET_CAT_H)
     r:EnableMouse(true)
     ns.AddHeaderBand(r)
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -261,34 +238,23 @@ local function AcquireDetCat()
     r.goldText:SetPoint("RIGHT",r,"RIGHT",-4,0); r.goldText:SetJustifyH("RIGHT")
     r.goldText:SetFontHeight(ns.FONT_NORMAL); r.goldText:SetTextColor(unpack(ns.COL_GOLD))
     return r
-end
-local function ReleaseDetCat(r)
-    r:Hide(); r:ClearAllPoints(); r:SetHeight(DET_CAT_H); detCatPool[#detCatPool+1]=r
-end
+end, function(r) r:SetHeight(DET_CAT_H) end)
 
 ------------------------------------------------------------------------
 -- Session detail window
 ------------------------------------------------------------------------
 local function EnsureDetailFrame()
     if DListFrame then return end
-    DetailFrame = CreateFrame("Frame","NightsFarmtrackerDetailWnd",UIParent,"BackdropTemplate")
-    DetailFrame:SetWidth(DET_W)
-    DetailFrame:SetFrameStrata("MEDIUM"); DetailFrame:SetClampedToScreen(true)
-    DetailFrame:SetMovable(true); DetailFrame:EnableMouse(true)
-    DetailFrame:RegisterForDrag("LeftButton")
-    DetailFrame:SetScript("OnDragStart",function(s) s:StartMoving() end)
-    DetailFrame:SetScript("OnDragStop", function(s) s:StopMovingOrSizing() end)
-    ns.ApplyFrameStyle(DetailFrame); DetailFrame:Hide()
+    DetailFrame = ns.CreateWindowFrame("NightsFarmtrackerDetailWnd", "", {width = DET_W})
     ns.DetailFrame = DetailFrame  -- exposed so Settings can close it when it opens
-    DetailFrame:HookScript("OnHide", function(self) ns.HideTooltipOf(self) end)
-    table.insert(UISpecialFrames,"NightsFarmtrackerDetailWnd")
 
-    -- Header: single line "Date  ·  Duration  ·  Total Gold"
-    DetailFrame.dateText = DetailFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    DetailFrame.dateText:SetPoint("TOPLEFT",  DET_PAD, -12)
-    DetailFrame.dateText:SetPoint("TOPRIGHT", -DET_PAD, -12)
-    DetailFrame.dateText:SetJustifyH("CENTER")
-    DetailFrame.dateText:SetTextColor(unpack(ns.COL_GOLD)); DetailFrame.dateText:SetFontHeight(ns.FONT_HEADER)
+    -- Title: the session date, set per session, 2 px lower than the usual
+    -- title row (the close button keeps its place).
+    local dateText = DetailFrame.titleFS
+    dateText:ClearAllPoints()
+    dateText:SetPoint("TOPLEFT",  DET_PAD, -12)
+    dateText:SetPoint("TOPRIGHT", -DET_PAD, -12)
+    DetailFrame.dateText = dateText
 
     -- Invisible hitbox over the header line: hovering the combined total
     -- shows the Items/Direct/Total breakdown instead of a permanent
@@ -322,14 +288,7 @@ local function EnsureDetailFrame()
     end)
     headerHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    local hSep = DetailFrame:CreateTexture(nil,"ARTWORK"); hSep:SetHeight(1)
-    hSep:SetColorTexture(unpack(ns.COL_BORDER))
-    hSep:SetPoint("TOPLEFT",DET_PAD,-(DET_HDR_H-1)); hSep:SetPoint("TOPRIGHT",-DET_PAD,-(DET_HDR_H-1))
-
-    local xBtn = ns.CreateCloseButton(DetailFrame, 18, 0.8); xBtn:SetPoint("TOPRIGHT",-DET_PAD,-10)
-    xBtn:SetScript("OnClick",function()
-        if not ns.DeferInCombat(function() DetailFrame:Hide() end) then DetailFrame:Hide() end
-    end)
+    ns.AddHLine(DetailFrame, "TOP", DET_PAD, -(DET_HDR_H-1))
 
     DScrollFrame = CreateFrame("ScrollFrame",nil,DetailFrame)
     DScrollFrame:SetPoint("TOPLEFT",DET_PAD,-DET_HDR_H); DScrollFrame:SetWidth(DET_CONT_W)
@@ -340,7 +299,6 @@ local function EnsureDetailFrame()
     local OnWheel = ns.MakeWheelHandler(DScrollFrame, DListFrame, DET_ROW_H)
     DScrollFrame:SetScript("OnMouseWheel",OnWheel)
     DListFrame:EnableMouseWheel(true); DListFrame:SetScript("OnMouseWheel",OnWheel)
-
 end
 
 -- Row gold text. Plain rows and rows with a frozen AH/vendor split show
@@ -393,9 +351,8 @@ end
 
 local function RebuildDetailContent(session)
     currentDetailSession = session
-    for _,r in ipairs(activeDetRows) do ReleaseDetRow(r) end
-    for _,r in ipairs(activeDetCats) do ReleaseDetCat(r)  end
-    activeDetRows={}; activeDetCats={}
+    detRowPool.releaseAll(activeDetRows)
+    detCatPool.releaseAll(activeDetCats)
 
     local cats, catOrder = ns.BuildSessionCategories(session)
 
@@ -415,7 +372,7 @@ local function RebuildDetailContent(session)
     for _, catName in ipairs(catOrder) do
         local cat = cats[catName]
         if #cat.items > 0 then
-            local ch = AcquireDetCat(); ch:SetSize(DET_CONT_W, DET_CAT_H); ch:SetPoint("TOPLEFT",0,-yOff)
+            local ch = detCatPool.acquire(DListFrame); ch:SetSize(DET_CONT_W, DET_CAT_H); ch:SetPoint("TOPLEFT",0,-yOff)
             flow.header(ch)
             local isCollapsed = detCollapsed[catName]
             ns.SetHeaderArrow(ch, isCollapsed)
@@ -430,7 +387,7 @@ local function RebuildDetailContent(session)
             if not isCollapsed then
                 yOff = yOff + ns.CAT_GAP
                 for _, entry in ipairs(cat.items) do
-                    local ir = AcquireDetRow(); ir:SetWidth(DET_CONT_W); ir:SetPoint("TOPLEFT",0,-yOff)
+                    local ir = detRowPool.acquire(DListFrame); ir:SetWidth(DET_CONT_W); ir:SetPoint("TOPLEFT",0,-yOff)
                     FillDetailRow(ir, entry)
                     activeDetRows[#activeDetRows+1]=ir; yOff = yOff + DET_ROW_H
                 end
@@ -485,10 +442,9 @@ end
 ------------------------------------------------------------------------
 function ns.RebuildHistory()
     if not HListFrame then return end
-    for _,r in ipairs(activeSessRows)  do ReleaseSessRow(r)  end
-    for _,r in ipairs(activeDayRows)   do ReleaseDayRow(r)   end
-    for _,r in ipairs(activeMonthRows) do ReleaseMonthRow(r) end
-    activeSessRows={}; activeDayRows={}; activeMonthRows={}
+    sessPool.releaseAll(activeSessRows)
+    dayPool.releaseAll(activeDayRows)
+    monthPool.releaseAll(activeMonthRows)
     local sessions=(NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions) or {}
 
     -- sessions is keyed by "YYYY-MM-DD" (each value an array of that day's
@@ -561,7 +517,7 @@ function ns.RebuildHistory()
         -- default: current month expanded, past months collapsed — user choice wins
         local collapsed=accDB.collapsedMonths[mKey]
         if collapsed==nil then collapsed=not month.isCurrent end
-        local mrow=AcquireMonthRow(); mrow:SetSize(ns.CONTENT_W, MONTH_H); mrow:SetPoint("TOPLEFT",0,-yOffset)
+        local mrow=monthPool.acquire(HListFrame); mrow:SetSize(ns.CONTENT_W, MONTH_H); mrow:SetPoint("TOPLEFT",0,-yOffset)
         flow.header(mrow)
         ns.SetHeaderArrow(mrow, collapsed)
         mrow.nameText:SetText(month.label)
@@ -604,7 +560,7 @@ function ns.RebuildHistory()
                 -- month header already says everything there is to say.
                 local skipDayRow = (not month.isCurrent) and #month.dayList==1 and #day.sessions==1
                 if not skipDayRow then
-                    local drow=AcquireDayRow(); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
+                    local drow=dayPool.acquire(HListFrame); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
                     flow.header(drow)
                     drow.dateText:SetText(dStr)
                     drow.goldText:SetText("")
@@ -621,7 +577,7 @@ function ns.RebuildHistory()
                 end
                 for si,entry in ipairs(day.sessions) do
                     local session=entry.session
-                    local row=AcquireSessRow(); row:SetWidth(ns.CONTENT_W); row:SetPoint("TOPLEFT",0,-yOffset)
+                    local row=sessPool.acquire(HListFrame); row:SetWidth(ns.CONTENT_W); row:SetPoint("TOPLEFT",0,-yOffset)
                     row.sep:SetShown(si < #day.sessions)   -- only between sessions; a header line follows the last one
                     row.session=session
                     local combinedGold = (session.totalGold or 0) + (session.lootedGold or 0)
@@ -685,9 +641,7 @@ local function EnsureHistFrame()
         ns.RefreshWindowChain("left")
     end)
 
-    local hSep=HistFrame:CreateTexture(nil,"ARTWORK"); hSep:SetHeight(1)
-    hSep:SetColorTexture(unpack(ns.COL_BORDER))
-    hSep:SetPoint("TOPLEFT",H_PAD,-(H_HDR_H-1)); hSep:SetPoint("TOPRIGHT",-H_PAD,-(H_HDR_H-1))
+    ns.AddHLine(HistFrame, "TOP", H_PAD, -(H_HDR_H-1))
 
     -- Hover on the title: gold of all saved months added up. The right edge
     -- stops short of the close button so the hitbox doesn't swallow its click.
@@ -722,10 +676,7 @@ local function EnsureHistFrame()
     HScrollFrame:SetScript("OnMouseWheel",OnWheel)
     HListFrame:EnableMouseWheel(true); HListFrame:SetScript("OnMouseWheel",OnWheel)
 
-    local fSep=HistFrame:CreateTexture(nil,"ARTWORK"); fSep:SetHeight(1)
-    fSep:SetColorTexture(unpack(ns.COL_BORDER))
-    fSep:SetPoint("BOTTOMLEFT",H_PAD,H_FTR_H-2); fSep:SetPoint("BOTTOMRIGHT",-H_PAD,H_FTR_H-2)
-    HistFrame.footerSep = fSep
+    HistFrame.footerSep = ns.AddHLine(HistFrame, "BOTTOM", H_PAD, H_FTR_H-2)
 
     HistFrame.countLabel = HistFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     HistFrame.countLabel:SetPoint("BOTTOMLEFT",H_PAD,8); HistFrame.countLabel:SetTextColor(0.40,0.40,0.40)

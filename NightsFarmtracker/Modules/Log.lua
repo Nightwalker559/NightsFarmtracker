@@ -12,7 +12,7 @@ local LOG_HDR_H   = ns.WINDOW_HDR_H
 local ROW_H       = ns.ROW_H
 local LOG_FTR_H   = 10
 local MIN_VIS_H   = 30
-local MAX_ENTRIES = 100  -- in-memory cap, oldest entries drop off
+local MAX_ENTRIES = 100  -- oldest entries drop off
 
 -- Row layout (the window is as wide as its widest row, see RebuildLogList)
 local TIME_W         = 38
@@ -25,19 +25,15 @@ local LogFrame, LScrollFrame, LListFrame
 
 -- Backed by NightsFarmtrackerDB.logEntries (SavedVariablesPerCharacter), so
 -- it survives /reload and relogs. Only ns.ClearLog() (called on session
--- reset) empties it - never written anywhere else, never account-wide.
+-- reset) empties it; it is never account-wide.
 
 ------------------------------------------------------------------------
 -- Row pool
 ------------------------------------------------------------------------
 local activeRows = {}
-local rowPool    = {}
 
-local function AcquireRow()
-    local r = table.remove(rowPool)
-    if r then r:SetParent(LListFrame); r:Show(); return r end
-
-    r = CreateFrame("Frame", nil, LListFrame)
+local rowPool = ns.NewPool(function(parent)
+    local r = CreateFrame("Frame", nil, parent)
     r:SetSize(ns.CONTENT_W, ROW_H)
 
     r.timeText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -68,26 +64,22 @@ local function AcquireRow()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return r
-end
-
-local function ReleaseRow(r)
-    r:Hide(); r:ClearAllPoints(); r.itemLink = nil
+end, function(r)
+    r.itemLink = nil
     r.iconBorder:Hide()
     r.rankBadge:SetText("")
-    rowPool[#rowPool+1] = r
-end
+end)
 
 ------------------------------------------------------------------------
 -- List rebuild
 ------------------------------------------------------------------------
 local function RebuildLogList()
     if not LListFrame then return end
-    for _, r in ipairs(activeRows) do ReleaseRow(r) end
-    activeRows = {}
+    rowPool.releaseAll(activeRows)
 
     local yOff, widest = 0, 0
     for _, e in ipairs(NightsFarmtrackerDB.logEntries or {}) do
-        local r = AcquireRow()
+        local r = rowPool.acquire(LListFrame)
         r:SetPoint("TOPLEFT", 0, -yOff)
         r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
         r.timeText:SetText(date("%H:%M", e.timestamp or time()))
@@ -179,9 +171,7 @@ local function EnsureLogFrame()
         NightsFarmtrackerDB.logWindowShown = false
     end)
 
-    local hSep = LogFrame:CreateTexture(nil,"ARTWORK"); hSep:SetHeight(1)
-    hSep:SetColorTexture(unpack(ns.COL_BORDER))
-    hSep:SetPoint("TOPLEFT", LOG_PAD, -(LOG_HDR_H-1)); hSep:SetPoint("TOPRIGHT", -LOG_PAD, -(LOG_HDR_H-1))
+    ns.AddHLine(LogFrame, "TOP", LOG_PAD, -(LOG_HDR_H-1))
 
     LScrollFrame = CreateFrame("ScrollFrame", nil, LogFrame)
     LScrollFrame:SetPoint("TOPLEFT", LOG_PAD, -LOG_HDR_H)
@@ -256,8 +246,7 @@ function ns.RestoreLogWindow()
     end
 end
 
--- Called from Settings when the feature is toggled off: hides the window
--- and clears the in-memory feed (kept disabled state = empty next time).
+-- Called from Settings when the feature is toggled off: hides the window.
 function ns.OnLogWindowDisabled()
     NightsFarmtrackerDB.logWindowShown = false
     if LogFrame then

@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - UI
--- BtnBar always visible: [▶][↺][⏱] left · [⚙][?][▼/▲][✕] right
--- Footer always visible: total gold | timer | gold/rate
+-- Main window: button bar (always visible), the item list and the footer
+-- (total gold | timer | gold/rate), plus the Gold Overview window below it.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -38,7 +38,6 @@ local COLLAPSED_H = HDR_TOTAL + 1 + FOOTER_H
 ------------------------------------------------------------------------
 -- State
 ------------------------------------------------------------------------
-local rowPool   = {}
 local itemRows  = {}
 local itemOrder = {}
 local cachedGold = 0
@@ -70,7 +69,7 @@ ns.MainFrame = MainFrame
 
 ------------------------------------------------------------------------
 -- Button bar — always visible
--- Left:  [▶] [↺] [⏱]
+-- Left:  [▶] [↺] [history/log] [filter/blacklist]
 -- Right: [⚙] [?] [▼/▲] [✕]
 ------------------------------------------------------------------------
 local BtnBar = CreateFrame("Frame", nil, MainFrame)
@@ -138,12 +137,7 @@ function ns.ApplyThemeDecor()
 end
 
 -- Separator below BtnBar
-local hdrSep = MainFrame:CreateTexture(nil, "ARTWORK")
-hdrSep:SetHeight(1)
-hdrSep:SetColorTexture(unpack(ns.COL_BORDER))
-hdrSep:SetPoint("TOPLEFT",  PAD,  -HDR_TOTAL)
-hdrSep:SetPoint("TOPRIGHT", -PAD, -HDR_TOTAL)
-table.insert(MainFrame.nftEdges, hdrSep)
+table.insert(MainFrame.nftEdges, ns.AddHLine(MainFrame, "TOP", PAD, -HDR_TOTAL))
 
 ------------------------------------------------------------------------
 -- Empty hint (expanded, no items yet)
@@ -160,11 +154,7 @@ table.insert(MainFrame.nftAccentTexts, emptyHint)
 ------------------------------------------------------------------------
 -- Footer — always visible: [total gold] [timer] [gold/rate]
 ------------------------------------------------------------------------
-local footerSep = MainFrame:CreateTexture(nil, "ARTWORK")
-footerSep:SetHeight(1)
-footerSep:SetColorTexture(unpack(ns.COL_BORDER))
-footerSep:SetPoint("BOTTOMLEFT",  PAD,  FOOTER_H - 2)
-footerSep:SetPoint("BOTTOMRIGHT", -PAD, FOOTER_H - 2)
+local footerSep = ns.AddHLine(MainFrame, "BOTTOM", PAD, FOOTER_H - 2)
 table.insert(MainFrame.nftEdges, footerSep)
 
 local goldBtn = CreateFrame("Button", nil, MainFrame)
@@ -234,10 +224,7 @@ do
     titleFS:SetFontHeight(ns.FONT_HEADER)
     GoldFrame.nftAccentTexts = { titleFS }
 
-    local sep1 = GoldFrame:CreateTexture(nil,"ARTWORK"); sep1:SetHeight(1)
-    sep1:SetColorTexture(unpack(ns.COL_BORDER))
-    sep1:SetPoint("TOPLEFT", gp, -26); sep1:SetPoint("TOPRIGHT", -gp, -26)
-    table.insert(GoldFrame.nftEdges, sep1)
+    table.insert(GoldFrame.nftEdges, ns.AddHLine(GoldFrame, "TOP", gp, -26))
 
     local function MakeRow(yOff, labelKey, bold)
         local font = bold and "GameFontNormal" or "GameFontNormalSmall"
@@ -257,10 +244,7 @@ do
     local itemsVal  = MakeRow(-33, "gold_items")
     local direktVal = MakeRow(-49, "looted_gold")
 
-    local sep2 = GoldFrame:CreateTexture(nil,"ARTWORK"); sep2:SetHeight(1)
-    sep2:SetColorTexture(unpack(ns.COL_BORDER))
-    sep2:SetPoint("TOPLEFT", gp, -63); sep2:SetPoint("TOPRIGHT", -gp, -63)
-    table.insert(GoldFrame.nftEdges, sep2)
+    table.insert(GoldFrame.nftEdges, ns.AddHLine(GoldFrame, "TOP", gp, -63))
 
     local totalVal = MakeRow(-72, "gold_total", true)
 
@@ -534,11 +518,8 @@ local function ResetRowLayout(row)
     row.goldText:SetFontHeight(ns.FONT_NORMAL)
 end
 
-local function AcquireRow()
-    local row = table.remove(rowPool)
-    if row then row:Show(); return row end
-
-    row = CreateFrame("Frame", nil, ListFrame)
+local rowPool = ns.NewPool(function(parent)
+    local row = CreateFrame("Frame", nil, parent)
     row:SetSize(CONTENT_W, ROW_H)
 
     -- Header band (background + top/bottom line), only shown on category
@@ -648,10 +629,7 @@ local function AcquireRow()
 
     ResetRowLayout(row)
     return row
-end
-
-local function ReleaseRow(row)
-    row:Hide(); row:ClearAllPoints()
+end, function(row)
     row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false
     row.itemName=nil; row.itemLink=nil; row.itemID=nil; row.baseItemID=nil
     row.isCategoryHeader=nil; row.categoryName=nil; row.isJunkMerged=nil
@@ -660,7 +638,12 @@ local function ReleaseRow(row)
     row.icon:Show()
     row.srcText:SetText("")
     row.rankBadge:SetText("")
-    rowPool[#rowPool+1] = row
+end)
+
+-- Releases every row of the current list.
+local function ClearRows()
+    for _, row in pairs(itemRows) do rowPool.release(row) end
+    itemRows, itemOrder = {}, {}
 end
 
 local function PlaceRow(row, yOff, name, icon, nameColor, quality)
@@ -680,7 +663,7 @@ end
 
 -- Hands back a category header row that turned out to have nothing to show.
 local function DropLastHeader(row, name)
-    ReleaseRow(row)
+    rowPool.release(row)
     itemRows[name] = nil
     itemOrder[#itemOrder] = nil   -- PlaceRow appended it; keep #itemOrder = real rows
 end
@@ -852,7 +835,7 @@ end
 -- Category header row; returns it so an empty category can be dropped again.
 -- flow (ns.NewHeaderFlow) decides whether the header draws its top line.
 local function PlaceCategoryHeader(catName, cat, isCollapsed, yOffset, flow)
-    local hdr = AcquireRow()
+    local hdr = rowPool.acquire(ListFrame)
     hdr:SetSize(CONTENT_W, CAT_ROW_H)
     PlaceRow(hdr, yOffset, catName, nil, ns.COL_ACCENT)
     hdr.icon:Hide(); hdr.iconBorder:Hide()
@@ -890,14 +873,11 @@ local function AddTierEntries(flat, item, hasAH, fv, qAtlas)
             if gv.sellPrice and gv.sellPrice > 0 then tV = gv.sellPrice * tc end
             local tGold = fv and (tV or 0) or math.max(tAH or 0, tV or 0)
             if tGold > 0 then
-                local rankIcon = qAtlas[tier]
-                              and CreateAtlasMarkup(qAtlas[tier], ns.RANK_ICON_W, ns.RANK_ICON_H)
-                              or ("|cffaaaaaa R" .. tier .. "|r")
                 flat[#flat + 1] = {
                     isRank = true, name = item.name, d = d,
                     tier = tier, tid = tid, tc = tc,
                     tAH = tAH, tV = tV, tGold = tGold,
-                    rankIcon = rankIcon, fv = fv,
+                    rankIcon = ns.RankBadgeMarkup(qAtlas[tier], tier), fv = fv,
                 }
             end
         end
@@ -954,7 +934,7 @@ local function BuildFlatList(cat, hasAH, qAtlas)
 end
 
 local function RenderFlatRow(fi, yOffset)
-    local row = AcquireRow()
+    local row = rowPool.acquire(ListFrame)
     local d = fi.d
     row.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); row.icon:Show()
@@ -1001,8 +981,7 @@ end
 
 local function BuildHUD()
     local savedScroll = ScrollFrame:GetVerticalScroll()
-    for _, row in pairs(itemRows) do ReleaseRow(row) end
-    itemRows, itemOrder = {}, {}
+    ClearRows()
 
     local db = NightsFarmtrackerDB
     local cats, grandTotal = CollectCategories(db)
@@ -1018,10 +997,7 @@ local function BuildHUD()
     local sorted = {}
     for catName, cat in pairs(cats) do sorted[#sorted + 1] = {name = catName, cat = cat} end
     table.sort(sorted, function(a, b)
-        if a.cat.totalGold ~= b.cat.totalGold then return a.cat.totalGold > b.cat.totalGold end
-        local oa = (a.cat.classID and ns.CLASS_PRIORITY[a.cat.classID]) or 50
-        local ob = (b.cat.classID and ns.CLASS_PRIORITY[b.cat.classID]) or 50
-        return oa < ob
+        return ns.CategoryBefore(a.cat.totalGold, a.cat.classID, b.cat.totalGold, b.cat.classID)
     end)
 
     local yOffset = 0
@@ -1103,8 +1079,7 @@ function ns.Reset(skipSave)
     db.logWindowShown = false
     ns.StopTimer(); ns.CleanupPriceUpdate()
     GoldFrame:Hide()
-    for _, row in pairs(itemRows) do ReleaseRow(row) end
-    itemRows, itemOrder = {}, {}
+    ClearRows()
     cachedGold = 0
     goalReached = false
     ns.UpdateTimerDisplay()

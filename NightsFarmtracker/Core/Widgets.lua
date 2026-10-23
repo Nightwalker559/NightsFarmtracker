@@ -6,12 +6,6 @@
 local _, ns = ...
 
 ------------------------------------------------------------------------
--- Docks `frame` to the left or right of `anchor`. Without room on screen in
--- that direction it docks below the anchor, or above it when the screen bottom
--- is too close (windows are clamped to the screen, so a "below" without room
--- would slide up over the anchor). Call it after the frame has its final
--- height.
-------------------------------------------------------------------------
 -- After a drag WoW may report any anchor point of the frame ("RIGHT", ...),
 -- which would make height changes grow it in both directions. Re-anchors it
 -- to the TOP of the screen at the same spot and returns the offsets
@@ -40,6 +34,11 @@ local function DockStacked(frame, anchor, edge)
     end
 end
 
+-- Docks `frame` to the left or right of `anchor`. Without room on screen in
+-- that direction it docks below the anchor, or above it when the screen bottom
+-- is too close (windows are clamped to the screen, so a "below" without room
+-- would slide up over the anchor). Call it after the frame has its final
+-- height.
 function ns.DockFrame(frame, anchor, side)
     frame:ClearAllPoints()
     local width       = frame:GetWidth() or ns.FRAME_W
@@ -128,6 +127,20 @@ function ns.ApplyQualityColor(nameText, iconBorder, quality, fallbackColor)
 end
 
 ------------------------------------------------------------------------
+-- 1 px line in the theme border color across the frame, `pad` in from both
+-- sides and `offset` down (negative) or up (positive) from its top/bottom
+-- edge: window title and footer separators. edge is "TOP" or "BOTTOM".
+------------------------------------------------------------------------
+function ns.AddHLine(frame, edge, pad, offset)
+    local line = frame:CreateTexture(nil, "ARTWORK")
+    line:SetHeight(1)
+    line:SetColorTexture(unpack(ns.COL_BORDER))
+    line:SetPoint(edge .. "LEFT",  pad,  offset)
+    line:SetPoint(edge .. "RIGHT", -pad, offset)
+    return line
+end
+
+------------------------------------------------------------------------
 -- Row furniture: a bottom separator line (Export picker rows) and the item
 -- icon plus its quality border shared by the HUD, History, Log and the drop
 -- lists (the caller anchors the icon).
@@ -152,6 +165,48 @@ function ns.AddRowIcon(row)
     border:Hide()
     row.iconBorder = border
     return icon
+end
+
+------------------------------------------------------------------------
+-- Pool of reusable frames / font strings, so list rebuilds don't leak new
+-- widgets. create(parent) builds a fresh one; reset(obj) (optional) clears
+-- per-use state (scripts, texts, stored data) when it goes back.
+--   pool.acquire(parent)  reuse (re-parented, shown) or create
+--   pool.release(obj)     hide, unanchor, reset, keep for reuse
+--   pool.releaseAll(list) release every object of an active list and empty it
+------------------------------------------------------------------------
+function ns.NewPool(create, reset)
+    local free, pool = {}, {}
+    function pool.acquire(parent)
+        local obj = table.remove(free)
+        if not obj then return create(parent) end
+        if obj:GetParent() ~= parent then obj:SetParent(parent) end
+        obj:Show()
+        return obj
+    end
+    function pool.release(obj)
+        obj:Hide(); obj:ClearAllPoints()
+        if reset then reset(obj) end
+        free[#free + 1] = obj
+    end
+    function pool.releaseAll(list)
+        for i = #list, 1, -1 do
+            pool.release(list[i])
+            list[i] = nil
+        end
+    end
+    return pool
+end
+
+-- StaticPopup with OK/Cancel and the addon's usual settings; onAccept(dialog,
+-- data) runs on OK. `extra` adds or overrides dialog fields (e.g. hideOnEscape).
+function ns.RegisterConfirmDialog(name, text, onAccept, extra)
+    local dialog = {
+        text = text, button1 = OKAY, button2 = CANCEL, OnAccept = onAccept,
+        timeout = 0, whileDead = true, hideOnEscape = true,
+    }
+    for k, v in pairs(extra or {}) do dialog[k] = v end
+    StaticPopupDialogs[name] = dialog
 end
 
 ------------------------------------------------------------------------
@@ -185,8 +240,8 @@ function ns.ShowHeaderBand(frame, shown)
     if frame.headerArrow and not shown then frame.headerArrow:Hide() end
 end
 
--- Collapse/expand arrow at the left of a collapsible header (replaces the old
--- "+" / "-" text prefix). Header texts start at ns.HEADER_TEXT_X, right of it.
+-- Collapse/expand arrow at the left of a collapsible header. Header texts
+-- start at ns.HEADER_TEXT_X, right of it.
 ns.HEADER_ARROW_SIZE = 10
 ns.HEADER_TEXT_X     = 4 + ns.HEADER_ARROW_SIZE + 4
 function ns.SetHeaderArrow(frame, collapsed)
@@ -256,20 +311,6 @@ function ns.CreateCloseButton(parent, size, idleAlpha, tooltip)
         if tooltip then GameTooltip:Hide() end
     end)
     return btn
-end
-
-------------------------------------------------------------------------
--- Rank badge from a saved item link: some reagents (e.g. per-rank ore) carry
--- their quality tier as atlas markup in their own name
--- ("|A:Professions-ChatIcon-Quality-12-Tier1:17:15::1|a"), fixed at link time.
--- Used as the fallback badge for entries whose tier breakdown is missing or
--- failed the consistency check.
-------------------------------------------------------------------------
-function ns.RankIconFromLink(link)
-    if not link then return nil end
-    local atlasName = link:match("|A:(.-):")
-    if not atlasName or not atlasName:find("Tier%d") then return nil end
-    return CreateAtlasMarkup(atlasName, ns.RANK_ICON_W, ns.RANK_ICON_H)
 end
 
 ------------------------------------------------------------------------
@@ -457,6 +498,34 @@ function ns.CreateWindowFrame(name, title, opts)
 end
 
 ------------------------------------------------------------------------
+-- Small movable overlay (Venom Tracker, Fishing Lure Bar): styled, clamped,
+-- hidden at first. Dragging saves db[posKey] = { "TOP", x, y } (anchored to
+-- the screen top, see ns.AnchorToTop); the X button calls onClose. The caller
+-- sets size, position and content.
+------------------------------------------------------------------------
+function ns.CreateOverlayFrame(name, posKey, onClose)
+    local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+    frame:SetFrameStrata("MEDIUM")
+    frame:SetClampedToScreen(true)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    ns.ApplyFrameStyle(frame)
+    frame:Hide()
+    frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local x, y = ns.AnchorToTop(self)
+        if x then NightsFarmtrackerDB[posKey] = { "TOP", x, y } end
+    end)
+
+    frame.closeButton = ns.MakeBtn(frame, 14, "btn_close.png")
+    frame.closeButton:SetPoint("TOPRIGHT", -4, -4)
+    frame.closeButton:SetScript("OnClick", onClose)
+    return frame
+end
+
+------------------------------------------------------------------------
 -- Frame style helper — square 1px border, dark teal background.
 -- Used by all windows (main, history, detail, settings).
 ------------------------------------------------------------------------
@@ -534,9 +603,7 @@ function ns.CreateCopyTextWindow(name, title)
     frame:SetHeight(360)
     frame:SetScript("OnHide", function() ns.RefreshWindowChain("left") end)
 
-    local sep = frame:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
-    sep:SetPoint("TOPLEFT", ns.PAD, -(HDR_H - 1)); sep:SetPoint("TOPRIGHT", -ns.PAD, -(HDR_H - 1))
+    ns.AddHLine(frame, "TOP", ns.PAD, -(HDR_H - 1))
 
     local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     hint:SetPoint("TOPLEFT", ns.PAD, -(HDR_H + 6))

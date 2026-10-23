@@ -1,34 +1,18 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Settings
--- Custom settings window (no WoW Settings API dependency).
--- Price source: Auctionator / TSM4 / None + TSM price source selector.
+-- Custom settings window (no WoW Settings API dependency): one scrolling page
+-- with a section sidebar - display, price source, colors, profiles, ...
 ------------------------------------------------------------------------
 local _, ns = ...
 
+ns.RegisterConfirmDialog("NFT_RELOAD", ns.L["reload_required"], function() ReloadUI() end)
+ns.RegisterConfirmDialog("NFT_CONFIRM_HISTORY_COMPACT", ns.L["compact_history_confirm"], function()
+    NightsFarmtrackerDB.sessionHistoryMode = "compact"
+    ns.CompactOldMonths()
+    ns.RebuildHistory()
+    ns.RebuildSettingsContent()
+end)
 
-StaticPopupDialogs["NFT_RELOAD"] = {
-    text        = ns.L["reload_required"],
-    button1     = OKAY,
-    button2     = CANCEL,
-    OnAccept    = function() ReloadUI() end,
-    timeout     = 0,
-    whileDead   = true,
-    hideOnEscape = true,
-}
-StaticPopupDialogs["NFT_CONFIRM_HISTORY_COMPACT"] = {
-    text        = ns.L["compact_history_confirm"],
-    button1     = OKAY,
-    button2     = CANCEL,
-    OnAccept    = function()
-        NightsFarmtrackerDB.sessionHistoryMode = "compact"
-        ns.CompactOldMonths()
-        ns.RebuildHistory()
-        ns.RebuildSettingsContent()
-    end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-}
 -- Wipes both SavedVariables tables and reloads - InitDB()/InitAccountDB()
 -- (called again on the reload) then rebuild everything from scratch, same
 -- as a fresh install. Deletes settings, session history, Vendor-Only
@@ -39,17 +23,10 @@ function ns.ResetAddonToDefault()
     ReloadUI()
 end
 
-StaticPopupDialogs["NFT_CONFIRM_RESET_ADDON"] = {
-    text        = ns.L["reset_addon_confirm"],
-    button1     = OKAY,
-    button2     = CANCEL,
-    OnAccept    = function() ns.ResetAddonToDefault() end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-}
-local SF           -- settings frame (lazy built)
+ns.RegisterConfirmDialog("NFT_CONFIRM_RESET_ADDON", ns.L["reset_addon_confirm"],
+    function() ns.ResetAddonToDefault() end, { preferredIndex = 3 })
+
+local SF          -- settings frame (lazy built)
 local SScrollFrame -- scroll container for content
 local SListFrame   -- scroll child (all widgets live here)
 local SSidebar     -- category nav sidebar (doesn't scroll)
@@ -72,20 +49,10 @@ local TITLE_STEP, TITLE_STEP_CTRL = 26, 22
 ------------------------------------------------------------------------
 -- Radio button row — pooled (built once, reconfigured on reuse) so
 -- RebuildSettingsContent doesn't leak new Frame/FontString objects on
--- every settings interaction. Mirrors the AcquireRow/ReleaseRow pattern
--- used throughout the rest of the addon (UI.lua, History.lua, etc.).
+-- every settings interaction (see ns.NewPool).
 ------------------------------------------------------------------------
-local radioPool = {}
-
-local function AcquireRadio(parent)
-    local row = table.remove(radioPool)
-    if row then
-        row:SetParent(parent)
-        row:Show()
-        return row
-    end
-
-    row = CreateFrame("Frame", nil, parent)
+local function CreateRadio(parent)
+    local row = CreateFrame("Frame", nil, parent)
     row:SetSize(S_W - S_PAD*2, CTRL_SIZE + CTRL_GAP)
 
     local dot = CreateFrame("Frame", nil, row, "BackdropTemplate")
@@ -136,6 +103,8 @@ local function AcquireRadio(parent)
 
     return row
 end
+
+local radioPool = ns.NewPool(CreateRadio, function(row) row:SetScript("OnMouseUp", nil) end)
 
 -- (Re-)configures a pooled radio row for its current position/label/value/
 -- callback. Called every time regardless of whether the row is freshly
@@ -202,28 +171,14 @@ StaticPopupDialogs["NFT_PROFILE_RENAME"] = ProfilePrompt("profile_rename_prompt"
             ns.RebuildSettingsContent()
         end
     end)
-StaticPopupDialogs["NFT_PROFILE_DELETE_CONFIRM"] = {
-    text         = ns.L["profile_delete_confirm"],
-    button1      = OKAY,
-    button2      = CANCEL,
-    OnAccept     = function(_, name)
-        local wasActive = (name == ns.GetActiveProfileName())
-        if ns.DeleteProfile(name) then
-            if wasActive then ns.SetActiveProfile(ns.DEFAULT_PROFILE) end
-            ns.RebuildSettingsContent()
-            if wasActive then StaticPopup_Show("NFT_RELOAD") end
-        end
-    end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-}
-
-local function ReleaseRadio(row)
-    row:Hide(); row:ClearAllPoints()
-    row:SetScript("OnMouseUp", nil)
-    radioPool[#radioPool+1] = row
-end
+ns.RegisterConfirmDialog("NFT_PROFILE_DELETE_CONFIRM", ns.L["profile_delete_confirm"], function(_, name)
+    local wasActive = (name == ns.GetActiveProfileName())
+    if ns.DeleteProfile(name) then
+        if wasActive then ns.SetActiveProfile(ns.DEFAULT_PROFILE) end
+        ns.RebuildSettingsContent()
+        if wasActive then StaticPopup_Show("NFT_RELOAD") end
+    end
+end)
 
 ------------------------------------------------------------------------
 -- Helper: dropdown for TSM price source
@@ -1018,17 +973,8 @@ end
 ------------------------------------------------------------------------
 -- Checkbox row — pooled, same rationale as radio rows above.
 ------------------------------------------------------------------------
-local checkboxPool = {}
-
-local function AcquireCheckbox(parent)
-    local row = table.remove(checkboxPool)
-    if row then
-        row:SetParent(parent)
-        row:Show()
-        return row
-    end
-
-    row = CreateFrame("Frame", nil, parent)
+local function CreateCheckbox(parent)
+    local row = CreateFrame("Frame", nil, parent)
     row:SetSize(S_W - S_PAD*2, CTRL_SIZE + CTRL_GAP)
 
     local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
@@ -1050,6 +996,8 @@ local function AcquireCheckbox(parent)
     return row
 end
 
+local checkboxPool = ns.NewPool(CreateCheckbox, function(row) row:SetScript("OnMouseUp", nil) end)
+
 -- (Re-)configures a pooled checkbox row: label text, position, and the
 -- getValue/setValue accessors driving its checked state and click handler.
 local function ConfigureCheckbox(row, label, yOff, getValue, setValue)
@@ -1067,63 +1015,30 @@ local function ConfigureCheckbox(row, label, yOff, getValue, setValue)
     return row
 end
 
-local function ReleaseCheckbox(row)
-    row:Hide(); row:ClearAllPoints()
-    row:SetScript("OnMouseUp", nil)
-    checkboxPool[#checkboxPool+1] = row
-end
-
 ------------------------------------------------------------------------
 -- Section title / hint text — pooled FontStrings. Text color is set once
 -- at creation (ns.COL_ACCENT/gray) since a theme change always requires
 -- a UI reload (see ApplyColorTheme), so it never goes stale while pooled.
 ------------------------------------------------------------------------
-local sectionLabelPool = {}
-local hintLabelPool    = {}
-
-local function AcquireSectionLabel(parent)
-    local fs = table.remove(sectionLabelPool)
-    if fs then fs:SetParent(parent); fs:Show(); return fs end
-    fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+local sectionLabelPool = ns.NewPool(function(parent)
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fs:SetTextColor(unpack(ns.COL_ACCENT))
     return fs
-end
+end)
 
-local function ReleaseSectionLabel(fs)
-    fs:Hide(); fs:ClearAllPoints()
-    sectionLabelPool[#sectionLabelPool+1] = fs
-end
+local hintLabelPool = ns.NewPool(function(parent)
+    return parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+end)
 
-local function AcquireHintLabel(parent)
-    local fs = table.remove(hintLabelPool)
-    if fs then fs:SetParent(parent); fs:Show(); return fs end
-    fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    return fs
-end
-
-local function ReleaseHintLabel(fs)
-    fs:Hide(); fs:ClearAllPoints()
-    hintLabelPool[#hintLabelPool+1] = fs
-end
-
--- Separate pool for the one hint that uses a fixed width + word wrap (the
--- TSM hint line) - kept apart from the auto-sized hints above so reuse
--- never has to un-set a manually fixed width.
-local wrappedHintPool = {}
-
-local function AcquireWrappedHint(parent)
-    local fs = table.remove(wrappedHintPool)
-    if fs then fs:SetParent(parent); fs:Show(); return fs end
-    fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+-- Separate pool for the hints that use a fixed width + word wrap - kept apart
+-- from the auto-sized hints above so reuse never has to un-set a manually
+-- fixed width.
+local wrappedHintPool = ns.NewPool(function(parent)
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     fs:SetWidth(S_W - S_PAD*2)
     fs:SetJustifyH("LEFT")
     return fs
-end
-
-local function ReleaseWrappedHint(fs)
-    fs:Hide(); fs:ClearAllPoints()
-    wrappedHintPool[#wrappedHintPool+1] = fs
-end
+end)
 
 ------------------------------------------------------------------------
 -- Settings content, rebuilt on open and on every change. All widgets are
@@ -1135,11 +1050,11 @@ end
 local settingsContent = {}
 
 local RELEASE_FN = {
-    radio       = ReleaseRadio,
-    checkbox    = ReleaseCheckbox,
-    section     = ReleaseSectionLabel,
-    hint        = ReleaseHintLabel,
-    wrappedHint = ReleaseWrappedHint,
+    radio       = radioPool.release,
+    checkbox    = checkboxPool.release,
+    section     = sectionLabelPool.release,
+    hint        = hintLabelPool.release,
+    wrappedHint = wrappedHintPool.release,
 }
 
 ------------------------------------------------------------------------
@@ -1149,14 +1064,10 @@ local RELEASE_FN = {
 -- header lands at the top of the visible area.
 ------------------------------------------------------------------------
 local S_SIDEBAR_W = 92
-local sidebarPool = {}
 local sidebarRows = {}
 
-local function AcquireSidebarRow(parent)
-    local row = table.remove(sidebarPool)
-    if row then row:SetParent(parent); row:Show(); return row end
-
-    row = CreateFrame("Button", nil, parent)
+local sidebarPool = ns.NewPool(function(parent)
+    local row = CreateFrame("Button", nil, parent)
     row:SetWidth(S_SIDEBAR_W - 12)
     row.txt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     row.txt:SetPoint("TOPLEFT", 0, 0)
@@ -1170,21 +1081,14 @@ local function AcquireSidebarRow(parent)
     row:SetScript("OnEnter", function(self) self.txt:SetTextColor(1, 0.82, 0) end)
     row:SetScript("OnLeave", function(self) self.txt:SetTextColor(0.7, 0.7, 0.7) end)
     return row
-end
-
-local function ReleaseSidebarRow(row)
-    row:Hide(); row:ClearAllPoints()
-    row:SetScript("OnClick", nil)
-    sidebarPool[#sidebarPool + 1] = row
-end
+end, function(row) row:SetScript("OnClick", nil) end)
 
 local function RebuildSidebar(jumpTargets)
-    for _, row in ipairs(sidebarRows) do ReleaseSidebarRow(row) end
-    sidebarRows = {}
+    sidebarPool.releaseAll(sidebarRows)
 
     local rowY = -4
     for _, target in ipairs(jumpTargets) do
-        local row = AcquireSidebarRow(SSidebar)
+        local row = sidebarPool.acquire(SSidebar)
         row.txt:SetText(target.title)
         row.txt:SetTextColor(0.7, 0.7, 0.7)
         row:SetPoint("TOPLEFT", 6, rowY)
@@ -1194,7 +1098,6 @@ local function RebuildSidebar(jumpTargets)
             local maxS = math.max(0, SListFrame:GetHeight() - SScrollFrame:GetHeight())
             SScrollFrame:SetVerticalScroll(math.max(0, math.min(target.y, maxS)))
         end)
-        row:Show()
         sidebarRows[#sidebarRows + 1] = row
         rowY = rowY - row:GetHeight() - 10
     end
@@ -1229,7 +1132,7 @@ function ns.RebuildSettingsContent()
 
     -- Section title label at y; returns the y below it.
     local function sectionTitle(y, key, step)
-        local lbl = track(AcquireSectionLabel(SListFrame), "section")
+        local lbl = track(sectionLabelPool.acquire(SListFrame), "section")
         lbl:SetPoint("TOPLEFT", S_PAD, y)
         lbl:SetText(ns.L[key])
         return y - step
@@ -1238,7 +1141,7 @@ function ns.RebuildSettingsContent()
     -- Grey wrapped hint text at y (full width); returns the FontString so the
     -- caller can size the space below it.
     local function wrappedHint(y, text)
-        local fs = track(AcquireWrappedHint(SListFrame), "wrappedHint")
+        local fs = track(wrappedHintPool.acquire(SListFrame), "wrappedHint")
         fs:SetPoint("TOPLEFT", S_PAD, y)
         fs:SetTextColor(0.5,0.5,0.5)
         fs:SetText(text)
@@ -1252,7 +1155,7 @@ function ns.RebuildSettingsContent()
 
     -- Grey single-line hint label; the caller moves y down.
     local function hintLabel(x, y, text, gray)
-        local fs = track(AcquireHintLabel(SListFrame), "hint")
+        local fs = track(hintLabelPool.acquire(SListFrame), "hint")
         fs:SetPoint("TOPLEFT", x, y)
         fs:SetTextColor(gray, gray, gray)
         fs:SetText(text)
@@ -1261,7 +1164,7 @@ function ns.RebuildSettingsContent()
     -- Checkbox row at y; returns the y below it: CTRL_GAP below the box or
     -- the (possibly wrapped) label, whichever is taller.
     local function checkbox(y, labelKey, get, set)
-        local row = ConfigureCheckbox(track(AcquireCheckbox(SListFrame), "checkbox"), ns.L[labelKey], y, get, set)
+        local row = ConfigureCheckbox(track(checkboxPool.acquire(SListFrame), "checkbox"), ns.L[labelKey], y, get, set)
         return y - math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())) - CTRL_GAP
     end
 
@@ -1285,7 +1188,7 @@ function ns.RebuildSettingsContent()
     local function radioGroup(y, options, current, set, after)
         local rows = {}
         for i, opt in ipairs(options) do
-            local row = track(AcquireRadio(SListFrame), "radio")
+            local row = track(radioPool.acquire(SListFrame), "radio")
             ConfigureRadio(row, ns.L[opt[1]], y, opt[2], set)
             row:SetSelected(current == opt[2]); row:SetEnabled(true)
             rows[i] = row
@@ -1316,7 +1219,7 @@ function ns.RebuildSettingsContent()
         local function setAH(v) db.ahSource = v; ns.ClearPriceCache(); ns.RefreshHUD() end
 
         for _, opt in ipairs(ahOptions) do
-            local row = track(AcquireRadio(SListFrame), "radio")
+            local row = track(radioPool.acquire(SListFrame), "radio")
             ConfigureRadio(row, opt.label, y, opt.value, setAH)
             row:SetSelected(getAH() == opt.value)
             row:SetEnabled(opt.avail)
@@ -1642,9 +1545,7 @@ local function EnsureSettingsFrame()
         ns.RefreshWindowChain("left")
     end)
 
-    local sep = SF:CreateTexture(nil,"ARTWORK")
-    sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
-    sep:SetPoint("TOPLEFT",S_PAD,-(S_HDR_H-1)); sep:SetPoint("TOPRIGHT",-S_PAD,-(S_HDR_H-1))
+    ns.AddHLine(SF, "TOP", S_PAD, -(S_HDR_H-1))
 
     -- Sidebar — fixed-width category nav, doesn't scroll with the content.
     SSidebar = CreateFrame("Frame", nil, SF)

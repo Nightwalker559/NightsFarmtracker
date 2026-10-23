@@ -172,17 +172,17 @@ end
 ------------------------------------------------------------------------
 -- Collapsible checkbox section: a header above one pooled checkbox row per
 -- entry. Arguments: frame (parent of the rows), header (from
--- CreateSectionHeader), pool/rows (this section's row pool and active rows),
--- padX, secTop (Y where the section starts), titleText, collapsed, entries
--- ({ key, label } list), isEnabled(key) and setEnabled(key, value),
--- onChanged() (optional). Returns the Y where the next section starts.
+-- CreateSectionHeader), rows (this section's active rows), padX, secTop (Y
+-- where the section starts), titleText, collapsed, entries ({ key, label }
+-- list), isEnabled(key) and setEnabled(key, value), onChanged() (optional).
+-- Returns the Y where the next section starts.
 ------------------------------------------------------------------------
-function ns.RebuildCheckboxSection(frame, header, pool, rows, padX, secTop, titleText, collapsed, entries, isEnabled, setEnabled, onChanged)
-    for _, r in ipairs(rows) do
-        r:Hide(); r:ClearAllPoints(); r:SetScript("OnMouseUp", nil)
-        pool[#pool+1] = r
-    end
-    for i = #rows, 1, -1 do rows[i] = nil end
+local checkboxRowPool = ns.NewPool(
+    function(parent) return ns.CreateCheckboxRow(parent, ns.CONTENT_W, ns.CHECKBOX_ROW_H) end,
+    function(r) r:SetScript("OnMouseUp", nil) end)
+
+function ns.RebuildCheckboxSection(frame, header, rows, padX, secTop, titleText, collapsed, entries, isEnabled, setEnabled, onChanged)
+    checkboxRowPool.releaseAll(rows)
 
     header:ClearAllPoints()
     header:SetPoint("TOPLEFT", padX, -secTop)
@@ -193,9 +193,7 @@ function ns.RebuildCheckboxSection(frame, header, pool, rows, padX, secTop, titl
     if not collapsed then
         n = #entries
         for i, entry in ipairs(entries) do
-            local r = table.remove(pool)
-            if r then r:SetParent(frame); r:Show()
-            else r = ns.CreateCheckboxRow(frame, ns.CONTENT_W, ns.CHECKBOX_ROW_H) end
+            local r = checkboxRowPool.acquire(frame)
             r:SetPoint("TOPLEFT", padX, -(secTop + ns.CAT_ROW_H + (i-1) * ns.CHECKBOX_ROW_H))
             r.lbl:SetText(entry.label)
 
@@ -233,13 +231,13 @@ end
 -- sorted by name, plus the scroll area and the "list empty" label. The window
 -- grows with its content up to ns.GetMaxWindowH(), then scrolls.
 --
--- cfg: window, listFrame, scrollFrame, emptyLabel; pool, rows (row pool and
--- active rows); headerPool, headers (the same for the group headers); padX;
--- bodyTop (window Y where the scroll area starts); itemsTop (Y inside
--- listFrame where the rows start); ftrH; minVisH (room for the "list empty"
--- label); items (itemID -> { name, icon, quality, expansionID }); collapsed
--- (expansionID -> true, persisted by the caller); rebuild() (re-runs the
--- window rebuild after a collapse); onShiftRemove(itemID); onRemoveGroup(
+-- cfg: window, listFrame, scrollFrame, emptyLabel; itemPool, rows (the
+-- window's item row pool, see ns.NewPool, and its active rows); headers (active
+-- group headers); padX; bodyTop (window Y where the scroll area starts);
+-- itemsTop (Y inside listFrame where the rows start); ftrH; minVisH (room for
+-- the "list empty" label); items (itemID -> { name, icon, quality,
+-- expansionID }); collapsed (expansionID -> true, persisted by the caller);
+-- rebuild() (re-runs the window rebuild after a collapse); onRemoveGroup(
 -- groupName, itemIDs).
 ------------------------------------------------------------------------
 local UNKNOWN_EXPANSION = -1
@@ -272,20 +270,12 @@ local function CreateItemGroupHeader(parent)
     return h
 end
 
-function ns.RebuildDropItemList(cfg)
-    local pool, rows = cfg.pool, cfg.rows
-    for _, r in ipairs(rows) do
-        r:Hide(); r:ClearAllPoints(); r.itemID = nil; r.iconBorder:Hide()
-        pool[#pool + 1] = r
-    end
-    for i = #rows, 1, -1 do rows[i] = nil end
+local groupHeaderPool = ns.NewPool(CreateItemGroupHeader)
 
-    local headerPool, headers = cfg.headerPool, cfg.headers
-    for _, h in ipairs(headers) do
-        h:Hide(); h:ClearAllPoints()
-        headerPool[#headerPool + 1] = h
-    end
-    for i = #headers, 1, -1 do headers[i] = nil end
+function ns.RebuildDropItemList(cfg)
+    local itemPool, rows, headers = cfg.itemPool, cfg.rows, cfg.headers
+    itemPool.releaseAll(rows)
+    groupHeaderPool.releaseAll(headers)
 
     -- Bucket by expansion. Older entries have no expansionID: resolve it now and
     -- store it; if the item is not cached yet it goes under "Unknown" and a load
@@ -323,9 +313,7 @@ function ns.RebuildDropItemList(cfg)
                           or ns.EXPANSION_NAMES[exp] or ("Expansion " .. exp)
         local collapsed = cfg.collapsed[exp]
 
-        local h = table.remove(headerPool)
-        if h then h:SetParent(cfg.listFrame); h:Show()
-        else h = CreateItemGroupHeader(cfg.listFrame) end
+        local h = groupHeaderPool.acquire(cfg.listFrame)
         h:SetPoint("TOPLEFT", 0, -yOff)
         flow.header(h)
         ns.SetHeaderArrow(h, collapsed)
@@ -340,9 +328,7 @@ function ns.RebuildDropItemList(cfg)
         if not collapsed then
             yOff = yOff + ns.CAT_GAP
             for _, e in ipairs(list) do
-                local r = table.remove(pool)
-                if r then r:SetParent(cfg.listFrame); r:Show()
-                else r = ns.CreateDropListItemRow(cfg.listFrame, cfg.onShiftRemove) end
+                local r = itemPool.acquire(cfg.listFrame)
                 r:SetPoint("TOPLEFT", 0, -yOff)
                 r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
                 r.nameText:SetText(ns.TruncateName(ns.DisplayName(e.name, e.itemID) or ("Item " .. e.itemID)))
@@ -396,29 +382,28 @@ local SEC_GAP   = 4 + 1 + 4  -- space, separator, space between sections
 function ns.CreateDropListWindow(cfg)
     local pad, hdrH = ns.PAD, ns.WINDOW_HDR_H
     local frame, scrollFrame, listFrame, Rebuild
-    local catRows, catPool = {}, {}
-    local expRows, expPool = {}, {}
-    local itemRows, itemPool = {}, {}
-    local headers, headerPool = {}, {}
+    local catRows, expRows, itemRows, headers = {}, {}, {}, {}
 
     local function RefreshAll()
         Rebuild()
         ns.RefreshHUD()
     end
 
-    StaticPopupDialogs[cfg.clearPopup] = {
-        text = ns.L[cfg.clearConfirmKey], button1 = OKAY, button2 = CANCEL,
-        OnAccept = function() cfg.clear(); RefreshAll() end,
-        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-    }
-    StaticPopupDialogs[cfg.removeGroupPopup] = {
-        text = ns.L[cfg.removeGroupKey], button1 = OKAY, button2 = CANCEL,
-        OnAccept = function(_, data)
+    local function RemoveItem(itemID)
+        cfg.remove(itemID)
+        RefreshAll()
+    end
+    local itemPool = ns.NewPool(
+        function(parent) return ns.CreateDropListItemRow(parent, RemoveItem) end,
+        function(r) r.itemID = nil; r.iconBorder:Hide() end)
+
+    ns.RegisterConfirmDialog(cfg.clearPopup, ns.L[cfg.clearConfirmKey],
+        function() cfg.clear(); RefreshAll() end, { preferredIndex = 3 })
+    ns.RegisterConfirmDialog(cfg.removeGroupPopup, ns.L[cfg.removeGroupKey],
+        function(_, data)
             for _, itemID in ipairs(data.ids) do cfg.remove(itemID) end
             RefreshAll()
-        end,
-        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-    }
+        end, { preferredIndex = 3 })
 
     local function Items()
         return NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB[cfg.itemsKey]
@@ -439,7 +424,7 @@ function ns.CreateDropListWindow(cfg)
         local entries = {}
         for i, name in ipairs(names) do entries[i] = { key = name, label = name } end
         local y = ns.RebuildCheckboxSection(
-            listFrame, frame.catHeader, catPool, catRows, 0, 0, ns.L[cfg.categoriesTitleKey],
+            listFrame, frame.catHeader, catRows, 0, 0, ns.L[cfg.categoriesTitleKey],
             NightsFarmtrackerDB[cfg.categoriesCollapsedKey], entries,
             cfg.isCategoryEnabled, cfg.setCategory, ns.RefreshHUD)
 
@@ -449,7 +434,7 @@ function ns.CreateDropListWindow(cfg)
                 exps[i] = { key = expID, label = ns.EXPANSION_NAMES[expID] or ("Expansion " .. expID) }
             end
             y = ns.RebuildCheckboxSection(
-                listFrame, frame.expHeader, expPool, expRows, 0, y, ns.L[cfg.expansions.titleKey],
+                listFrame, frame.expHeader, expRows, 0, y, ns.L[cfg.expansions.titleKey],
                 NightsFarmtrackerDB[cfg.expansions.collapsedKey], exps,
                 ns.IsAHExpansionEnabled, ns.SetAHExpansionEnabled, ns.RefreshHUD)
         end
@@ -475,10 +460,9 @@ function ns.CreateDropListWindow(cfg)
 
         ns.RebuildDropItemList({
             window = frame, listFrame = listFrame, scrollFrame = scrollFrame, emptyLabel = frame.emptyLabel,
-            pool = itemPool, rows = itemRows, padX = pad, bodyTop = hdrH, itemsTop = dzSepTop + 1 + 4,
+            itemPool = itemPool, rows = itemRows, padX = pad, bodyTop = hdrH, itemsTop = dzSepTop + 1 + 4,
             ftrH = FTR_H, minVisH = MIN_VIS_H, items = Items(),
-            onShiftRemove = function(itemID) cfg.remove(itemID); RefreshAll() end,
-            headerPool = headerPool, headers = headers,
+            headers = headers,
             collapsed = ns.GetCollapsedTable(cfg.groupsCollapsedKey),
             rebuild = Rebuild,
             onRemoveGroup = function(groupName, itemIDs)
@@ -488,6 +472,7 @@ function ns.CreateDropListWindow(cfg)
     end
     ns[cfg.rebuildKey] = Rebuild
 
+    -- Separator line inside the scrolling body; Rebuild positions it.
     local function SectionLine(parent)
         local line = parent:CreateTexture(nil, "ARTWORK")
         line:SetHeight(1)
@@ -512,8 +497,7 @@ function ns.CreateDropListWindow(cfg)
         frame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", 4, 0)
         ns[cfg.frameKey] = frame  -- other windows anchor to it
 
-        local hSep = SectionLine(frame)
-        hSep:SetPoint("TOPLEFT", pad, -(hdrH - 1)); hSep:SetPoint("TOPRIGHT", -pad, -(hdrH - 1))
+        ns.AddHLine(frame, "TOP", pad, -(hdrH - 1))
 
         ns.EnableItemDrop(frame, HandleDrop)
 

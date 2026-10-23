@@ -1,3 +1,9 @@
+------------------------------------------------------------------------
+-- Night's Farmtracker - Repairs
+-- One-time data repairs and migrations of saved sessions and of the live
+-- session, run once per account/character from the numbered registry at the
+-- end of this file (see ns.ACCOUNT_REPAIRS / ns.CHARACTER_REPAIRS).
+------------------------------------------------------------------------
 local _, ns = ...
 
 -- Migrates the old flat sessions array (sessions[1], sessions[2], ...) to
@@ -84,13 +90,15 @@ end
 -- items saved before the fix with canAH=false purely because of their
 -- bind type (not BoP/BoA, which stay vendor-only) get canAH re-enabled so
 -- they price via AH again. Returns how many items were touched.
+local function FixBindOnUseCanAH(d)
+    if d.canAH == false and not d.isBoP and not d.isBoA then
+        d.canAH = true
+        return true
+    end
+end
+
 function ns.RepairBindOnUseCanAH(sessions)
-    return ForEachSavedItem(sessions, function(d)
-        if d.canAH == false and not d.isBoP and not d.isBoA then
-            d.canAH = true
-            return true
-        end
-    end)
+    return ForEachSavedItem(sessions, FixBindOnUseCanAH)
 end
 
 -- Repairs gear-variant price data. Found in saved data:
@@ -382,6 +390,77 @@ function ns.StripRedundantGearItemLink(d)
 end
 
 ------------------------------------------------------------------------
+-- One-time repair for gear looted this session before variants existed: it was
+-- merged into one db.count entry per item ID, mixing item levels and qualities.
+-- Rebuilds the variant buckets from the items still in the bags; whatever was
+-- already sold, mailed or banked stays in one fallback bucket (last known
+-- quality and link) instead of being lost.
+function ns.MigrateGearVariantsFromBags(items)
+    if not items then return end
+    local targets = {}
+    for itemID, d in pairs(items) do
+        if ns.IsGearClass(d.classID) and not d.variants then
+            targets[itemID] = d
+        end
+    end
+    if not next(targets) then return end
+
+    for bag = 0, 5 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local ci = C_Container.GetContainerItemInfo(bag, slot)
+            if ci and targets[ci.itemID] then
+                local d    = targets[ci.itemID]
+                local link = C_Container.GetContainerItemLink(bag, slot)
+                if link then
+                    local _, _, iQuality, iLevel, _, _, _, _, _, _, sp = C_Item.GetItemInfo(link)
+                    local vKey = ns.GearVariantKey(link)
+                    d.variants  = d.variants or {}
+                    local gv    = d.variants[vKey]
+                    if not gv then
+                        gv = { amount = 0 }
+                        d.variants[vKey] = gv
+                    end
+                    gv.amount    = gv.amount + (ci.stackCount or 1)
+                    gv.quality   = iQuality
+                    gv.itemLevel = iLevel
+                    gv.itemLink  = link
+                    if sp and sp > 0 then gv.sellPrice = sp end
+                end
+            end
+        end
+    end
+
+    for _, d in pairs(targets) do
+        local found = 0
+        if d.variants then
+            for _, gv in pairs(d.variants) do found = found + gv.amount end
+        end
+        local remainder = (d.amount or 0) - found
+        if remainder > 0 then
+            d.variants = d.variants or {}
+            -- String key, never a bare number: a numeric key mixed into an
+            -- otherwise bonus-ID-string-keyed variants table would make
+            -- key-type checks depend on Lua's undefined pairs() order.
+            local key = "legacy_q" .. tostring(d.quality or 0)
+            local gv  = d.variants[key]
+            if not gv then
+                gv = { amount = 0, quality = d.quality, itemLink = d.itemLink, sellPrice = d.sellPrice }
+                d.variants[key] = gv
+            end
+            gv.amount = gv.amount + remainder
+        end
+    end
+end
+
+-- Same repair as above, applied to the most recently saved session (rather
+-- than the live/current one) - for when a session was already closed before
+-- this fix was installed, but the items are still sitting in bags.
+function ns.RepairLastSessionGearVariants()
+    local session = ns.GetNewestSession()
+    if session then ns.MigrateGearVariantsFromBags(session.items) end
+end
+
+------------------------------------------------------------------------
 -- Central one-time repair registry. Account-wide (NightsFarmtrackerAccountDB)
 -- and per-character (NightsFarmtrackerDB) repairs each run once, tracked by an
 -- incrementing "repairVersion" per scope: ns.RunAccountRepairs and
@@ -422,6 +501,10 @@ ns.ACCOUNT_REPAIRS = {
 -- NightsFarmtrackerDB.count, so an already-open session self-heals
 -- immediately instead of waiting for its next loot event (see ProcessLoot
 -- in Main.lua, which guards against the same issues going forward).
+local function ForEachLiveItem(fn)
+    for _, d in pairs(NightsFarmtrackerDB.count) do fn(d) end
+end
+
 ns.CHARACTER_REPAIRS = {
     { 1, "tierBreakdowns", function()
         local db = NightsFarmtrackerDB
@@ -437,43 +520,16 @@ ns.CHARACTER_REPAIRS = {
             end
         end
     end },
-    { 2, "bindOnUseCanAH", function()
-        local db = NightsFarmtrackerDB
-        for _, d in pairs(db.count) do
-            if d.canAH == false and not d.isBoP and not d.isBoA then
-                d.canAH = true
-            end
-        end
-    end },
+    { 2, "bindOnUseCanAH", function() ForEachLiveItem(FixBindOnUseCanAH) end },
     -- Live-count counterpart of account repair #7 - collapses
     -- gearVariants/q+qIDs+qAHTotal into the unified d.variants field on the
     -- current (unsaved) session too, so it self-heals immediately.
-    { 3, "unifiedVariants", function()
-        local db = NightsFarmtrackerDB
-        for _, d in pairs(db.count) do
-            ns.MigrateItemToUnifiedVariants(d)
-        end
-    end },
-    { 4, "normalizeVariantKeys", function()
-        local db = NightsFarmtrackerDB
-        for _, d in pairs(db.count) do
-            ns.NormalizeVariantKeys(d)
-        end
-    end },
+    { 3, "unifiedVariants", function() ForEachLiveItem(ns.MigrateItemToUnifiedVariants) end },
+    { 4, "normalizeVariantKeys", function() ForEachLiveItem(ns.NormalizeVariantKeys) end },
     -- Live-count counterpart of account repair #9.
-    { 5, "mergeDuplicateGearVariants", function()
-        local db = NightsFarmtrackerDB
-        for _, d in pairs(db.count) do
-            ns.MergeDuplicateGearVariants(d)
-        end
-    end },
+    { 5, "mergeDuplicateGearVariants", function() ForEachLiveItem(ns.MergeDuplicateGearVariants) end },
     -- Live-count counterpart of account repair #10.
-    { 6, "stripRedundantGearItemLink", function()
-        local db = NightsFarmtrackerDB
-        for _, d in pairs(db.count) do
-            ns.StripRedundantGearItemLink(d)
-        end
-    end },
+    { 6, "stripRedundantGearItemLink", function() ForEachLiveItem(ns.StripRedundantGearItemLink) end },
 }
 
 -- Legacy per-flag names this replaces, oldest first - used ONLY once, to

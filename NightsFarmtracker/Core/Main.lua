@@ -148,8 +148,7 @@ local function RecordReagentTier(db, entry, itemID, link, qty, sellPrice)
     if sellPrice and sellPrice > 0 then gv.sellPrice = sellPrice end
     db.qAtlas       = db.qAtlas or {}
     db.qAtlas[tier] = qi.iconChat
-    return qi.iconChat and CreateAtlasMarkup(qi.iconChat, ns.RANK_ICON_W, ns.RANK_ICON_H)
-        or ("|cffaaaaaa R" .. tier .. "|r")
+    return ns.RankBadgeMarkup(qi.iconChat, tier)
 end
 
 -- Adds one looted stack to the session count. Returns true if the item still
@@ -214,6 +213,18 @@ local function ResolveItemInfo(pending)
     return {
         name = name, quality = quality, itemLevel = itemLevel, itemSubType = itemSubType, icon = icon,
         sellPrice = sellPrice, classID = classID, subClassID = subClassID, bindType = bindType,
+    }
+end
+
+-- One looted stack as ProcessLoot wants it. `color` is the link's color code
+-- (hex), `itemName` the bracketed name; both may be nil.
+local function NewPendingLoot(itemID, qty, link, itemName, color)
+    return {
+        itemID      = itemID,
+        qty         = qty,
+        link        = link,
+        itemName    = itemName,
+        linkQuality = LINK_QUALITY[color and color:lower()],
     }
 end
 
@@ -375,9 +386,7 @@ function ns.UpdatePricesFromBags()
             data.noSell = true
             updated = true
         end
-        EventFrame:UnregisterEvent("BAG_UPDATE_DELAYED")
-        ns.pendingPriceUpdate = false
-        priceRetryCount       = 0
+        ns.CleanupPriceUpdate()
     else
         priceRetryCount = priceRetryCount + 1
     end
@@ -677,13 +686,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end)
 
-        ProcessLoot({{
-            itemID      = itemID,
-            qty         = qty,
-            link        = fullLink,
-            itemName    = itemName,
-            linkQuality = LINK_QUALITY[color and color:lower()],
-        }})
+        ProcessLoot({ NewPendingLoot(itemID, qty, fullLink, itemName, color) })
 
     elseif event == "ENCOUNTER_LOOT_RECEIVED" and not NightsFarmtrackerDB.paused then
         -- Fires for encounter loot (boss drops etc.), locale-independent
@@ -711,13 +714,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
             local itemName = link:match("%[(.-)%]")
             local fullLink = link:match("(|H.+|h%[.-%]|h)") or link
 
-            ProcessLoot({{
-                itemID      = itemID,
-                qty         = tonumber(qty) or 1,
-                link        = fullLink,
-                itemName    = itemName,
-                linkQuality = LINK_QUALITY[color and color:lower()],
-            }})
+            ProcessLoot({ NewPendingLoot(itemID, tonumber(qty) or 1, fullLink, itemName, color) })
         end)
     end
 end)

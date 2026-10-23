@@ -7,13 +7,15 @@ local _, ns = ...
 -- Hover shows only the essentials; clicking the button opens the full
 -- info window (all sections, what Ctrl-click does, slash commands).
 -- Built once at load time (static content) instead of on every hover.
+local categoriesSection = { title = ns.L["help_categories"], lines = { ns.L["help_cat_click"], ns.L["help_cat_rclick"] } }
+
 local helpTipSections = {
-    { title = ns.L["help_categories"], lines = { ns.L["help_cat_click"], ns.L["help_cat_rclick"] } },
+    categoriesSection,
     { title = ns.L["help_items"],      lines = { ns.L["help_item_ctrl_lclick"], ns.L["help_item_ctrl_rclick"], ns.L["help_item_rclick"] } },
 }
 
 local helpSections = {
-    { title = ns.L["help_categories"], lines = { ns.L["help_cat_click"], ns.L["help_cat_rclick"] } },
+    categoriesSection,
     { title = ns.L["help_items"],      lines = { ns.L["help_item_hover"], ns.L["help_item_ctrl_lclick"], ns.L["help_item_ctrl_rclick"], ns.L["help_item_rclick"],
                                                  ns.L["help_detail_vendor"], ns.L["help_detail_blacklist"], ns.L["help_detail_undo"] } },
     { title = ns.L["help_gold"],       lines = { ns.L["help_gold_click"] } },
@@ -38,6 +40,7 @@ local function BuildHelpText()
 end
 
 function ns.ToggleHelpWindow()
+    if ns.DeferInCombat(ns.ToggleHelpWindow) then return end
     if not HelpFrame then
         local W = 420
         HelpFrame = ns.CreateWindowFrame("NightsFarmtrackerHelpWnd", ns.L["help_detail_title"], {width = W, titleColor = ns.COL_ACCENT})
@@ -46,9 +49,7 @@ function ns.ToggleHelpWindow()
         HelpFrame:SetFrameStrata("HIGH")
         HelpFrame:SetToplevel(true)
         local hdrH = ns.WINDOW_HDR_H
-        local sep = HelpFrame:CreateTexture(nil, "ARTWORK")
-        sep:SetHeight(1); sep:SetColorTexture(unpack(ns.COL_BORDER))
-        sep:SetPoint("TOPLEFT", ns.PAD, -(hdrH - 1)); sep:SetPoint("TOPRIGHT", -ns.PAD, -(hdrH - 1))
+        ns.AddHLine(HelpFrame, "TOP", ns.PAD, -(hdrH - 1))
         -- The text scrolls once the window reaches ns.GetMaxHelpH()
         local textW  = W - 2 * ns.PAD
         local scroll = CreateFrame("ScrollFrame", nil, HelpFrame)

@@ -11,6 +11,8 @@
 
 - Footer line is hidden when a scrolled list ends flush on a header (Main window and Session History), no more double line
 - The main window position is saved per profile instead of per character (existing positions carry over once)
+- Gear AH Threshold sound and the Session History mode (full / compact) belong to the profile now, like the other settings (they were saved per character; existing values carry over)
+- Internal cleanup: shared helpers for list row pools, confirm dialogs, separator lines, overlay windows and item value rules; Core.lua split into Core, Theme and Util; the Fishing Lure Bar follows the main window only while it is shown
 
 
 ## 1.7.9

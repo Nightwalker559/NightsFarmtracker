@@ -34,6 +34,12 @@ function ns.ForEachSession(sessions, fn)
     end
 end
 
+local function CopyVariant(gv, ahTotal, ahAmount)
+    return { amount = gv.amount, quality = gv.quality, itemLevel = gv.itemLevel,
+             itemLink = gv.itemLink, sellPrice = gv.sellPrice, ahTotal = ahTotal,
+             priceItemID = gv.priceItemID, ahAmount = ahAmount }
+end
+
 -- Copies an item's variants into a saved session. With snapshotAH (copying
 -- from the live session) each variant's AH value is looked up once and frozen
 -- into gv.ahTotal (a gold total, not a unit price). Copying from an already
@@ -58,11 +64,21 @@ local function CopyVariants(variants, itemID, snapshotAH)
         if ahAmount == nil and snapshotAH then
             ahAmount = (ahTotal > 0) and gv.amount or 0
         end
-        copy[key] = { amount = gv.amount, quality = gv.quality, itemLevel = gv.itemLevel,
-                      itemLink = gv.itemLink, sellPrice = gv.sellPrice, ahTotal = ahTotal,
-                      priceItemID = gv.priceItemID, ahAmount = ahAmount }
+        copy[key] = CopyVariant(gv, ahTotal, ahAmount)
     end
     return copy
+end
+
+-- Fields every saved item shares, whether it was just saved from the live
+-- session or copied from another saved session; the caller adds the rest
+-- (totals, variants, frozen values).
+local function CopyItemFields(d)
+    return {
+        amount=d.amount, icon=d.icon, quality=d.quality, itemSubType=d.itemSubType, sellPrice=d.sellPrice,
+        isVendorTrash=d.isVendorTrash, isBoE=d.isBoE, isBoP=d.isBoP, isBoA=d.isBoA, canAH=d.canAH,
+        isCosmetic=d.isCosmetic, name=d.name,
+        classID=d.classID, subClassID=d.subClassID, itemID=d.itemID, itemLink=d.itemLink,
+    }
 end
 
 -- Sum of every variant's amount, for the reagent-tier consistency gate
@@ -90,16 +106,12 @@ local function MergeSessionInto(target, src, keepTimestamp)
     for itemID, d in pairs(src.items or {}) do
         local ei = target.items[itemID]
         if not ei then
-            target.items[itemID] = {
-                amount=d.amount, icon=d.icon, quality=d.quality, itemSubType=d.itemSubType,
-                sellPrice=d.sellPrice, vendorTotal=d.vendorTotal or 0, ahTotal=d.ahTotal or 0,
-                isVendorTrash=d.isVendorTrash, isBoE=d.isBoE, isBoP=d.isBoP, isBoA=d.isBoA, canAH=d.canAH,
-                isCosmetic=d.isCosmetic, name=d.name,
-                classID=d.classID, subClassID=d.subClassID, itemID=d.itemID, itemLink=d.itemLink,
-                variants=CopyVariants(d.variants, d.itemID, false),
-                filterFrozen=d.filterFrozen, histValue=d.histValue,
-                ahAmount=d.ahAmount, ahValue=d.ahValue,
-            }
+            ei = CopyItemFields(d)
+            ei.vendorTotal, ei.ahTotal = d.vendorTotal or 0, d.ahTotal or 0
+            ei.variants = CopyVariants(d.variants, d.itemID, false)
+            ei.filterFrozen, ei.histValue = d.filterFrozen, d.histValue
+            ei.ahAmount, ei.ahValue = d.ahAmount, d.ahValue
+            target.items[itemID] = ei
         else
             -- Only stays frozen if BOTH sides were frozen at save time; a
             -- legacy (unfrozen) side falls back to the live vendor filters.
@@ -146,10 +158,7 @@ local function MergeSessionInto(target, src, keepTimestamp)
                     for key, gv in pairs(d.variants) do
                         local egv = ei.variants[key]
                         if not egv then
-                            ei.variants[key] = { amount = gv.amount, quality = gv.quality,
-                                itemLevel = gv.itemLevel, itemLink = gv.itemLink, sellPrice = gv.sellPrice,
-                                ahTotal = gv.ahTotal or 0, priceItemID = gv.priceItemID,
-                                ahAmount = gv.ahAmount }
+                            ei.variants[key] = CopyVariant(gv, gv.ahTotal or 0, gv.ahAmount)
                         else
                             if egv.ahAmount ~= nil and gv.ahAmount ~= nil then
                                 egv.ahAmount = egv.ahAmount + gv.ahAmount
@@ -189,6 +198,17 @@ local function MergeSessionInto(target, src, keepTimestamp)
     end
 end
 ns.MergeSessionInto = MergeSessionInto
+
+-- Folds a list of sessions (oldest first after sorting) into its first entry,
+-- which ends up with the most recent timestamp, and returns it.
+local function MergeSessionList(list)
+    table.sort(list, function(a, b) return a.timestamp < b.timestamp end)
+    local merged = list[1]
+    for i = 2, #list do
+        MergeSessionInto(merged, list[i], true)
+    end
+    return merged
+end
 
 -- Sessions saved before the timestamp became the real start time carry the
 -- save (Reset) time, so a session farmed on day A and reset on day B sits
@@ -249,7 +269,7 @@ function ns.SaveCurrentSession()
         -- value, so changing the filters later can't retroactively re-price
         -- this session in History (see BuildSessionCategories).
         local forceVendor = ns.IsForceVendor(data.itemID) or ns.IsForceVendorCategory(data)
-            or ns.IsForceVendorExpansion(data)
+            or ns.IsForceVendorExpansion(data)   -- not ns.IsVendorOnly: BoP/canAH are decided separately below
         if forceVendor and variantsCopy then
             for _, gv in pairs(variantsCopy) do gv.ahTotal = 0; gv.ahAmount = 0 end
         end
@@ -284,16 +304,11 @@ function ns.SaveCurrentSession()
         newEntry.totalVendor = newEntry.totalVendor + (vendor or 0)
         newEntry.totalAH     = newEntry.totalAH     + (ah or 0)
 
-        newEntry.items[itemID] = {
-            amount=data.amount, icon=data.icon, quality=data.quality,
-            itemSubType=data.itemSubType, sellPrice=data.sellPrice,
-            vendorTotal=vendor, ahTotal=ah,
-            isVendorTrash=data.isVendorTrash, isBoE=data.isBoE, isBoP=data.isBoP,
-            isBoA=data.isBoA, canAH=data.canAH, isCosmetic=data.isCosmetic, name=data.name,
-            classID=data.classID, subClassID=data.subClassID, itemID=data.itemID, itemLink=data.itemLink,
-            variants=variantsCopy, filterFrozen=true, histValue=histValue,
-            ahAmount=ahAmount, ahValue=ahValue,
-        }
+        local saved = CopyItemFields(data)
+        saved.vendorTotal, saved.ahTotal = vendor, ah
+        saved.variants, saved.filterFrozen, saved.histValue = variantsCopy, true, histValue
+        saved.ahAmount, saved.ahValue = ahAmount, ahValue
+        newEntry.items[itemID] = saved
     end
     -- Sessions are stored per calendar day, newest first, keyed by when the
     -- session started (db.sessionStartTime), not when it is reset, so farming past
@@ -309,10 +324,9 @@ function ns.SaveCurrentSession()
         sessions[todayKey] = todayList
     end
 
-    -- No hard cap on session count anymore. Default is "full" (keep every
-    -- session forever). Only in "compact" mode does everything outside the
-    -- current calendar month get folded into one entry per month right
-    -- after saving, keeping the list bounded.
+    -- Default mode is "full" (keep every session forever). Only in "compact"
+    -- mode does everything outside the current calendar month get folded into
+    -- one entry per month right after saving, keeping the list bounded.
     if db.sessionHistoryMode == "compact" then
         ns.CompactOldMonths()
     end
@@ -329,12 +343,7 @@ function ns.MergeDaySessions(dayKey)
     local dayList = sessions and sessions[dayKey]
     if not dayList or #dayList < 2 then return end
 
-    table.sort(dayList, function(a,b) return a.timestamp < b.timestamp end)
-    local merged = dayList[1]
-    for i = 2, #dayList do
-        MergeSessionInto(merged, dayList[i], true) -- keep most recent timestamp
-    end
-    sessions[dayKey] = { merged }
+    sessions[dayKey] = { MergeSessionList(dayList) }
     ns.RebuildHistory()
 end
 
@@ -358,8 +367,7 @@ end
 -- the threshold, see BuildSessionCategories - only session.totalGold uses it.)
 local function FrozenItemValue(d)
     local vendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
-    if d.isBoP or d.canAH == false or ns.IsForceVendor(d.itemID)
-       or ns.IsForceVendorCategory(d) or ns.IsForceVendorExpansion(d) then
+    if ns.IsVendorOnly(d) then
         return vendor or ns.VendorTotal(d) or 0
     end
     if d.variants and ns.IsGear(d) then
@@ -368,16 +376,12 @@ local function FrozenItemValue(d)
             local sp = ns.VariantSellPrice(gv, d)
             local v  = (sp and sp > 0 and gv.amount) and sp * gv.amount or nil
             local a  = (gv.ahTotal or 0) > 0 and gv.ahTotal or nil
-            if ns.IsGearThresholdVendorOnly(d, a) then total = total + (v or a or 0)
-            elseif a and v then total = total + math.max(a, v)
-            else total = total + (a or v or 0) end
+            total = total + (ns.PickValue(d, v, a) or 0)
         end
         return total
     end
     local a = (d.ahTotal or 0) > 0 and d.ahTotal or nil
-    if ns.IsGearThresholdVendorOnly(d, a) then return vendor or a or 0 end
-    if a and vendor then return math.max(a, vendor) end
-    return a or vendor or 0
+    return ns.PickValue(d, vendor, a) or 0
 end
 
 function ns.RepairSessionAHPrices(session)
@@ -387,8 +391,7 @@ function ns.RepairSessionAHPrices(session)
     end
     local fixed, missing, skipped = 0, 0, 0
     for _, d in pairs(session.items) do
-        if not (d.isBoP or d.canAH == false or ns.IsForceVendor(d.itemID)
-                or ns.IsForceVendorCategory(d) or ns.IsForceVendorExpansion(d)) then
+        if not ns.IsVendorOnly(d) then
             local oldAH, newAH, changed, skip, cut = d.ahTotal or 0, 0, false, false, false
             local gear = ns.IsGearThresholdApplicable(d)
             if d.variants then
@@ -461,6 +464,19 @@ function ns.RepairSessionAHPrices(session)
     return fixed, missing, skipped, totalGold - oldTotal
 end
 
+-- Most recently saved session = the first (newest) entry of the newest day
+-- key. ISO-format day keys ("YYYY-MM-DD") sort correctly as plain strings.
+-- Returns session, dayKey (nothing if there is no saved session).
+function ns.GetNewestSession()
+    local sessions = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions
+    local latestKey
+    for k in pairs(sessions or {}) do
+        if type(k) == "string" and (not latestKey or k > latestKey) then latestKey = k end
+    end
+    local session = latestKey and sessions[latestKey] and sessions[latestKey][1]
+    if session then return session, latestKey end
+end
+
 -- Re-prices the newest saved session (ns.GetNewestSession). Run via /nft repairprices.
 function ns.RepairLastSessionPrices()
     local L = ns.L
@@ -520,26 +536,14 @@ function ns.CompactOldMonths()
     if not next(byMonth) then return end
 
     for mKey, list in pairs(byMonth) do
-        table.sort(list, function(a,b) return a.timestamp < b.timestamp end)
-        local merged = list[1]
-        for i = 2, #list do
-            MergeSessionInto(merged, list[i], true) -- keep most recent timestamp
-        end
+        local merged = MergeSessionList(list)
         merged.timestamp = ns.EndOfMonthTimestamp(mKey)
         merged.isMonthCompact = true
         sessions[date("%Y-%m-%d", merged.timestamp)] = { merged }
     end
 end
 
-StaticPopupDialogs["NFT_CONFIRM_MERGE_DAY"] = {
-    text         = "%s",
-    button1      = OKAY,
-    button2      = CANCEL,
-    OnAccept     = function(_, data) ns.MergeDaySessions(data) end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-}
+ns.RegisterConfirmDialog("NFT_CONFIRM_MERGE_DAY", "%s", function(_, data) ns.MergeDaySessions(data) end)
 
 ------------------------------------------------------------------------
 -- Delete all sessions belonging to one calendar month ("YYYY-MM")
@@ -559,15 +563,7 @@ function ns.DeleteMonthSessions(monthKey)
     ns.RebuildHistory()
 end
 
-StaticPopupDialogs["NFT_CONFIRM_DELETE_MONTH"] = {
-    text         = "%s",
-    button1      = OKAY,
-    button2      = CANCEL,
-    OnAccept     = function(_, data) ns.DeleteMonthSessions(data) end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-}
+ns.RegisterConfirmDialog("NFT_CONFIRM_DELETE_MONTH", "%s", function(_, data) ns.DeleteMonthSessions(data) end)
 
 ------------------------------------------------------------------------
 -- Clear all saved session history — shared by the History window's
@@ -579,31 +575,18 @@ function ns.ClearAllSessionHistory()
     ns.RebuildHistory()
 end
 
-StaticPopupDialogs["NFT_CONFIRM_CLEAR_ALL_HISTORY"] = {
-    text         = ns.L["clear_all_history_confirm"],
-    button1      = OKAY,
-    button2      = CANCEL,
-    OnAccept     = function() ns.ClearAllSessionHistory() end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-}
+ns.RegisterConfirmDialog("NFT_CONFIRM_CLEAR_ALL_HISTORY", ns.L["clear_all_history_confirm"],
+    function() ns.ClearAllSessionHistory() end)
 
 ------------------------------------------------------------------------
 -- One-time, account-wide prompt (see ns.MaybePromptSessionResetMigration
--- in Main.lua) offering to clear session history saved before the itemLink fix
--- itemLink fix, since those old sessions can't show an accurate tooltip
+-- in Main.lua) offering to clear session history saved before the itemLink
+-- fix, since those old sessions can't show an accurate tooltip
 -- for scaling gear and never will be able to.
 ------------------------------------------------------------------------
-StaticPopupDialogs["NFT_CONFIRM_SESSION_RESET_MIGRATION"] = {
-    text         = ns.L["session_reset_migration_text"],
-    button1      = OKAY,
-    button2      = CANCEL,
-    OnAccept     = function() ns.ClearAllSessionHistory() end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = false,  -- explicit choice only, avoid it silently vanishing on login
-}
+-- hideOnEscape off: explicit choice only, avoid it silently vanishing on login
+ns.RegisterConfirmDialog("NFT_CONFIRM_SESSION_RESET_MIGRATION", ns.L["session_reset_migration_text"],
+    function() ns.ClearAllSessionHistory() end, { hideOnEscape = false })
 
 -- Called once at PLAYER_LOGIN (see Main.lua). Shows the migration prompt at
 -- most once per account, and only if there's actually old session history
@@ -616,6 +599,38 @@ function ns.MaybePromptSessionResetMigration()
     if accDB.sessions and next(accDB.sessions) then
         StaticPopup_Show("NFT_CONFIRM_SESSION_RESET_MIGRATION")
     end
+end
+
+-- AH value, vendor value, row gold and AH/vendor split of one saved variant
+-- row (a reagent tier or one item-level group of scaling gear). gv.ahTotal is
+-- already the frozen, session-added AH value - never recompute unit price ×
+-- amount, so merged sessions with different AH prices sum correctly. Legacy
+-- entries saved before that field existed have no ahTotal at all: fall back
+-- to a live lookup for those (priceID/link) instead of silently dropping to
+-- vendor-only. useAH is false for vendor-only items (no AH lookup at all).
+local function VariantRowValue(gv, amount, sellPrice, useAH, priceID, link, hasAH)
+    local tAH, tV
+    if useAH then
+        if (gv.ahTotal or 0) > 0 then
+            tAH = gv.ahTotal
+        elseif gv.ahTotal == nil and hasAH then
+            local p = ns.GetAHPriceForID(priceID, link)
+            if p then tAH = p * amount end
+        end
+    end
+    local sp = (sellPrice and sellPrice > 0) and sellPrice or nil
+    if sp then tV = sp * amount end
+    local tGold = (tAH and tAH > 0) and tAH or tV or 0
+    local breakdown
+    if gv.ahAmount ~= nil then
+        -- Amount split is known: AH-priced units at their frozen AH total,
+        -- the rest at vendor price (mixed sessions).
+        local vN = math.max(0, amount - gv.ahAmount)
+        local vV = (sp or 0) * vN
+        tGold = (tAH or 0) + vV
+        breakdown = { ahN = gv.ahAmount, ahV = tAH or 0, vN = vN, vV = vV }
+    end
+    return tAH, tV, tGold, breakdown
 end
 
 -- Category/item builder used by the Detail window.
@@ -685,34 +700,10 @@ local function BuildSessionCategories(session)
                 local tc  = gv and gv.amount or 0
                 local tid = gv and gv.priceItemID
                 if tc > 0 then
-                    local tAH, tV
-                    -- gv.ahTotal is already the frozen, session-added AH
-                    -- value for this tier - never recompute unit price × qty,
-                    -- so merged sessions with different AH prices sum correctly.
-                    -- Legacy entries saved before this field existed have no
-                    -- ahTotal at all - fall back to a live lookup for those
-                    -- instead of silently dropping to vendor-only.
-                    if tid and not isVendorOnly then
-                        if (gv.ahTotal or 0) > 0 then
-                            tAH = gv.ahTotal
-                        elseif gv.ahTotal == nil and hasAH then
-                            local p = ns.GetAHPriceForID(tid)
-                            if p then tAH = p * tc end
-                        end
-                    end
-                    if gv.sellPrice and gv.sellPrice > 0 then tV = gv.sellPrice * tc end
-                    local tGold = (tAH and tAH > 0) and tAH or tV or 0
-                    local breakdown
-                    if gv.ahAmount ~= nil then
-                        -- Amount split is known: AH-priced units at their frozen AH
-                        -- total, the rest at vendor price (mixed sessions).
-                        local vN = math.max(0, tc - gv.ahAmount)
-                        local vV = (gv.sellPrice or 0) * vN
-                        tGold = (tAH or 0) + vV
-                        breakdown = { ahN = gv.ahAmount, ahV = tAH or 0, vN = vN, vV = vV }
-                    end
+                    local tAH, tV, tGold, breakdown = VariantRowValue(gv, tc, gv.sellPrice,
+                        tid and not isVendorOnly, tid, nil, hasAH)
                     if tGold > 0 then
-                        local rankIcon = qAtlas[tier] and CreateAtlasMarkup(qAtlas[tier],ns.RANK_ICON_W,ns.RANK_ICON_H) or ("|cffaaaaaa R"..tier.."|r")
+                        local rankIcon = ns.RankBadgeMarkup(qAtlas[tier], tier)
                         cats[cat].items[#cats[cat].items+1] = {
                             name=d.name, d=d, gold=tGold, isRank=true,
                             tier=tier, tc=tc, tid=tid, tAH=tAH, tV=tV, rankIcon=rankIcon,
@@ -730,31 +721,8 @@ local function BuildSessionCategories(session)
             -- summed row (see GroupGearVariantsForDisplay).
             for ilvl, gv in pairs(ns.GroupGearVariantsForDisplay(d.variants)) do
                 if gv.amount > 0 then
-                    local tAH, tV
-                    -- gv.ahTotal is already the frozen, session-added AH value
-                    -- for this variant - never recompute unit price × amount,
-                    -- so merged sessions with different AH prices sum correctly.
-                    -- Legacy entries saved before this field existed have no
-                    -- ahTotal at all - fall back to a live lookup for those
-                    -- instead of silently dropping to vendor-only.
-                    if not isVendorOnly then
-                        if (gv.ahTotal or 0) > 0 then
-                            tAH = gv.ahTotal
-                        elseif gv.ahTotal == nil and hasAH then
-                            local p = ns.GetAHPriceForID(d.itemID, gv.itemLink)
-                            if p then tAH = p * gv.amount end
-                        end
-                    end
-                    local sp = ns.VariantSellPrice(gv, d)
-                    if sp and sp > 0 then tV = sp * gv.amount end
-                    local tGold = (tAH and tAH > 0) and tAH or tV or 0
-                    local breakdown
-                    if gv.ahAmount ~= nil then
-                        local vN = math.max(0, gv.amount - gv.ahAmount)
-                        local vV = ((sp and sp > 0) and sp or 0) * vN
-                        tGold = (tAH or 0) + vV
-                        breakdown = { ahN = gv.ahAmount, ahV = tAH or 0, vN = vN, vV = vV }
-                    end
+                    local tAH, tV, tGold, breakdown = VariantRowValue(gv, gv.amount, ns.VariantSellPrice(gv, d),
+                        not isVendorOnly, d.itemID, gv.itemLink, hasAH)
                     if tGold > 0 then
                         cats[cat].items[#cats[cat].items+1] = {
                             name=d.name, d=d, gold=tGold, isGearVariant=true,
@@ -793,11 +761,8 @@ local function BuildSessionCategories(session)
         end
     end
 
-    table.sort(catOrder, function(a,b)
-        if cats[a].gold ~= cats[b].gold then return cats[a].gold > cats[b].gold end
-        local oa = (cats[a].classID and ns.CLASS_PRIORITY[cats[a].classID]) or 50
-        local ob = (cats[b].classID and ns.CLASS_PRIORITY[cats[b].classID]) or 50
-        return oa < ob
+    table.sort(catOrder, function(a, b)
+        return ns.CategoryBefore(cats[a].gold, cats[a].classID, cats[b].gold, cats[b].classID)
     end)
 
     for _, catName in ipairs(catOrder) do

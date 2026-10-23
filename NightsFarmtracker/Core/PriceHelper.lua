@@ -335,9 +335,8 @@ end
 
 -- Vendor sell price for one variant: trust its own recorded sellPrice,
 -- else look one up live via its item link (bonus IDs → correct scaled
--- price) or, failing that, its price-lookup itemID. Exposed on ns since
--- History.lua, ItemHelper.lua and UI.lua all need this same fallback for
--- their own per-variant row/total math (was duplicated inline in all three).
+-- price) or, failing that, its price-lookup itemID. Shared by the per-variant
+-- row/total math of Sessions.lua, ItemHelper.lua and UI.lua.
 function ns.VariantSellPrice(gv, data)
     local sp = gv.sellPrice
     if not sp then

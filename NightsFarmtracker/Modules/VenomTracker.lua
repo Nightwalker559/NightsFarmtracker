@@ -49,15 +49,11 @@ end
 local function EnsureVenomFrame()
     if VenomFrame then return end
 
-    VenomFrame = CreateFrame("Frame", "NightsFarmtrackerVenomFrame", UIParent, "BackdropTemplate")
+    -- The X fully disables the tracker, keeping the Settings checkbox in sync
+    -- instead of just hiding it for the session.
+    VenomFrame = ns.CreateOverlayFrame("NightsFarmtrackerVenomFrame", "venomPos",
+        function() ns.SetVenomTrackerEnabled(false) end)
     VenomFrame:SetSize(150, 44)
-    VenomFrame:SetFrameStrata("MEDIUM")
-    VenomFrame:SetClampedToScreen(true)
-    VenomFrame:SetMovable(true)
-    VenomFrame:EnableMouse(true)
-    VenomFrame:RegisterForDrag("LeftButton")
-    ns.ApplyFrameStyle(VenomFrame)
-    VenomFrame:Hide()
     ns.VenomFrame = VenomFrame
 
     -- Give it a valid anchor immediately, same rationale as the Bait
@@ -76,21 +72,6 @@ local function EnsureVenomFrame()
     VenomFrame.currencyText:SetFontHeight(ns.FONT_NORMAL)
     VenomFrame.currencyText:SetTextColor(unpack(ns.COL_GOLD))
     VenomFrame.currencyText:SetText("...")
-
-    VenomFrame.closeButton = ns.MakeBtn(VenomFrame, 14, "btn_close.png")
-    VenomFrame.closeButton:SetPoint("TOPRIGHT", -4, -4)
-    VenomFrame.closeButton:SetScript("OnClick", function()
-        -- Closing via X fully disables the bar, keeping the Settings
-        -- checkbox in sync instead of just hiding it for the session.
-        ns.SetVenomTrackerEnabled(false)
-    end)
-
-    VenomFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    VenomFrame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local x, y = ns.AnchorToTop(self)
-        if x then NightsFarmtrackerDB.venomPos = { "TOP", x, y } end
-    end)
 
     VenomFrame:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" then
