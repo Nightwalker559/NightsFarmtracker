@@ -5,6 +5,7 @@
 ### New
 
 - Option to show the average value per day in the Session History (Settings, Session History): month hover and total hover; the month's length is the divisor (the running month counts up to today), so compacted months work too
+- Option to hide the client's money message while the mailbox is open, e.g. when taking auction gold (Settings, Display); it only changes the chat, the Direct gold counter is unchanged
 
 ### Changed
 
