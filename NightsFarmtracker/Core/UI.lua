@@ -947,19 +947,19 @@ local function RenderFlatRow(fi, yOffset)
     if fi.isRank then
         local key = tostring(d.itemID) .. "_q" .. fi.tier
         row.itemName = fi.name; row.itemID = fi.tid; row.itemLink = nil; row.baseItemID = d.itemID
-        row.nameText:SetText(ns.ShortItemName(ns.DisplayName(fi.name, fi.tid)))
         row.rankBadge:SetText(fi.rankIcon or "")
         row.countText:SetText(tostring(fi.tc)); row.barCount = fi.tc
         ShowGold(row, fi.tAH, fi.tV, fi.fv)
+        ns.SetItemRowName(row.nameText, ns.DisplayName(fi.name, fi.tid))
         itemOrder[#itemOrder + 1] = key; itemRows[key] = row
     elseif fi.isGearVariant then
         local gv  = fi.gv
         local key = tostring(d.itemID) .. "_g" .. tostring(fi.ilvl)
         row.itemName = fi.name; row.itemID = d.itemID; row.itemLink = gv.itemLink; row.baseItemID = d.itemID
-        row.nameText:SetText(ns.ShortItemName(ns.DisplayName(fi.name, gv.itemLink or d.itemID)))
         row.rankBadge:SetText("")
         row.countText:SetText(tostring(gv.amount)); row.barCount = gv.amount
         ShowGold(row, fi.tAH, fi.tV, fi.fv)
+        ns.SetItemRowName(row.nameText, ns.DisplayName(fi.name, gv.itemLink or d.itemID))
         itemOrder[#itemOrder + 1] = key; itemRows[key] = row
     else
         local it = fi.item
@@ -970,10 +970,10 @@ local function RenderFlatRow(fi, yOffset)
         else
             row.itemID, row.itemLink, row.baseItemID = d.itemID, d.itemLink, d.itemID
         end
-        row.nameText:SetText(ns.ShortItemName(d.isJunkMerged and fi.name or ns.DisplayName(fi.name, d.itemID)))
         row.rankBadge:SetText(ns.RankIconFromLink(d.itemLink) or "")
         row.countText:SetText(tostring(d.amount)); row.barCount = d.amount
         ShowGold(row, it.ah, it.vendor, fi.fv)
+        ns.SetItemRowName(row.nameText, d.isJunkMerged and fi.name or ns.DisplayName(fi.name, d.itemID))
         itemOrder[#itemOrder + 1] = it.itemID; itemRows[it.itemID] = row
     end
 end
