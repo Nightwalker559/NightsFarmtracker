@@ -441,19 +441,19 @@ end
 -- RebuildHistory
 ------------------------------------------------------------------------
 
--- Adds a session to a {sum, n} average accumulator (items + direct gold).
--- A compacted month entry stands for many sessions, so it is left out.
-local function AddToAverage(acc, session)
-    if session.isMonthCompact then return end
-    acc.avgSum = (acc.avgSum or 0) + (session.totalGold or 0) + (session.lootedGold or 0)
-    acc.avgN   = (acc.avgN or 0) + 1
+-- Days a month counts for the average: its full length, or for the running
+-- month only the days up to today (the rest has no income yet).
+local function MonthDays(mKey, isCurrent)
+    if isCurrent then return tonumber(date("%d")) end
+    local y, m = mKey:match("^(%d+)-(%d+)$")
+    return tonumber(date("%d", time({year = tonumber(y), month = tonumber(m) + 1, day = 0, hour = 12})))
 end
 
--- Average gold per session of an accumulator, nil when the option is off or
--- there is nothing to average.
-local function AverageOf(acc)
-    if not NightsFarmtrackerDB.sessionHistoryAvg or not acc.avgN or acc.avgN == 0 then return nil end
-    return math.floor(acc.avgSum / acc.avgN)
+-- Average gold per day, nil when the option is off or there is nothing to average.
+-- Works on the month's total, so compacted months (no days left) get one too.
+local function AveragePerDay(gold, days)
+    if not NightsFarmtrackerDB.sessionHistoryAvg or gold <= 0 or days <= 0 then return nil end
+    return math.floor(gold / days)
 end
 
 function ns.RebuildHistory()
@@ -492,7 +492,6 @@ function ns.RebuildHistory()
             end
             days[dStr].totalGold=days[dStr].totalGold+session.totalGold
             days[dStr].lootedGold=(days[dStr].lootedGold or 0)+(session.lootedGold or 0)
-            AddToAverage(days[dStr], session)
             days[dStr].sessions[#days[dStr].sessions+1]={session=session,dayKey=dayKey,sessIdx=sessIdx}
         end
     end
@@ -512,7 +511,6 @@ function ns.RebuildHistory()
         table.insert(months[mKey].dayList,dStr)
         for _,entry in ipairs(day.sessions) do
             months[mKey].sessionsList[#months[mKey].sessionsList+1]=entry.session
-            AddToAverage(months[mKey], entry.session)
         end
     end
 
@@ -522,8 +520,7 @@ function ns.RebuildHistory()
         local m=months[mKey]
         tot.items=tot.items+m.totalGold
         tot.looted=tot.looted+(m.lootedGold or 0)
-        tot.avgSum=(tot.avgSum or 0)+(m.avgSum or 0)
-        tot.avgN=(tot.avgN or 0)+(m.avgN or 0)
+        tot.days=(tot.days or 0)+MonthDays(mKey, m.isCurrent)
     end
     historyTotals = tot
 
@@ -552,9 +549,9 @@ function ns.RebuildHistory()
                 GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(month.totalGold or 0), 0.75,0.75,0.75, 1,1,1)
                 GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(month.lootedGold or 0), 0.75,0.75,0.75, 1,1,1)
                 GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(monthCombined), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
-                local avg = AverageOf(month)
+                local avg = AveragePerDay(monthCombined, MonthDays(mKey, month.isCurrent))
                 if avg then
-                    GameTooltip:AddDoubleLine(ns.L["avg_per_session"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+                    GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
                 end
             end
             GameTooltip:Show()
@@ -587,9 +584,7 @@ function ns.RebuildHistory()
                     local drow=dayPool.acquire(HListFrame); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
                     flow.header(drow)
                     drow.dateText:SetText(dStr)
-                    -- A day with one session would just repeat that session's value.
-                    local dayAvg = #day.sessions > 1 and AverageOf(day)
-                    drow.goldText:SetText(dayAvg and ("Ø "..ns.FormatGold(dayAvg)) or "")
+                    drow.goldText:SetText("")
                     if #day.sessions > 1 then
                         drow.mergeBtn:Show()
                         drow.mergeBtn:SetScript("OnClick", function()
@@ -687,9 +682,9 @@ local function EnsureHistFrame()
         GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(t.items), 0.75,0.75,0.75, 1,1,1)
         GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(t.looted), 0.75,0.75,0.75, 1,1,1)
         GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(t.items + t.looted), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
-        local avg = AverageOf(t)
+        local avg = AveragePerDay(t.items + t.looted, t.days or 0)
         if avg then
-            GameTooltip:AddDoubleLine(ns.L["avg_per_session"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+            GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
         end
         GameTooltip:Show()
     end)

@@ -4,7 +4,7 @@
 
 ### New
 
-- Option to show the average value per session in the Session History (Settings, Session History): on the day rows with several sessions and in the month and total hover
+- Option to show the average value per day in the Session History (Settings, Session History): month hover and total hover; the month's length is the divisor (the running month counts up to today), so compacted months work too
 
 ### Changed
 
