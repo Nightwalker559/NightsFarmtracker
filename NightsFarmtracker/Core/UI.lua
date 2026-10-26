@@ -425,16 +425,11 @@ end
 ------------------------------------------------------------------------
 -- Combat-safe hide for MainFrame. Hiding it can throw ADDON_ACTION_BLOCKED
 -- during combat lockdown (its OnHide chain touches BaitFrame, which can
--- hold a SecureActionButtonTemplate lure button); defer to
--- PLAYER_REGEN_ENABLED instead of failing silently.
+-- hold a SecureActionButtonTemplate lure button); defer until combat ends
+-- instead of failing silently.
 ------------------------------------------------------------------------
-local pendingMainHide = false
-
 local function SafeHideMainFrame()
-    if InCombatLockdown() then
-        pendingMainHide = true
-        return
-    end
+    if ns.DeferInCombat(SafeHideMainFrame) then return end
     NightsFarmtrackerDB.visible = false
     MainFrame:Hide()
 end
@@ -460,10 +455,6 @@ heightWatcher:SetScript("OnEvent", function()
     if pendingHeightUpdate then
         pendingHeightUpdate = false
         UpdateFrameHeight()
-    end
-    if pendingMainHide then
-        pendingMainHide = false
-        SafeHideMainFrame()
     end
 end)
 
@@ -511,6 +502,7 @@ local function ResetRowLayout(row)
     row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
     row.nameText:SetPoint("RIGHT", row,      "RIGHT", -128, 0)
     row.nameText:SetFontHeight(ns.FONT_NORMAL)
+    row.nameText:SetMaxLines(2)
     row.countText:ClearAllPoints()
     row.countText:SetPoint("RIGHT", row, "RIGHT", -90, 0)
     row.goldText:ClearAllPoints()
@@ -592,7 +584,8 @@ local rowPool = ns.NewPool(function(parent)
     ns.AddRowIcon(row)
     row.rankBadge = ns.CreateIconBadge(row, row.icon)
 
-    -- Single-line layout: all y=0 → vertically centered with icon
+    -- All y=0 → vertically centered with the icon; long names wrap onto a
+    -- second line (see ns.SetItemRowName)
     row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     ns.SetupRowNameText(row.nameText)
 
@@ -848,6 +841,7 @@ local function PlaceCategoryHeader(catName, cat, isCollapsed, yOffset, flow)
     hdr.nameText:SetPoint("RIGHT", hdr, "RIGHT", -100, 0)
     hdr.nameText:SetText(catName)
     hdr.nameText:SetFontHeight(ns.FONT_NORMAL)
+    hdr.nameText:SetMaxLines(1)   -- a header is one line high; item rows may wrap onto two
     hdr.goldText:ClearAllPoints()
     -- same right edge as the item amounts below (they leave room for the AH/V tag)
     hdr.goldText:SetPoint("RIGHT", hdr, "RIGHT", NightsFarmtrackerDB.showPriceSource and (-4 - SRC_SHIFT) or -4, 0)
@@ -857,7 +851,7 @@ local function PlaceCategoryHeader(catName, cat, isCollapsed, yOffset, flow)
 end
 
 -- Reagent items: one entry per quality tier that has a value.
-local function AddTierEntries(flat, item, hasAH, fv, qAtlas)
+local function AddTierEntries(flat, item, fv, qAtlas)
     local d = item.data
     for tier = 1, 3 do
         local gv = d.variants[tier]
@@ -915,7 +909,7 @@ local function BuildFlatList(cat, hasAH, qAtlas)
         local d = item.data
         local fv = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, item.ah)
         if d.variants and not ns.IsGear(d) then
-            AddTierEntries(flat, item, hasAH, fv, qAtlas)
+            AddTierEntries(flat, item, fv, qAtlas)
         elseif d.variants then
             AddGearEntries(flat, item, hasAH)
         else

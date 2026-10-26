@@ -181,7 +181,8 @@ ns.RegisterConfirmDialog("NFT_PROFILE_DELETE_CONFIRM", ns.L["profile_delete_conf
 end)
 
 ------------------------------------------------------------------------
--- Helper: dropdown for TSM price source
+-- Single-instance widgets (see PlaceWidget) and the popup lists of the
+-- dropdowns
 ------------------------------------------------------------------------
 local tsmDropdown
 local tsmCustomEB
@@ -193,6 +194,7 @@ local maxHeightEB
 local profileDropdown
 local profileButtons
 local deleteProfileRow
+local themeMenuList, profileMenuList, deleteMenuList
 
 -- Single-instance widgets are built on first use, then only moved and shown.
 local function PlaceWidget(widget, make, y)
@@ -264,6 +266,23 @@ local function MakePopupList()
     ns.StyleBackdropBox(list, {0.05,0.08,0.09,1})
     list:Hide()
     return list
+end
+
+-- Opens `list` under `anchor` (prepare() fills it first), or closes it again
+-- when it is already open.
+local function ToggleMenu(list, anchor, prepare)
+    if list:IsShown() then list:Hide(); return end
+    if prepare then prepare() end
+    list:ClearAllPoints()
+    list:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -2)
+    list:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -2)
+    list:Show()
+end
+
+local function CloseMenus()
+    if themeMenuList then themeMenuList:Hide() end
+    if profileMenuList then profileMenuList:Hide() end
+    if deleteMenuList then deleteMenuList:Hide() end
 end
 
 local function MakeDropdown(parent, yOff)
@@ -539,12 +558,9 @@ local function MakeMaxHeightEB(parent, yOff)
     return frame
 end
 
-------------------------------------------------------------------------
--- Helper: dropdown for Color Theme (expandable list, unlike the TSM
--- cycle-button - there are enough themes that jumping straight to one
--- beats clicking through them one by one)
-------------------------------------------------------------------------
-local themeMenuList
+-- Color Theme dropdown (MakeThemeDropdown below): an expandable list, unlike
+-- the TSM cycle-button - there are enough themes that jumping straight to one
+-- beats clicking through them one by one.
 local THEME_ROW_H = 20
 
 ------------------------------------------------------------------------
@@ -564,10 +580,6 @@ local function MakeExportButton(parent)
     btn:SetScript("OnLeave", function() text:SetTextColor(unpack(ns.COL_ACCENT)) end)
     btn:SetScript("OnClick", function() ns.ToggleExportWindow() end)
     return btn
-end
-
-local function CloseThemeMenu()
-    if themeMenuList then themeMenuList:Hide() end
 end
 
 -- Miniature window (frame colors, header strip - flat or gradient depending
@@ -690,12 +702,9 @@ local function MakeThemeDropdown(parent, yOff)
 
     frame:EnableMouse(true)
     frame:SetScript("OnMouseUp", function()
-        if list:IsShown() then list:Hide(); return end
-        list:ClearAllPoints()
-        list:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -2)
-        list:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, -2)
-        for _, r in ipairs(list.rows) do r:PaintChips() end  -- custom color may have changed
-        list:Show()
+        ToggleMenu(list, frame, function()
+            for _, r in ipairs(list.rows) do r:PaintChips() end  -- custom color may have changed
+        end)
     end)
 
     function frame:Refresh()
@@ -802,13 +811,8 @@ end
 -- (unlike the Color Theme list) since profiles can be created, renamed or
 -- deleted at any time.
 ------------------------------------------------------------------------
-local profileMenuList
 local profileMenuRows = {}
 local PROFILE_ROW_H = 20
-
-local function CloseProfileMenu()
-    if profileMenuList then profileMenuList:Hide() end
-end
 
 local function MakeProfileDropdown(parent)
     local frame = MakeDropdownBox(parent, S_W - S_PAD*2 - 40)
@@ -828,14 +832,7 @@ local function MakeProfileDropdown(parent)
     end
 
     frame:EnableMouse(true)
-    frame:SetScript("OnMouseUp", function()
-        if list:IsShown() then list:Hide(); return end
-        RebuildList()
-        list:ClearAllPoints()
-        list:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -2)
-        list:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, -2)
-        list:Show()
-    end)
+    frame:SetScript("OnMouseUp", function() ToggleMenu(list, frame, RebuildList) end)
 
     function frame:Refresh()
         self.lbl:SetText(ns.GetActiveProfileName())
@@ -883,13 +880,8 @@ end
 -- profile that ISN'T the character's active one needs no reload at all;
 -- only deleting the active one does (handled in NFT_PROFILE_DELETE_CONFIRM).
 ------------------------------------------------------------------------
-local deleteMenuList
 local deleteMenuRows = {}
 local DELETE_ROW_H = 20
-
-local function CloseDeleteMenu()
-    if deleteMenuList then deleteMenuList:Hide() end
-end
 
 local function MakeDeleteProfileRow(parent)
     local frame = CreateFrame("Frame", nil, parent)
@@ -929,12 +921,7 @@ local function MakeDeleteProfileRow(parent)
     dd:EnableMouse(true)
     dd:SetScript("OnMouseUp", function()
         if #Candidates() == 0 then return end
-        if list:IsShown() then list:Hide(); return end
-        RebuildList()
-        list:ClearAllPoints()
-        list:SetPoint("TOPLEFT", dd, "BOTTOMLEFT", 0, -2)
-        list:SetPoint("TOPRIGHT", dd, "BOTTOMRIGHT", 0, -2)
-        list:Show()
+        ToggleMenu(list, dd, RebuildList)
     end)
 
     local delBtn = CreateFrame("Button", nil, frame)
@@ -1113,9 +1100,7 @@ end
 ------------------------------------------------------------------------
 function ns.RebuildSettingsContent()
     if not SListFrame then return end
-    CloseThemeMenu()
-    CloseProfileMenu()
-    CloseDeleteMenu()
+    CloseMenus()
     local prevScroll = SScrollFrame:GetVerticalScroll()
     for _, entry in ipairs(settingsContent) do
         local release = RELEASE_FN[entry.kind]
@@ -1540,9 +1525,7 @@ local function EnsureSettingsFrame()
     -- list is a separate TOOLTIP-strata frame parented to UIParent, so it
     -- doesn't auto-close with SF on its own.
     SF:SetScript("OnHide", function()
-        CloseThemeMenu()
-        CloseProfileMenu()
-        CloseDeleteMenu()
+        CloseMenus()
         ns.RefreshWindowChain("left")
     end)
 

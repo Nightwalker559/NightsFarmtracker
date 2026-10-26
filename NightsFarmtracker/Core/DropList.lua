@@ -143,7 +143,6 @@ function ns.CreateDropZone(parent, height, onDrop)
     return dz
 end
 
-
 ------------------------------------------------------------------------
 -- Scroll frame + list frame pair for the Vendor-Only Filter / Blacklist
 -- item lists: mouse-wheel scrolling in row steps, item drops accepted on
@@ -167,7 +166,6 @@ function ns.CreateDropListScroll(window, onDrop)
 
     return scrollFrame, listFrame
 end
-
 
 ------------------------------------------------------------------------
 -- Collapsible checkbox section: a header above one pooled checkbox row per
@@ -225,21 +223,6 @@ function ns.GetCollapsedTable(key)
     return db[key]
 end
 
-------------------------------------------------------------------------
--- Rebuilds the item list below the drop zone: pooled icon + name rows, grouped
--- under one collapsible header per expansion (newest first, unknown last) and
--- sorted by name, plus the scroll area and the "list empty" label. The window
--- grows with its content up to ns.GetMaxWindowH(), then scrolls.
---
--- cfg: window, listFrame, scrollFrame, emptyLabel; itemPool, rows (the
--- window's item row pool, see ns.NewPool, and its active rows); headers (active
--- group headers); padX; bodyTop (window Y where the scroll area starts);
--- itemsTop (Y inside listFrame where the rows start); ftrH; minVisH (room for
--- the "list empty" label); items (itemID -> { name, icon, quality,
--- expansionID }); collapsed (expansionID -> true, persisted by the caller);
--- rebuild() (re-runs the window rebuild after a collapse); onRemoveGroup(
--- groupName, itemIDs).
-------------------------------------------------------------------------
 local UNKNOWN_EXPANSION = -1
 
 -- Header for one expansion group: ns.CreateSectionHeader + a small X button
@@ -272,6 +255,21 @@ end
 
 local groupHeaderPool = ns.NewPool(CreateItemGroupHeader)
 
+------------------------------------------------------------------------
+-- Rebuilds the item list below the drop zone: pooled icon + name rows, grouped
+-- under one collapsible header per expansion (newest first, unknown last) and
+-- sorted by name, plus the scroll area and the "list empty" label. The window
+-- grows with its content up to ns.GetMaxWindowH(), then scrolls.
+--
+-- cfg: window, listFrame, scrollFrame, emptyLabel; itemPool, rows (the
+-- window's item row pool, see ns.NewPool, and its active rows); headers (active
+-- group headers); padX; bodyTop (window Y where the scroll area starts);
+-- itemsTop (Y inside listFrame where the rows start); ftrH; minVisH (room for
+-- the "list empty" label); items (itemID -> { name, icon, quality,
+-- expansionID }); collapsed (expansionID -> true, persisted by the caller);
+-- rebuild() (re-runs the window rebuild after a collapse); onRemoveGroup(
+-- groupName, itemIDs).
+------------------------------------------------------------------------
 function ns.RebuildDropItemList(cfg)
     local itemPool, rows, headers = cfg.itemPool, cfg.rows, cfg.headers
     itemPool.releaseAll(rows)
@@ -472,14 +470,6 @@ function ns.CreateDropListWindow(cfg)
     end
     ns[cfg.rebuildKey] = Rebuild
 
-    -- Separator line inside the scrolling body; Rebuild positions it.
-    local function SectionLine(parent)
-        local line = parent:CreateTexture(nil, "ARTWORK")
-        line:SetHeight(1)
-        line:SetColorTexture(unpack(ns.COL_BORDER))
-        return line
-    end
-
     local function CollapsibleHeader(titleKey, collapsedKey, hintKey)
         local header = ns.CreateSectionHeader(listFrame, ns.CONTENT_W)
         ns.WireSectionHeader(header, titleKey, function()
@@ -510,10 +500,10 @@ function ns.CreateDropListWindow(cfg)
         if cfg.expansions then
             frame.expHeader = CollapsibleHeader(cfg.expansions.titleKey, cfg.expansions.collapsedKey, cfg.expansions.hintKey)
         end
-        frame.sectionSep = SectionLine(listFrame)
+        frame.sectionSep = ns.AddHLine(listFrame, "TOP", 0, 0)   -- separator lines: Rebuild positions them
 
         frame.DropZone = ns.CreateDropZone(listFrame, DZ_H, HandleDrop)
-        frame.dzSep = SectionLine(listFrame)
+        frame.dzSep = ns.AddHLine(listFrame, "TOP", 0, 0)
 
         frame.emptyLabel = listFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         frame.emptyLabel:SetJustifyH("CENTER")

@@ -445,8 +445,7 @@ end
 -- month only the days up to today (the rest has no income yet).
 local function MonthDays(mKey, isCurrent)
     if isCurrent then return tonumber(date("%d")) end
-    local y, m = mKey:match("^(%d+)-(%d+)$")
-    return tonumber(date("%d", time({year = tonumber(y), month = tonumber(m) + 1, day = 0, hour = 12})))
+    return tonumber(date("%d", ns.EndOfMonthTimestamp(mKey)))
 end
 
 -- Average gold per day, nil when the option is off or there is nothing to average.

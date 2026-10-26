@@ -72,8 +72,9 @@ end
 -- profiles[key]) instead of directly on NightsFarmtrackerDB, so switching
 -- profile switches all of them at once (the main window position included).
 -- Everything else (session/tracking state, other window positions, UI
--- collapse flags, minimap) stays character-local, unchanged. A metatable installed in InitDB() transparently
--- redirects reads/writes of these keys - no other file needs to change.
+-- collapse flags, minimap) stays character-local, unchanged. A metatable
+-- installed in InitDB() transparently redirects reads/writes of these keys -
+-- no other file needs to change.
 ns.PROFILE_KEYS = {
     goldRateMode=true, sessionLength=true, sessionHistoryEnabled=true, logWindowEnabled=true,
     vendorFilterEnabled=true, blacklistEnabled=true, mergeDaily=true,

@@ -126,9 +126,8 @@ function ns.EnableItemDrop(frame, onDrop)
     frame:SetScript("OnMouseUp", function(_, btn) if btn == "LeftButton" then onDrop() end end)
 end
 
-
 ------------------------------------------------------------------------
--- Utility
+-- Formatting
 ------------------------------------------------------------------------
 function ns.FormatTime(s)
     s = math.floor(s or 0)
@@ -253,7 +252,7 @@ end
 -- Sets the item name of a list row: the full name when it fits the two lines
 -- of the name field, else its first two words (the tooltip has the full name).
 -- The width is worked out from the field's anchors and the row's size and
--- measured with a hidden font string of that fixed width: asking the field
+-- measured with a separate font string of that fixed width: asking the field
 -- itself returns stale line counts before its first layout pass (window
 -- opened for the first time).
 local measureFS
