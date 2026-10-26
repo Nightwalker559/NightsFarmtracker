@@ -1329,7 +1329,6 @@ function ns.RebuildSettingsContent()
         y = checkbox(y, "lockout_enabled",
             function() return db.instanceLockoutEnabled == true end,
             function(v) ns.SetInstanceLockoutEnabled(v) end)
-        y = flag(y, "hide_mail_money", "hideMailMoney", false)
 
         return y
     end)
