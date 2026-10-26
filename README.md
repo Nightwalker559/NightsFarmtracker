@@ -6,7 +6,7 @@ Night's Farmtracker counts everything you loot while you grind, groups it by cat
 
 For World of Warcraft: Midnight (game versions 12.1 and 12.1.5). English and German. Optional: Auctionator, Oribos Exchange or TradeSkillMaster for AH prices.
 
-**Author:** Nightwalker559 · **License:** MIT
+**Author:** Nightwalker559 · **License:** MIT with AI restriction
 
 ---
 
