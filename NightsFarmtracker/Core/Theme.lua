@@ -254,6 +254,7 @@ function ns.StyleBackdropBox(frame, bgColor)
     frame:SetBackdropColor(unpack(bgColor or {0.06,0.09,0.10,1}))
     frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
 end
+
 -- Best-effort early apply in case SavedVariables already happen to be
 -- available (e.g. on repeated /reload during dev). On a normal login this
 -- runs before SavedVariables are loaded and falls back to "default"; the

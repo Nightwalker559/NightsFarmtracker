@@ -347,14 +347,6 @@ function ns.MergeDaySessions(dayKey)
     ns.RebuildHistory()
 end
 
-------------------------------------------------------------------------
--- Re-prices a saved session whose AH prices are wrong or missing (the relog
--- save can run before the AH addon answers or the item cache is warm). Every
--- AH-priced item/variant gets the current price for its exact link. Vendor-only
--- items and items whose data is not loaded yet are skipped; a second run picks
--- those up. Idempotent while the AH data stays the same. Returns: re-priced
--- items, items still without AH price, skipped items, gold change.
-------------------------------------------------------------------------
 local function LinkCached(link)
     return link == nil or C_Item.GetItemInfo(link) ~= nil
 end
@@ -384,6 +376,14 @@ local function FrozenItemValue(d)
     return ns.PickValue(d, vendor, a) or 0
 end
 
+------------------------------------------------------------------------
+-- Re-prices a saved session whose AH prices are wrong or missing (the relog
+-- save can run before the AH addon answers or the item cache is warm). Every
+-- AH-priced item/variant gets the current price for its exact link. Vendor-only
+-- items and items whose data is not loaded yet are skipped; a second run picks
+-- those up. Idempotent while the AH data stays the same. Returns: re-priced
+-- items, items still without AH price, skipped items, gold change.
+------------------------------------------------------------------------
 function ns.RepairSessionAHPrices(session)
     local db = NightsFarmtrackerDB
     if not session or not session.items or db.ahSource == "none" or not ns.HasAnyAH() then
@@ -638,6 +638,8 @@ local function BuildSessionCategories(session)
     -- Use AH if available, else vendor (same logic as main frame)
     local hasAH = ns.HasAnyAH() and NightsFarmtrackerDB.ahSource ~= "none"
 
+    local qAtlas = session.qAtlas or NightsFarmtrackerDB.qAtlas or {}
+
     -- Build categories
     local cats, catOrder = {}, {}
     for _, d in pairs(session.items) do
@@ -656,8 +658,6 @@ local function BuildSessionCategories(session)
         else
             isVendorOnly = ns.IsVendorOnly(d)
         end
-        local qAtlas = session.qAtlas or NightsFarmtrackerDB.qAtlas or {}
-
         -- A reagent-tier breakdown (item is not Equipment - see ns.IsGear)
         -- that doesn't sum to the item's own amount means GetReagentQualityInfo
         -- mis-tagged a tier at tracking time (see ProcessLoot's guard) - this
@@ -772,6 +772,6 @@ local function BuildSessionCategories(session)
         end)
     end
 
-    return cats, catOrder, hasAH
+    return cats, catOrder
 end
 ns.BuildSessionCategories = BuildSessionCategories

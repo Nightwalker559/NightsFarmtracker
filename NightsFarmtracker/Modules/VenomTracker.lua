@@ -172,7 +172,7 @@ local function ScanVenom()
     -- No line matched the locale keyword: this is NOT the same as "0
     -- venom" (that only happens if the keyword line exists but has no
     -- number). Showing "0" here would be misleading if the keyword is
-    -- wrong, so surface it as unknown and warn once per session.
+    -- wrong, so surface it as unknown and warn once per character.
     VenomFrame.venomText:SetText(LABEL .. ": n/a")
     UpdateVenomFrameWidth()
     if not NightsFarmtrackerDB.venomWarnedLocaleMismatch then

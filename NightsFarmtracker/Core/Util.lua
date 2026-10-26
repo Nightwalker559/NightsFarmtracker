@@ -126,9 +126,8 @@ function ns.EnableItemDrop(frame, onDrop)
     frame:SetScript("OnMouseUp", function(_, btn) if btn == "LeftButton" then onDrop() end end)
 end
 
-
 ------------------------------------------------------------------------
--- Utility
+-- Formatting
 ------------------------------------------------------------------------
 function ns.FormatTime(s)
     s = math.floor(s or 0)
@@ -240,6 +239,50 @@ function ns.TruncateName(name)
         return name:sub(1, offset) .. ".."
     end
     return name
+end
+
+-- First two words of an item name ("Befleckte Morgenlichtarmplatten des
+-- Kommandanten" -> "Befleckte Morgenlichtarmplatten").
+local function FirstTwoWords(name)
+    local first, second = name:match("^(%S+)%s+(%S+)")
+    if first then return first .. " " .. second end
+    return name
+end
+
+-- Sets the item name of a list row: the full name when it fits the two lines
+-- of the name field, else its first two words (the tooltip has the full name).
+-- The width is worked out from the field's anchors and the row's size and
+-- measured with a separate font string of that fixed width: asking the field
+-- itself returns stale line counts before its first layout pass (window
+-- opened for the first time).
+local measureFS
+function ns.SetItemRowName(fs, name)
+    name = name or ""
+    local width = fs:GetParent():GetWidth()
+    for i = 1, fs:GetNumPoints() do
+        local point, _, _, x = fs:GetPoint(i)
+        x = tonumber(x) or 0
+        if point == "LEFT" then
+            width = width - (ns.ICON_X + ns.ICON_SIZE + x)   -- anchored to the row icon's right edge
+        elseif point == "RIGHT" then
+            width = width + x
+        end
+    end
+    if not measureFS then
+        measureFS = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        measureFS:SetFontHeight(ns.FONT_NORMAL)
+        measureFS:SetWordWrap(true)
+    end
+    measureFS:SetWidth(math.max(width, 1))
+    measureFS:SetText(name)
+    fs:SetText(measureFS:GetNumLines() > 2 and FirstTwoWords(name) or name)
+end
+
+-- Item name field of a list row: long names may wrap onto a second line (the
+-- row is tall enough for two); see ns.SetItemRowName.
+function ns.SetupRowNameText(fs)
+    fs:SetJustifyH("LEFT"); fs:SetJustifyV("MIDDLE")
+    fs:SetWordWrap(true); fs:SetMaxLines(2)
 end
 
 -- Resolves an item's CURRENT-locale display name from its itemID (or

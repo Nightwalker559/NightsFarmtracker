@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.1
+
+### New
+
+- Option to show the average value per day in the Session History (Settings, Session History): month hover and total hover; the month's length is the divisor (the running month counts up to today), so compacted months work too
+
+### Changed
+
+- Long item names in the main window and the Session History detail window wrap onto two lines; only names that do not fit even then are shortened to their first two words (the tooltip has the full name)
+- Internal cleanup: one helper for the Settings dropdown lists, combat-deferred hiding of the main window and the Fishing Lure Bar use the shared combat queue, separator lines in the Filter/Blacklist windows use the shared line helper
+
 ## 1.8.0
 
 ### New

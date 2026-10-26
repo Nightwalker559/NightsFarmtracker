@@ -221,7 +221,7 @@ function ns.ReapplyBaitPosition()
     if not BaitFrame:IsShown() then return end
     if InCombatLockdown() then return end
     ApplyBaitPosition()
-    if ns.RepositionVenomTracker then ns.RepositionVenomTracker() end
+    RepositionVenom()
 end
 
 -- The bar is not anchored to MainFrame (see ApplyBaitPosition), so it follows
@@ -337,17 +337,12 @@ end
 ------------------------------------------------------------------------
 -- Combat-safe hide. BaitFrame can parent a SecureActionButtonTemplate
 -- lure button (see AcquireButton above), so hiding it directly during
--- combat throws ADDON_ACTION_BLOCKED. Defer to PLAYER_REGEN_ENABLED
--- instead of failing silently.
+-- combat throws ADDON_ACTION_BLOCKED. Defer until combat ends instead of
+-- failing silently.
 ------------------------------------------------------------------------
-local pendingHide = false
-
 local function SafeHideBaitFrame()
     if not BaitFrame then return end
-    if InCombatLockdown() then
-        pendingHide = true
-        return
-    end
+    if ns.DeferInCombat(SafeHideBaitFrame) then return end
     BaitFrame:Hide()
 end
 ns.SafeHideBaitFrame = SafeHideBaitFrame
@@ -458,7 +453,7 @@ end
 ------------------------------------------------------------------------
 local watcher = CreateFrame("Frame")
 watcher:RegisterEvent("PLAYER_LOGIN")
-watcher:RegisterEvent("PLAYER_REGEN_ENABLED")   -- always: completes a hide deferred during combat
+watcher:RegisterEvent("PLAYER_REGEN_ENABLED")   -- always: re-syncs the position after combat
 
 -- Equipment and bag events are only needed while the bar is enabled
 -- (BAG_UPDATE_DELAYED fires on every loot/vendor/bank action).
@@ -490,10 +485,6 @@ end
 watcher:SetScript("OnEvent", function(_, event, arg1)
     if event == "PLAYER_LOGIN" then UpdateWatcher() end
     if event == "PLAYER_REGEN_ENABLED" then
-        if pendingHide then
-            pendingHide = false
-            SafeHideBaitFrame()
-        end
         ns.ReapplyBaitPosition()   -- MainFrame may have been dragged during combat
     end
     if not NightsFarmtrackerDB or NightsFarmtrackerDB.baitFrameEnabled ~= true then return end

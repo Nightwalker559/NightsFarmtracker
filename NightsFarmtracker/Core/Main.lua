@@ -1,6 +1,6 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Main
--- Events, loot processing, timer.
+-- Events, loot processing, timer, slash commands.
 ------------------------------------------------------------------------
 local _, ns = ...
 

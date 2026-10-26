@@ -158,7 +158,7 @@ local detRowPool = ns.NewPool(function(parent)
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 4, 0)
     r.nameText:SetPoint("RIGHT", r,           "RIGHT", -128, 0)
-    r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(ns.FONT_NORMAL); r.nameText:SetWordWrap(false)
+    ns.SetupRowNameText(r.nameText); r.nameText:SetFontHeight(ns.FONT_NORMAL)
 
     r.countText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.countText:SetPoint("RIGHT", r, "RIGHT", -90, 0)
@@ -324,7 +324,7 @@ local function FillDetailRow(ir, entry)
     if entry.isRank then
         ir.itemID = entry.tid
         ir.itemLink = nil
-        ir.nameText:SetText(ns.TruncateName(ns.DisplayName(entry.name, entry.tid)))
+        ns.SetItemRowName(ir.nameText, ns.DisplayName(entry.name, entry.tid))
         ir.rankBadge:SetText(entry.rankIcon or "")
         ir.countText:SetText(tostring(entry.tc))
     elseif entry.isGearVariant then
@@ -332,13 +332,13 @@ local function FillDetailRow(ir, entry)
         ns.ApplyQualityColor(ir.nameText, ir.iconBorder, gv.quality, {1,1,1})
         ir.itemID = d.itemID
         ir.itemLink = gv.itemLink
-        ir.nameText:SetText(ns.TruncateName(ns.DisplayName(entry.name, gv.itemLink or d.itemID)))
+        ns.SetItemRowName(ir.nameText, ns.DisplayName(entry.name, gv.itemLink or d.itemID))
         ir.rankBadge:SetText("")
         ir.countText:SetText(tostring(gv.amount))
     else
         ir.itemID = d.itemID
         ir.itemLink = d.itemLink
-        ir.nameText:SetText(d.isJunkMerged and ns.TruncateName(entry.name) or ns.TruncateName(ns.DisplayName(entry.name, d.itemID)))
+        ns.SetItemRowName(ir.nameText, d.isJunkMerged and entry.name or ns.DisplayName(entry.name, d.itemID))
         ir.rankBadge:SetText(entry.rankIcon or "")
         ir.countText:SetText(tostring(d.amount))
     end
@@ -440,6 +440,21 @@ end
 ------------------------------------------------------------------------
 -- RebuildHistory
 ------------------------------------------------------------------------
+
+-- Days a month counts for the average: its full length, or for the running
+-- month only the days up to today (the rest has no income yet).
+local function MonthDays(mKey, isCurrent)
+    if isCurrent then return tonumber(date("%d")) end
+    return tonumber(date("%d", ns.EndOfMonthTimestamp(mKey)))
+end
+
+-- Average gold per day, nil when the option is off or there is nothing to average.
+-- Works on the month's total, so compacted months (no days left) get one too.
+local function AveragePerDay(gold, days)
+    if not NightsFarmtrackerDB.sessionHistoryAvg or gold <= 0 or days <= 0 then return nil end
+    return math.floor(gold / days)
+end
+
 function ns.RebuildHistory()
     if not HListFrame then return end
     sessPool.releaseAll(activeSessRows)
@@ -504,6 +519,7 @@ function ns.RebuildHistory()
         local m=months[mKey]
         tot.items=tot.items+m.totalGold
         tot.looted=tot.looted+(m.lootedGold or 0)
+        tot.days=(tot.days or 0)+MonthDays(mKey, m.isCurrent)
     end
     historyTotals = tot
 
@@ -532,6 +548,10 @@ function ns.RebuildHistory()
                 GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(month.totalGold or 0), 0.75,0.75,0.75, 1,1,1)
                 GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(month.lootedGold or 0), 0.75,0.75,0.75, 1,1,1)
                 GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(monthCombined), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+                local avg = AveragePerDay(monthCombined, MonthDays(mKey, month.isCurrent))
+                if avg then
+                    GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+                end
             end
             GameTooltip:Show()
         end)
@@ -661,6 +681,10 @@ local function EnsureHistFrame()
         GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(t.items), 0.75,0.75,0.75, 1,1,1)
         GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(t.looted), 0.75,0.75,0.75, 1,1,1)
         GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(t.items + t.looted), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+        local avg = AveragePerDay(t.items + t.looted, t.days or 0)
+        if avg then
+            GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+        end
         GameTooltip:Show()
     end)
     titleHit:SetScript("OnLeave", function() GameTooltip:Hide() end)

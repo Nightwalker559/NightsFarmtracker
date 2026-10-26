@@ -37,7 +37,6 @@ function ns.MigrateSessionsToDateKeyed(sessions)
     return count
 end
 
-------------------------------------------------------------------------
 -- Calls fn(d, itemID, session) for every saved item of every session and adds
 -- up what it returns (a number, or true for 1). Returns the total.
 local function ForEachSavedItem(sessions, fn)

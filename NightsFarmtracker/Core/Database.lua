@@ -72,8 +72,9 @@ end
 -- profiles[key]) instead of directly on NightsFarmtrackerDB, so switching
 -- profile switches all of them at once (the main window position included).
 -- Everything else (session/tracking state, other window positions, UI
--- collapse flags, minimap) stays character-local, unchanged. A metatable installed in InitDB() transparently
--- redirects reads/writes of these keys - no other file needs to change.
+-- collapse flags, minimap) stays character-local, unchanged. A metatable
+-- installed in InitDB() transparently redirects reads/writes of these keys -
+-- no other file needs to change.
 ns.PROFILE_KEYS = {
     goldRateMode=true, sessionLength=true, sessionHistoryEnabled=true, logWindowEnabled=true,
     vendorFilterEnabled=true, blacklistEnabled=true, mergeDaily=true,
@@ -85,7 +86,7 @@ ns.PROFILE_KEYS = {
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
     showPriceSource=true, showValueBar=true, itemGoal=true,
-    pos=true, mainLocked=true, gearAHThresholdSound=true, sessionHistoryMode=true,
+    pos=true, mainLocked=true, gearAHThresholdSound=true, sessionHistoryMode=true, sessionHistoryAvg=true,
 }
 
 ns.DEFAULT_PROFILE = "Default"
@@ -123,6 +124,7 @@ local function NewProfileDefaults()
         mainLocked            = false,
         gearAHThresholdSound  = false,
         sessionHistoryMode    = "full",
+        sessionHistoryAvg     = false,
     }
 end
 
