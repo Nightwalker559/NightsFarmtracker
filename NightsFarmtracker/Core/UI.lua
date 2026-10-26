@@ -594,8 +594,7 @@ local rowPool = ns.NewPool(function(parent)
 
     -- Single-line layout: all y=0 → vertically centered with icon
     row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.nameText:SetJustifyH("LEFT")
-    row.nameText:SetWordWrap(false)
+    ns.SetupRowNameText(row.nameText)
 
     row.countText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     row.countText:SetJustifyH("RIGHT")
@@ -948,7 +947,7 @@ local function RenderFlatRow(fi, yOffset)
     if fi.isRank then
         local key = tostring(d.itemID) .. "_q" .. fi.tier
         row.itemName = fi.name; row.itemID = fi.tid; row.itemLink = nil; row.baseItemID = d.itemID
-        row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, fi.tid)))
+        row.nameText:SetText(ns.DisplayName(fi.name, fi.tid) or "")
         row.rankBadge:SetText(fi.rankIcon or "")
         row.countText:SetText(tostring(fi.tc)); row.barCount = fi.tc
         ShowGold(row, fi.tAH, fi.tV, fi.fv)
@@ -957,7 +956,7 @@ local function RenderFlatRow(fi, yOffset)
         local gv  = fi.gv
         local key = tostring(d.itemID) .. "_g" .. tostring(fi.ilvl)
         row.itemName = fi.name; row.itemID = d.itemID; row.itemLink = gv.itemLink; row.baseItemID = d.itemID
-        row.nameText:SetText(ns.TruncateName(ns.DisplayName(fi.name, gv.itemLink or d.itemID)))
+        row.nameText:SetText(ns.DisplayName(fi.name, gv.itemLink or d.itemID) or "")
         row.rankBadge:SetText("")
         row.countText:SetText(tostring(gv.amount)); row.barCount = gv.amount
         ShowGold(row, fi.tAH, fi.tV, fi.fv)
@@ -971,7 +970,7 @@ local function RenderFlatRow(fi, yOffset)
         else
             row.itemID, row.itemLink, row.baseItemID = d.itemID, d.itemLink, d.itemID
         end
-        row.nameText:SetText(d.isJunkMerged and ns.TruncateName(fi.name) or ns.TruncateName(ns.DisplayName(fi.name, d.itemID)))
+        row.nameText:SetText((d.isJunkMerged and fi.name or ns.DisplayName(fi.name, d.itemID) or ""))
         row.rankBadge:SetText(ns.RankIconFromLink(d.itemLink) or "")
         row.countText:SetText(tostring(d.amount)); row.barCount = d.amount
         ShowGold(row, it.ah, it.vendor, fi.fv)

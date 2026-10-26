@@ -242,6 +242,13 @@ function ns.TruncateName(name)
     return name
 end
 
+-- Item name field of a list row: long names wrap onto a second line (the row
+-- is tall enough for two) instead of being cut off at NAME_MAX.
+function ns.SetupRowNameText(fs)
+    fs:SetJustifyH("LEFT"); fs:SetJustifyV("MIDDLE")
+    fs:SetWordWrap(true); fs:SetMaxLines(2)
+end
+
 -- Resolves an item's CURRENT-locale display name from its itemID (or
 -- itemLink - GetItemInfo accepts either), falling back to the stored name
 -- if unavailable (e.g. no identifier stored, or the rare case the client

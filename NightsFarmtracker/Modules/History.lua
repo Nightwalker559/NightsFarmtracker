@@ -158,7 +158,7 @@ local detRowPool = ns.NewPool(function(parent)
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 4, 0)
     r.nameText:SetPoint("RIGHT", r,           "RIGHT", -128, 0)
-    r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(ns.FONT_NORMAL); r.nameText:SetWordWrap(false)
+    ns.SetupRowNameText(r.nameText); r.nameText:SetFontHeight(ns.FONT_NORMAL)
 
     r.countText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.countText:SetPoint("RIGHT", r, "RIGHT", -90, 0)
@@ -324,7 +324,7 @@ local function FillDetailRow(ir, entry)
     if entry.isRank then
         ir.itemID = entry.tid
         ir.itemLink = nil
-        ir.nameText:SetText(ns.TruncateName(ns.DisplayName(entry.name, entry.tid)))
+        ir.nameText:SetText(ns.DisplayName(entry.name, entry.tid) or "")
         ir.rankBadge:SetText(entry.rankIcon or "")
         ir.countText:SetText(tostring(entry.tc))
     elseif entry.isGearVariant then
@@ -332,13 +332,13 @@ local function FillDetailRow(ir, entry)
         ns.ApplyQualityColor(ir.nameText, ir.iconBorder, gv.quality, {1,1,1})
         ir.itemID = d.itemID
         ir.itemLink = gv.itemLink
-        ir.nameText:SetText(ns.TruncateName(ns.DisplayName(entry.name, gv.itemLink or d.itemID)))
+        ir.nameText:SetText(ns.DisplayName(entry.name, gv.itemLink or d.itemID) or "")
         ir.rankBadge:SetText("")
         ir.countText:SetText(tostring(gv.amount))
     else
         ir.itemID = d.itemID
         ir.itemLink = d.itemLink
-        ir.nameText:SetText(d.isJunkMerged and ns.TruncateName(entry.name) or ns.TruncateName(ns.DisplayName(entry.name, d.itemID)))
+        ir.nameText:SetText((d.isJunkMerged and entry.name or ns.DisplayName(entry.name, d.itemID) or ""))
         ir.rankBadge:SetText(entry.rankIcon or "")
         ir.countText:SetText(tostring(d.amount))
     end

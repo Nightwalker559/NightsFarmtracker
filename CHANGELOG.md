@@ -6,6 +6,10 @@
 
 - Option to show the average value per session in the Session History (Settings, Session History): on the day rows with several sessions and in the month and total hover
 
+### Changed
+
+- Long item names wrap onto a second line in the main window and the Session History detail window instead of being cut off
+
 ## 1.8.0
 
 ### New
