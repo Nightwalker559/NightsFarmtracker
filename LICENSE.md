@@ -15,14 +15,19 @@ copies or substantial portions of the Software.
 Artificial intelligence restriction. Notwithstanding anything to the contrary
 above, no permission is granted to use the Software, in whole or in part, for
 artificial intelligence or machine learning purposes. This expressly includes:
-training, pre-training, fine-tuning, alignment, distillation, evaluation or
-benchmarking of models; inclusion in datasets, training corpora, embedding
-indexes, vector databases or retrieval indexes; use as AI input, context,
-grounding data, reference or retrieved material; processing through
-retrieval-augmented generation, automated code completion, code generation or
-comparable AI-assisted systems; and generating material intended to reproduce,
-imitate, derive from or substitute for the Software. This applies to local and
-remote systems alike, and to commercial and non-commercial use alike.
+
+- training, pre-training, fine-tuning, alignment, distillation, evaluation or
+  benchmarking of models;
+- inclusion in datasets, training corpora, embedding indexes, vector databases
+  or retrieval indexes;
+- use as AI input, context, grounding data, reference or retrieved material;
+- processing through retrieval-augmented generation, automated code completion,
+  code generation or comparable AI-assisted systems; and
+- generating material intended to reproduce, imitate, derive from or substitute
+  for the Software.
+
+This applies to local and remote systems alike, and to commercial and
+non-commercial use alike.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
