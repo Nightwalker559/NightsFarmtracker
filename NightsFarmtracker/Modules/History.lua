@@ -324,7 +324,7 @@ local function FillDetailRow(ir, entry)
     if entry.isRank then
         ir.itemID = entry.tid
         ir.itemLink = nil
-        ir.nameText:SetText(ns.DisplayName(entry.name, entry.tid) or "")
+        ir.nameText:SetText(ns.ShortItemName(ns.DisplayName(entry.name, entry.tid)))
         ir.rankBadge:SetText(entry.rankIcon or "")
         ir.countText:SetText(tostring(entry.tc))
     elseif entry.isGearVariant then
@@ -332,13 +332,13 @@ local function FillDetailRow(ir, entry)
         ns.ApplyQualityColor(ir.nameText, ir.iconBorder, gv.quality, {1,1,1})
         ir.itemID = d.itemID
         ir.itemLink = gv.itemLink
-        ir.nameText:SetText(ns.DisplayName(entry.name, gv.itemLink or d.itemID) or "")
+        ir.nameText:SetText(ns.ShortItemName(ns.DisplayName(entry.name, gv.itemLink or d.itemID)))
         ir.rankBadge:SetText("")
         ir.countText:SetText(tostring(gv.amount))
     else
         ir.itemID = d.itemID
         ir.itemLink = d.itemLink
-        ir.nameText:SetText((d.isJunkMerged and entry.name or ns.DisplayName(entry.name, d.itemID) or ""))
+        ir.nameText:SetText(ns.ShortItemName(d.isJunkMerged and entry.name or ns.DisplayName(entry.name, d.itemID)))
         ir.rankBadge:SetText(entry.rankIcon or "")
         ir.countText:SetText(tostring(d.amount))
     end

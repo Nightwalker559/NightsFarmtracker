@@ -8,7 +8,7 @@
 
 ### Changed
 
-- Long item names wrap onto a second line in the main window and the Session History detail window instead of being cut off
+- Item names in the main window and the Session History detail window show only their first two words (wrapping onto a second line when needed) instead of being cut off after 20 characters; the tooltip still has the full name
 
 ## 1.8.0
 

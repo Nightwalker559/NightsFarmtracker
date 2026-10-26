@@ -242,8 +242,18 @@ function ns.TruncateName(name)
     return name
 end
 
--- Item name field of a list row: long names wrap onto a second line (the row
--- is tall enough for two) instead of being cut off at NAME_MAX.
+-- Row label of an item: its first two words ("Befleckte Morgenlichtarmplatten
+-- des Kommandanten" -> "Befleckte Morgenlichtarmplatten"); the tooltip has the
+-- full name.
+function ns.ShortItemName(name)
+    if not name then return "" end
+    local first, second = name:match("^(%S+)%s+(%S+)")
+    if first then return first .. " " .. second end
+    return name
+end
+
+-- Item name field of a list row: the two words may wrap onto a second line
+-- (the row is tall enough for two).
 function ns.SetupRowNameText(fs)
     fs:SetJustifyH("LEFT"); fs:SetJustifyV("MIDDLE")
     fs:SetWordWrap(true); fs:SetMaxLines(2)
