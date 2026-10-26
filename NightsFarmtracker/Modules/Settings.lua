@@ -1410,6 +1410,7 @@ function ns.RebuildSettingsContent()
         end)
 
         y = flag(y, "merge_daily_sessions", "mergeDaily", true)
+        y = flag(y, "session_history_avg", "sessionHistoryAvg", false, function() ns.RebuildHistory() end)
 
         return y
     end)

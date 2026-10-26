@@ -85,7 +85,7 @@ ns.PROFILE_KEYS = {
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
     showPriceSource=true, showValueBar=true, itemGoal=true,
-    pos=true, mainLocked=true, gearAHThresholdSound=true, sessionHistoryMode=true,
+    pos=true, mainLocked=true, gearAHThresholdSound=true, sessionHistoryMode=true, sessionHistoryAvg=true,
 }
 
 ns.DEFAULT_PROFILE = "Default"
@@ -123,6 +123,7 @@ local function NewProfileDefaults()
         mainLocked            = false,
         gearAHThresholdSound  = false,
         sessionHistoryMode    = "full",
+        sessionHistoryAvg     = false,
     }
 end
 

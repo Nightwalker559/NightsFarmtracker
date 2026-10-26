@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.1
+
+### New
+
+- Option to show the average value per session in the Session History (Settings, Session History): on the day rows with several sessions and in the month and total hover
+
 ## 1.8.0
 
 ### New
