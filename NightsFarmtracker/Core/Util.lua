@@ -252,14 +252,31 @@ end
 
 -- Sets the item name of a list row: the full name when it fits the two lines
 -- of the name field, else its first two words (the tooltip has the full name).
--- Measures at the field's current width, so call it after the row's anchors
--- are final.
+-- The width is worked out from the field's anchors and the row's size and
+-- measured with a hidden font string of that fixed width: asking the field
+-- itself returns stale line counts before its first layout pass (window
+-- opened for the first time).
+local measureFS
 function ns.SetItemRowName(fs, name)
     name = name or ""
-    fs:SetMaxLines(0)
-    fs:SetText(name)
-    if fs:GetNumLines() > 2 then fs:SetText(FirstTwoWords(name)) end
-    fs:SetMaxLines(2)
+    local width = fs:GetParent():GetWidth()
+    for i = 1, fs:GetNumPoints() do
+        local point, _, _, x = fs:GetPoint(i)
+        x = tonumber(x) or 0
+        if point == "LEFT" then
+            width = width - (ns.ICON_X + ns.ICON_SIZE + x)   -- anchored to the row icon's right edge
+        elseif point == "RIGHT" then
+            width = width + x
+        end
+    end
+    if not measureFS then
+        measureFS = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        measureFS:SetFontHeight(ns.FONT_NORMAL)
+        measureFS:SetWordWrap(true)
+    end
+    measureFS:SetWidth(math.max(width, 1))
+    measureFS:SetText(name)
+    fs:SetText(measureFS:GetNumLines() > 2 and FirstTwoWords(name) or name)
 end
 
 -- Item name field of a list row: long names may wrap onto a second line (the
