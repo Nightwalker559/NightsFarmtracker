@@ -136,4 +136,12 @@ Debug commands for bug reports: `/nft debug` opens a live debug log window (copy
 
 ---
 
-The full version history is in the [changelog](https://github.com/Nightwalker559/NightsFarmtracker/blob/main/CHANGELOG.md). Bugs and suggestions: [GitHub Issues](https://github.com/Nightwalker559/NightsFarmtracker/issues), CurseForge or Wago.
+The full version history is in the [changelog](https://github.com/Nightwalker559/NightsFarmtracker/blob/main/CHANGELOG.md).
+
+## Feedback
+
+Found a bug or have an idea? [Open an issue on GitHub](https://github.com/Nightwalker559/NightsFarmtracker/issues).
+
+## License
+
+MIT with AI restriction (no use for AI or machine learning), see [LICENSE.md](https://github.com/Nightwalker559/NightsFarmtracker/blob/main/LICENSE.md).
