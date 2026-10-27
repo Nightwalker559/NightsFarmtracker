@@ -4,11 +4,11 @@
 
 ### New
 
-- Item goals: drag items into the new Item Goals window (Settings, Display, Edit Item Goals) and set a target amount for each one, e.g. 20 Arcane Crystals. The item's bar shows the progress, turns green at the target, and the first goal reached pauses the session. Goals are stored per profile
+- Item goals: drag items into the new Item Goals window (Settings, Display, Edit Item Goals) and set a target amount for each one, e.g. 20 Arcane Crystals. The item's bar shows the progress, turns green at the target, and the first goal reached pauses the session. The general Item goal stays: its amount (e.g. 1000 of anything) applies to every item without its own goal. Whichever goal is reached first pauses the session. Goals are stored per profile
 
 ### Changed
 
-- Session length and Item goals each have a checkbox now (Settings, Display); only one of the two can be active at a time, and the other keeps its values instead of having to be cleared. The old single "Item goal" amount for all items is gone (items without a goal keep the normal value bar); existing session lengths are carried over
+- Session length and Item goals each have a checkbox now (Settings, Display); only one of the two can be active at a time, and the other keeps its values instead of having to be cleared. existing settings are carried over
 - 6 px between a category header and its first item icon (and the next header), in all windows
 
 ## 1.8.1

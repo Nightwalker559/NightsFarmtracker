@@ -189,6 +189,7 @@ local tsmCustomEB
 local themeDropdown
 local gearThresholdEB
 local sessionLengthEB
+local itemGoalEB
 local goalsBtn
 local maxHeightEB
 local profileDropdown
@@ -510,6 +511,21 @@ local function MakeSessionLengthEB(parent, yOff)
         NightsFarmtrackerDB.sessionLength = tonumber(self:GetText()) or 0
         ns.UpdateTimerDisplay()
         ns.ApplyPauseVisuals()
+    end)
+    return frame
+end
+
+-- General item goal (pieces for every item without an own goal in the Item
+-- Goals window, 0 = none). Applied when the field loses focus / Enter is
+-- pressed, not per keystroke - typing "5" on the way to "500" would otherwise
+-- reach the goal and pause the session on the first digit.
+local function MakeItemGoalEB(parent, yOff)
+    local frame, eb = MakeNumberBox(parent, yOff, 6, ns.L["pieces_suffix"])
+    eb:HookScript("OnEditFocusLost", function(self)
+        local v = tonumber(self:GetText()) or 0
+        self:SetText(v > 0 and tostring(v) or "")
+        NightsFarmtrackerDB.itemGoal = v
+        ns.RefreshHUD()
     end)
     return frame
 end
@@ -1269,6 +1285,16 @@ function ns.RebuildSettingsContent()
 
         -- Item goals: per-item progress bar, green and timer stop at the goal.
         y = limitCheckbox(y, "item_goal_hint", "goal")
+
+        -- General goal for every item without an own one (see GetItemGoal)
+        local goalHint = wrappedHint(y, ns.L["item_goal_general_hint"])
+        y = y - math.ceil(goalHint:GetStringHeight()) - 6
+
+        itemGoalEB = PlaceWidget(itemGoalEB, MakeItemGoalEB, y)
+        local goal = tonumber(db.itemGoal) or 0
+        itemGoalEB.eb:SetText(goal > 0 and tostring(goal) or "")
+        track(itemGoalEB, "other")
+        y = y - 34
 
         goalsBtn = PlaceWidget(goalsBtn, MakeGoalsButton, y)
         track(goalsBtn, "other")

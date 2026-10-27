@@ -312,13 +312,15 @@ end)
 ------------------------------------------------------------------------
 -- Item goals and session length are mutually exclusive: db.limitMode picks
 -- which one is active ("goal" | "session" | "off"), the other keeps its value.
--- The goal of one item (pieces, from db.itemGoals) or nil: see ApplyValueBars.
--- Goals run the normal count-up timer.
+-- The goal of one item (pieces) or nil: its own amount from db.itemGoals, else
+-- the general db.itemGoal that covers every other item (0 = none). See
+-- ApplyValueBars. Goals run the normal count-up timer.
 function ns.GetItemGoal(itemID)
-    if NightsFarmtrackerDB.limitMode ~= "goal" or not itemID then return nil end
-    local goals = NightsFarmtrackerDB.itemGoals
-    local entry = goals and goals[itemID]
+    local db = NightsFarmtrackerDB
+    if db.limitMode ~= "goal" or not itemID then return nil end
+    local entry = db.itemGoals and db.itemGoals[itemID]
     local amount = entry and tonumber(entry.amount) or 0
+    if amount <= 0 then amount = tonumber(db.itemGoal) or 0 end
     return amount > 0 and amount or nil
 end
 
@@ -701,7 +703,7 @@ local function DrawBar(row, frac, r, g, b)
     row.barBg:Show(); row.bar:Show()
 end
 
--- Rows of an item with a goal (db.itemGoals) show their count relative to the
+-- Rows of an item with a goal (db.itemGoals / db.itemGoal) show their count relative to the
 -- goal instead, and turn green once it is reached; goalReached then tells
 -- BuildHUD to pause the session (also with the bars switched off). The merged
 -- junk row is a sum of many items, so it has no goal. Every other row keeps

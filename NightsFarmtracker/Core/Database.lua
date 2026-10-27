@@ -85,7 +85,7 @@ ns.PROFILE_KEYS = {
     venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
-    showPriceSource=true, showValueBar=true, itemGoals=true, limitMode=true,
+    showPriceSource=true, showValueBar=true, itemGoal=true, itemGoals=true, limitMode=true,
     pos=true, mainLocked=true, gearAHThresholdSound=true, sessionHistoryMode=true, sessionHistoryAvg=true,
 }
 
@@ -119,6 +119,7 @@ local function NewProfileDefaults()
         hudEnabled            = false,
         showPriceSource       = false,
         showValueBar          = true,
+        itemGoal              = 0,
         itemGoals             = {},
         limitMode             = "off",
         pos                 = { unpack(DEFAULT_MAIN_POS) },
@@ -244,14 +245,14 @@ function ns.InitDB()
     end
 
     -- limitMode ("session" | "goal" | "off") picks which of sessionLength /
-    -- itemGoals is active. Profiles saved before it existed keep an active
-    -- session length; the single global item goal they may carry has no
-    -- per-item equivalent and is dropped.
+    -- itemGoal / itemGoals is active. Profiles saved before it existed keep
+    -- whichever value was set (an item goal used to win over a session length).
     for _, profile in pairs(NightsFarmtrackerAccountDB.profiles) do
         if profile.limitMode == nil then
-            profile.limitMode = (tonumber(profile.sessionLength) or 0) > 0 and "session" or "off"
+            if (tonumber(profile.itemGoal) or 0) > 0 then profile.limitMode = "goal"
+            elseif (tonumber(profile.sessionLength) or 0) > 0 then profile.limitMode = "session"
+            else profile.limitMode = "off" end
         end
-        profile.itemGoal = nil
     end
 
     if not getmetatable(NightsFarmtrackerDB) then
@@ -435,8 +436,9 @@ ns.SetBlacklistCategory         = blacklistStore.setCategory
 ns.IsBlacklistCategory          = blacklistStore.hasCategory
 
 ------------------------------------------------------------------------
--- Item goals (profile scope): itemID -> { name, icon, quality, amount }.
--- Only active while db.limitMode == "goal" (see ns.GetItemGoal).
+-- Item goals (profile scope): itemID -> { name, icon, quality, amount }, on
+-- top of db.itemGoal (the amount for every item without an entry). Only
+-- active while db.limitMode == "goal" (see ns.GetItemGoal).
 ------------------------------------------------------------------------
 function ns.GetItemGoals()
     local db = NightsFarmtrackerDB
