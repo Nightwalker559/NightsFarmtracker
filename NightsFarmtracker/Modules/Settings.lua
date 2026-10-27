@@ -1294,9 +1294,11 @@ function ns.RebuildSettingsContent()
         local goal = tonumber(db.itemGoal) or 0
         itemGoalEB.eb:SetText(goal > 0 and tostring(goal) or "")
         track(itemGoalEB, "other")
-        y = y - 34
 
+        -- Item Goals window button, right of the amount box
         goalsBtn = PlaceWidget(goalsBtn, MakeGoalsButton, y)
+        goalsBtn:ClearAllPoints()
+        goalsBtn:SetPoint("LEFT", itemGoalEB.unitLbl, "RIGHT", 16, 0)
         track(goalsBtn, "other")
         y = y - 40
 
