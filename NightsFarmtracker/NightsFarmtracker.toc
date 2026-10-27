@@ -36,6 +36,7 @@ Modules\Log.lua
 Modules\Settings.lua
 Modules\Filter.lua
 Modules\Blacklist.lua
+Modules\ItemGoals.lua
 Modules\VenomTracker.lua
 Modules\BaitFrame.lua
 Modules\Lockout.lua

@@ -189,7 +189,7 @@ local tsmCustomEB
 local themeDropdown
 local gearThresholdEB
 local sessionLengthEB
-local itemGoalEB
+local goalsBtn
 local maxHeightEB
 local profileDropdown
 local profileButtons
@@ -514,21 +514,6 @@ local function MakeSessionLengthEB(parent, yOff)
     return frame
 end
 
--- Item goal (pieces per item). Applied when the field loses focus /
--- Enter is pressed, not per keystroke - typing "5" on the way to "500" would
--- otherwise reach the goal and pause the session on the first digit.
-local function MakeItemGoalEB(parent, yOff)
-    local frame, eb = MakeNumberBox(parent, yOff, 6, ns.L["pieces_suffix"])
-    eb:HookScript("OnEditFocusLost", function(self)
-        local v = tonumber(self:GetText()) or 0
-        self:SetText(v > 0 and tostring(v) or "")
-        NightsFarmtrackerDB.itemGoal = v
-        ns.UpdateTimerDisplay()
-        ns.RefreshHUD()
-    end)
-    return frame
-end
-
 -- Maximum window height (px). Applied when the field loses focus / Enter is
 -- pressed, not per keystroke - typing "5" on the way to "500" must not resize
 -- every open window to the minimum. Empty or 0 falls back to the default;
@@ -558,19 +543,23 @@ local THEME_ROW_H = 20
 -- persistent instance, reused across rebuilds like gearThresholdEB above.
 ------------------------------------------------------------------------
 local exportBtn
-local function MakeExportButton(parent)
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    ns.StyleBackdropBox(btn)
-    local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    text:SetPoint("CENTER")
-    text:SetTextColor(unpack(ns.COL_ACCENT))
-    text:SetText(ns.L["export_open_btn"])
-    btn:SetSize(text:GetStringWidth() + 20, 20)
-    btn:SetScript("OnEnter", function() text:SetTextColor(1,1,1) end)
-    btn:SetScript("OnLeave", function() text:SetTextColor(unpack(ns.COL_ACCENT)) end)
-    btn:SetScript("OnClick", function() ns.ToggleExportWindow() end)
-    return btn
+local function MakeWindowButton(labelKey, onClick)
+    return function(parent)
+        local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+        ns.StyleBackdropBox(btn)
+        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        text:SetPoint("CENTER")
+        text:SetTextColor(unpack(ns.COL_ACCENT))
+        text:SetText(ns.L[labelKey])
+        btn:SetSize(text:GetStringWidth() + 20, 20)
+        btn:SetScript("OnEnter", function() text:SetTextColor(1,1,1) end)
+        btn:SetScript("OnLeave", function() text:SetTextColor(unpack(ns.COL_ACCENT)) end)
+        btn:SetScript("OnClick", onClick)
+        return btn
+    end
 end
+local MakeExportButton = MakeWindowButton("export_open_btn", function() ns.ToggleExportWindow() end)
+local MakeGoalsButton  = MakeWindowButton("goals_open_btn",  function() ns.ToggleGoalsWindow() end)
 
 -- Miniature window (frame colors, header strip - flat or gradient depending
 -- on the Header gradient option - accent text) used by the theme list's
@@ -1264,6 +1253,7 @@ function ns.RebuildSettingsContent()
                     ns.UpdateTimerDisplay()
                     ns.ApplyPauseVisuals()
                     ns.RefreshHUD()
+                    if ns.RebuildGoalsList then ns.RebuildGoalsList() end
                     RunNextFrame(ns.RebuildSettingsContent)
                 end)
         end
@@ -1277,13 +1267,11 @@ function ns.RebuildSettingsContent()
         track(sessionLengthEB, "other")
         y = y - 40
 
-        -- Item goal: per-item progress bar, green and timer stop at the goal.
+        -- Item goals: per-item progress bar, green and timer stop at the goal.
         y = limitCheckbox(y, "item_goal_hint", "goal")
 
-        itemGoalEB = PlaceWidget(itemGoalEB, MakeItemGoalEB, y)
-        local goal = tonumber(db.itemGoal) or 0
-        itemGoalEB.eb:SetText(goal > 0 and tostring(goal) or "")
-        track(itemGoalEB, "other")
+        goalsBtn = PlaceWidget(goalsBtn, MakeGoalsButton, y)
+        track(goalsBtn, "other")
         y = y - 40
 
         -- Max window height: windows grow up to this, then their lists scroll.

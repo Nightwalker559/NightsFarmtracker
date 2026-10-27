@@ -295,7 +295,7 @@ end
 
 -- Closing the main window closes every popout that docks off it, so the
 -- user doesn't end up with orphaned windows floating on screen.
-local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "BlacklistFrame",
+local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "BlacklistFrame", "GoalsFrame",
                          "HistFrame", "DetailFrame", "VenomFrame" }
 
 MainFrame:HookScript("OnHide", function()
@@ -310,14 +310,16 @@ end)
 ------------------------------------------------------------------------
 -- Timer / rate
 ------------------------------------------------------------------------
--- Item goal and session length are mutually exclusive: db.limitMode picks
+-- Item goals and session length are mutually exclusive: db.limitMode picks
 -- which one is active ("goal" | "session" | "off"), the other keeps its value.
--- Optional item goal (db.itemGoal pieces per item): see ApplyValueBars. A goal
--- runs the normal count-up timer.
-function ns.GetItemGoal()
-    if NightsFarmtrackerDB.limitMode ~= "goal" then return nil end
-    local goal = tonumber(NightsFarmtrackerDB.itemGoal) or 0
-    return goal > 0 and goal or nil
+-- The goal of one item (pieces, from db.itemGoals) or nil: see ApplyValueBars.
+-- Goals run the normal count-up timer.
+function ns.GetItemGoal(itemID)
+    if NightsFarmtrackerDB.limitMode ~= "goal" or not itemID then return nil end
+    local goals = NightsFarmtrackerDB.itemGoals
+    local entry = goals and goals[itemID]
+    local amount = entry and tonumber(entry.amount) or 0
+    return amount > 0 and amount or nil
 end
 
 -- Optional fixed session length (db.sessionLength minutes): the timer then
@@ -699,42 +701,42 @@ local function DrawBar(row, frac, r, g, b)
     row.barBg:Show(); row.bar:Show()
 end
 
--- With an item goal (db.itemGoal) the bar is the item's count relative to the
--- goal instead, and turns green once it is reached; goalReached then tells
+-- Rows of an item with a goal (db.itemGoals) show their count relative to the
+-- goal instead, and turn green once it is reached; goalReached then tells
 -- BuildHUD to pause the session (also with the bars switched off). The merged
--- junk row is a sum of many items, so it has no goal bar.
+-- junk row is a sum of many items, so it has no goal. Every other row keeps
+-- the value bar, scaled among the rows without a goal.
 local function ApplyValueBars()
-    local goal = ns.GetItemGoal()
     goalReached = false
     barsShown = NightsFarmtrackerDB.showValueBar ~= false
-    if goal then
-        for _, row in pairs(itemRows) do
-            local c = row.barCount
-            if c and c > 0 and not row.isJunkMerged then
-                if c >= goal then
-                    goalReached = true
-                    DrawBar(row, 1, unpack(GOAL_COL))
-                else
-                    DrawBar(row, c / goal, unpack(ns.COL_ACCENT))
-                end
-            end
-        end
-        return
-    end
-    if not barsShown then return end
 
     local maxValue, maxMerged = 0, 0
     for _, row in pairs(itemRows) do
-        local v = row.barValue
-        if v then
-            if row.isJunkMerged then maxMerged = math.max(maxMerged, v)
-            else maxValue = math.max(maxValue, v) end
+        local goal = not row.isJunkMerged and row.barCount and ns.GetItemGoal(row.itemID)
+        if goal then
+            local c = row.barCount
+            row.barGoal = goal
+            if c >= goal then
+                goalReached = true
+                DrawBar(row, 1, unpack(GOAL_COL))
+            else
+                DrawBar(row, c / goal, unpack(ns.COL_ACCENT))
+            end
+        else
+            row.barGoal = nil
+            local v = row.barValue
+            if v then
+                if row.isJunkMerged then maxMerged = math.max(maxMerged, v)
+                else maxValue = math.max(maxValue, v) end
+            end
         end
     end
+    if not barsShown then return end
+
     if maxValue == 0 then maxValue = maxMerged end
     for _, row in pairs(itemRows) do
         local v = row.barValue
-        if v and v > 0 and maxValue > 0 then
+        if not row.barGoal and v and v > 0 and maxValue > 0 then
             DrawBar(row, v / maxValue, unpack(ns.COL_ACCENT))
         end
     end
