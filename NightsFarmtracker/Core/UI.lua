@@ -310,16 +310,20 @@ end)
 ------------------------------------------------------------------------
 -- Timer / rate
 ------------------------------------------------------------------------
--- Optional item goal (db.itemGoal pieces per item, 0 = off): see ApplyValueBars.
+-- Item goal and session length are mutually exclusive: db.limitMode picks
+-- which one is active ("goal" | "session" | "off"), the other keeps its value.
+-- Optional item goal (db.itemGoal pieces per item): see ApplyValueBars. A goal
+-- runs the normal count-up timer.
 function ns.GetItemGoal()
+    if NightsFarmtrackerDB.limitMode ~= "goal" then return nil end
     local goal = tonumber(NightsFarmtrackerDB.itemGoal) or 0
     return goal > 0 and goal or nil
 end
 
--- Optional fixed session length (db.sessionLength minutes, 0 = off): the
--- timer then counts down and the session pauses itself at 0.
+-- Optional fixed session length (db.sessionLength minutes): the timer then
+-- counts down and the session pauses itself at 0.
 function ns.GetSessionLimit()
-    if ns.GetItemGoal() then return nil end   -- a goal runs the normal count-up timer
+    if NightsFarmtrackerDB.limitMode ~= "session" then return nil end
     local minutes = tonumber(NightsFarmtrackerDB.sessionLength) or 0
     return minutes > 0 and minutes * 60 or nil
 end

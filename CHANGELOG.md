@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.2
+
+### Changed
+
+- Session length and Item goal each have a checkbox now (Settings, Display); only one of the two can be active at a time, and the other keeps its value instead of having to be cleared. Existing settings are carried over
+
 ## 1.8.1
 
 ### New

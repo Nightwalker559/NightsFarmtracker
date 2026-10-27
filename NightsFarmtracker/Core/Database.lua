@@ -85,7 +85,7 @@ ns.PROFILE_KEYS = {
     venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
-    showPriceSource=true, showValueBar=true, itemGoal=true,
+    showPriceSource=true, showValueBar=true, itemGoal=true, limitMode=true,
     pos=true, mainLocked=true, gearAHThresholdSound=true, sessionHistoryMode=true, sessionHistoryAvg=true,
 }
 
@@ -120,7 +120,8 @@ local function NewProfileDefaults()
         showPriceSource       = false,
         showValueBar          = true,
         itemGoal              = 0,
-        pos                   = { unpack(DEFAULT_MAIN_POS) },
+        limitMode             = "off",
+        pos                 = { unpack(DEFAULT_MAIN_POS) },
         mainLocked            = false,
         gearAHThresholdSound  = false,
         sessionHistoryMode    = "full",
@@ -233,6 +234,17 @@ function ns.InitDB()
             end
         end
         rawset(NightsFarmtrackerDB, "profileKey", ns.DEFAULT_PROFILE)
+    end
+
+    -- limitMode ("session" | "goal" | "off") picks which of sessionLength /
+    -- itemGoal is active. Profiles saved before it existed keep whichever
+    -- value was set (an item goal used to win over a session length).
+    for _, profile in pairs(NightsFarmtrackerAccountDB.profiles) do
+        if profile.limitMode == nil then
+            if (tonumber(profile.itemGoal) or 0) > 0 then profile.limitMode = "goal"
+            elseif (tonumber(profile.sessionLength) or 0) > 0 then profile.limitMode = "session"
+            else profile.limitMode = "off" end
+        end
     end
 
     if not getmetatable(NightsFarmtrackerDB) then

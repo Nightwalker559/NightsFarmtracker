@@ -502,7 +502,7 @@ local function MakeGearThresholdEB(parent, yOff)
     return frame
 end
 
--- Fixed session length in minutes (0 = off)
+-- Fixed session length in minutes
 local function MakeSessionLengthEB(parent, yOff)
     local frame, eb = MakeNumberBox(parent, yOff, 4, ns.L["minutes_suffix"])
     eb:SetScript("OnTextChanged", function(self, userInput)
@@ -514,16 +514,7 @@ local function MakeSessionLengthEB(parent, yOff)
     return frame
 end
 
--- Session length has no meaning while an item goal runs the count-up timer.
-local function UpdateSessionLengthLock()
-    if not sessionLengthEB then return end
-    local locked = ns.GetItemGoal() ~= nil
-    sessionLengthEB.eb:SetEnabled(not locked)
-    sessionLengthEB:SetAlpha(locked and 0.4 or 1)
-    sessionLengthEB.unitLbl:SetAlpha(locked and 0.4 or 1)
-end
-
--- Item goal (pieces per item, 0 = off). Applied when the field loses focus /
+-- Item goal (pieces per item). Applied when the field loses focus /
 -- Enter is pressed, not per keystroke - typing "5" on the way to "500" would
 -- otherwise reach the goal and pause the session on the first digit.
 local function MakeItemGoalEB(parent, yOff)
@@ -532,7 +523,6 @@ local function MakeItemGoalEB(parent, yOff)
         local v = tonumber(self:GetText()) or 0
         self:SetText(v > 0 and tostring(v) or "")
         NightsFarmtrackerDB.itemGoal = v
-        UpdateSessionLengthLock()
         ns.UpdateTimerDisplay()
         ns.RefreshHUD()
     end)
@@ -1262,21 +1252,33 @@ function ns.RebuildSettingsContent()
             db.goldRateMode == "min" and "min" or "hour",
             function(v) db.goldRateMode = v; ns.UpdateGoldRate() end, 32)
 
-        -- Fixed session length (0 = off): the timer counts down and the
-        -- session pauses at 0.
-        wrappedHint(y, ns.L["session_length_hint"])
-        y = y - 28
+        -- Session length and item goal exclude each other (db.limitMode);
+        -- the checkbox picks the active one, the other keeps its value.
+        -- Rebuilt next frame: the click handler still refreshes its own
+        -- (pooled) row after the setter returns.
+        local function limitCheckbox(y, labelKey, mode)
+            return checkbox(y, labelKey,
+                function() return db.limitMode == mode end,
+                function(v)
+                    db.limitMode = v and mode or "off"
+                    ns.UpdateTimerDisplay()
+                    ns.ApplyPauseVisuals()
+                    ns.RefreshHUD()
+                    RunNextFrame(ns.RebuildSettingsContent)
+                end)
+        end
+
+        -- Fixed session length: the timer counts down and the session pauses at 0.
+        y = limitCheckbox(y, "session_length_hint", "session")
 
         sessionLengthEB = PlaceWidget(sessionLengthEB, MakeSessionLengthEB, y)
         local lenMin = tonumber(db.sessionLength) or 0
         sessionLengthEB.eb:SetText(lenMin > 0 and tostring(lenMin) or "")
         track(sessionLengthEB, "other")
-        UpdateSessionLengthLock()
         y = y - 40
 
         -- Item goal: per-item progress bar, green and timer stop at the goal.
-        local goalHint = wrappedHint(y, ns.L["item_goal_hint"])
-        y = y - math.ceil(goalHint:GetStringHeight()) - 6
+        y = limitCheckbox(y, "item_goal_hint", "goal")
 
         itemGoalEB = PlaceWidget(itemGoalEB, MakeItemGoalEB, y)
         local goal = tonumber(db.itemGoal) or 0
