@@ -5,6 +5,7 @@
 ### Changed
 
 - Session length and Item goal each have a checkbox now (Settings, Display); only one of the two can be active at a time, and the other keeps its value instead of having to be cleared. Existing settings are carried over
+- 3 px between a category header and its first item icon (and the next header), in all windows
 
 ## 1.8.1
 
