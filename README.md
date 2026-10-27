@@ -16,7 +16,7 @@ For World of Warcraft: Midnight (game versions 12.1 and 12.1.5). English and Ger
 - **One compact window.** `/nft` or the minimap button opens it; a toolbar on top, the total, timer and gold rate below.
 - **Real values.** Every item is worth the higher of its AH and vendor price, with filters for everything that should only count at vendor price.
 - **History and export.** Sessions are saved per day and month, and can be exported as JSON.
-- **Profiles and themes.** Settings live in switchable profiles; 13 color themes plus your own color.
+- **Profiles and themes.** Settings live in switchable profiles; 16 color themes plus your own color.
 - **Optional extras** (Minimap HUD, fishing helpers, lockout counter) are all off by default.
 
 ---
@@ -74,7 +74,7 @@ Every item is valued at the higher of its AH and vendor price. Vendor-only items
 
 ## Look and feel
 
-- 13 color themes plus a custom color with live preview (Settings → Colors), an optional gradient on section headers and optional theme-colored toolbar icons.
+- 16 color themes plus a custom color with live preview (Settings → Colors), an optional gradient on section headers and optional theme-colored toolbar icons.
 - Windows dock next to each other without overlapping (below or above when there is no room beside) and can be dragged. The maximum window height is adjustable; longer lists scroll.
 - A minimap button (movable) and an entry in the minimap addon menu, both optional.
 

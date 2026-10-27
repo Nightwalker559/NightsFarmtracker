@@ -137,12 +137,30 @@ ns.COLOR_THEMES = {
         accent = {1.00, 0.50, 0.08},
         decor  = "pumpkin",
     },
+    yule = {
+        name     = "Yule",
+        labelKey = "theme_yule",
+        descKey  = "theme_yule_desc",
+        bg     = {0.04, 0.09, 0.07, 0.92},
+        border = {0.55, 0.16, 0.18, 0.85},
+        catBg  = {0.07, 0.15, 0.11, 0.80},
+        accent = {0.96, 0.34, 0.34},
+    },
+    snowfall = {
+        name     = "Snowfall",
+        labelKey = "theme_snowfall",
+        descKey  = "theme_snowfall_desc",
+        bg     = {0.07, 0.09, 0.12, 0.92},
+        border = {0.55, 0.62, 0.72, 0.85},
+        catBg  = {0.12, 0.15, 0.20, 0.80},
+        accent = {0.92, 0.96, 1.00},
+    },
 }
 -- Display order for the Settings dropdown
 ns.COLOR_THEME_ORDER = {
     "default", "void", "silvermoon", "fel", "frost", "bloodmoon",
     "molten", "emerald", "arcane", "bronze", "plague", "nether", "argent",
-    "halloween", "custom",
+    "halloween", "yule", "snowfall", "custom",
 }
 ns.COL_GOLD = {1.00, 0.82, 0.00}
 

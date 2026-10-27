@@ -5,6 +5,7 @@
 ### New
 
 - Item goals: drag items into the new Item Goals window (Settings, Display, Edit Item Goals) and set a target amount for each one, e.g. 20 Arcane Crystals. The item's bar shows the progress, turns green at the target, and the first goal reached pauses the session. The general Item goal stays: its amount (e.g. 1000 of anything) applies to every item without its own goal. Goals are stored per profile
+- Two winter color themes: Yule (pine green with berry red) and Snowfall (slate with silver and snow white)
 
 ### Changed
 
