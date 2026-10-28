@@ -114,8 +114,10 @@ local function RebuildLogList()
 
     LogFrame.emptyLabel:SetShown(#(NightsFarmtrackerDB.logEntries or {}) == 0)
 
-    -- Docking decides left/right (or below) by the frame's width: redo it
-    if widthChanged and LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
+    -- Docking decides left/right (or below/above) by the frame's size: redo it
+    if LogFrame:IsShown() and ns.ReanchorLogFrame and (widthChanged or NightsFarmtrackerDB.expanded == false) then
+        ns.ReanchorLogFrame()
+    end
 end
 ns.RebuildLogList = RebuildLogList  -- re-layout after the max window height setting changed
 
@@ -196,7 +198,7 @@ end
 ------------------------------------------------------------------------
 -- Anchoring — below MainFrame when collapsed (or below the Gold Overview
 -- window / Instance Lockout frame if those are also open there, to avoid
--- overlapping them), otherwise
+-- overlapping them; above MainFrame when there is no room below), otherwise
 -- part of the Log/Filter/Blacklist right-side chain (see
 -- ns.RefreshWindowChain in Widgets.lua), which also re-flows Filter/
 -- Blacklist if they're open.
@@ -204,12 +206,20 @@ end
 local function ReanchorLogFrame()
     if NightsFarmtrackerDB.expanded == false then
         LogFrame:ClearAllPoints()
-        if ns.LockoutFrame and ns.LockoutFrame:IsShown() then
-            LogFrame:SetPoint("TOPLEFT", ns.LockoutFrame, "BOTTOMLEFT", 0, -4)
-        elseif ns.GoldFrame and ns.GoldFrame:IsShown() then
-            LogFrame:SetPoint("TOPLEFT", ns.GoldFrame, "BOTTOMLEFT", 0, -4)
+        local below = ns.MainFrame
+        if ns.LockoutFrame and ns.LockoutFrame:IsShown() then below = ns.LockoutFrame
+        elseif ns.GoldFrame and ns.GoldFrame:IsShown() then below = ns.GoldFrame end
+
+        -- Windows are clamped to the screen: a log too tall for the room below
+        -- would slide up over the main window, so it goes above it instead.
+        local belowBottom, mainTop = below:GetBottom(), ns.MainFrame:GetTop()
+        local h = LogFrame:GetHeight()
+        local noRoomBelow = belowBottom and UIParent:GetBottom() and (belowBottom - 4 - h) < UIParent:GetBottom()
+        local roomAbove   = mainTop and UIParent:GetTop() and (mainTop + 4 + h) <= UIParent:GetTop()
+        if noRoomBelow and roomAbove then
+            LogFrame:SetPoint("BOTTOMLEFT", ns.MainFrame, "TOPLEFT", 0, 4)
         else
-            LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "BOTTOMLEFT", 0, -4)
+            LogFrame:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -4)
         end
     end
     ns.RefreshWindowChain("right")
