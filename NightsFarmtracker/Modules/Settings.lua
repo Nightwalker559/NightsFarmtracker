@@ -1530,10 +1530,13 @@ function ns.RebuildSettingsContent()
         return a.title:lower() < b.title:lower()
     end)
 
-    local y = -8   -- start with small top padding within scroll area
+    local TOP_PAD = 8   -- small top padding within the scroll area
+    local y = -TOP_PAD
     local jumpTargets = {}
     for _, sec in ipairs(sections) do
-        jumpTargets[#jumpTargets + 1] = {title = sec.title, y = -y}
+        -- keeps the same gap above the title as at the very top, so jumping to
+        -- the first section doesn't scroll at all
+        jumpTargets[#jumpTargets + 1] = {title = sec.title, y = -y - TOP_PAD}
         y = sec.builder(y)
         local last = settingsContent[#settingsContent]
         if last and last.kind == "checkbox" then y = y - CHECK_RUN_TAIL end   -- air before the next section title
