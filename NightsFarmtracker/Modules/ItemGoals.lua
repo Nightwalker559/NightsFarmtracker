@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Item Goals
 -- Items dragged in here get a target amount; while Item goals is the active
--- limit (Settings, Display) their bars show the progress and the session
+-- limit (Settings, Session Limit) their bars show the progress and the session
 -- pauses as soon as one of them reaches its amount. Per profile; the goals
 -- themselves live in db.itemGoals (see ns.SetItemGoal, ns.GetItemGoal).
 ------------------------------------------------------------------------

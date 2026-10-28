@@ -1248,7 +1248,7 @@ function ns.RebuildSettingsContent()
     end)
 
     -- ----------------------------------------------------------------
-    -- Section: Display
+    -- Section: Display (what the main window shows and how)
     -- ----------------------------------------------------------------
     addSection("display", function(y)
         y = sectionTitle(y, "display", TITLE_STEP_CTRL)
@@ -1256,6 +1256,22 @@ function ns.RebuildSettingsContent()
         y = radioGroup(y, { {"gold_per_hour", "hour"}, {"gold_per_min", "min"} },
             db.goldRateMode == "min" and "min" or "hour",
             function(v) db.goldRateMode = v; ns.UpdateGoldRate() end, 32)
+
+        y = radioGroup(y, { {"gold_display_classic", "classic"}, {"gold_display_modern", "modern"} },
+            db.goldDisplayMode == "modern" and "modern" or "classic",
+            function(v) db.goldDisplayMode = v; ns.RefreshHUD() end)
+
+        y = flag(y, "show_price_source", "showPriceSource", false, function() ns.RefreshHUD() end)
+        y = flag(y, "show_value_bar", "showValueBar", true, function() ns.RefreshHUD() end)
+
+        return y
+    end)
+
+    -- ----------------------------------------------------------------
+    -- Section: Session limit (session length or item goals)
+    -- ----------------------------------------------------------------
+    addSection("sec_session_limit", function(y)
+        y = sectionTitle(y, "sec_session_limit", TITLE_STEP_CTRL)
 
         -- Session length and item goal exclude each other (db.limitMode);
         -- the checkbox picks the active one, the other keeps its value.
@@ -1302,6 +1318,15 @@ function ns.RebuildSettingsContent()
         track(goalsBtn, "other")
         y = y - 40
 
+        return y
+    end)
+
+    -- ----------------------------------------------------------------
+    -- Section: Windows and buttons (height, lock, optional windows, launchers)
+    -- ----------------------------------------------------------------
+    addSection("sec_windows", function(y)
+        y = sectionTitle(y, "sec_windows", TITLE_STEP)
+
         -- Max window height: windows grow up to this, then their lists scroll.
         local heightHint = wrappedHint(y, string.format(ns.L["max_window_height_hint"],
             ns.DEFAULT_MAX_WINDOW_H, ns.MIN_MAX_WINDOW_H, ns.MAX_MAX_WINDOW_H))
@@ -1312,12 +1337,6 @@ function ns.RebuildSettingsContent()
         track(maxHeightEB, "other")
         y = y - 40
 
-        y = radioGroup(y, { {"gold_display_classic", "classic"}, {"gold_display_modern", "modern"} },
-            db.goldDisplayMode == "modern" and "modern" or "classic",
-            function(v) db.goldDisplayMode = v; ns.RefreshHUD() end)
-
-        y = flag(y, "show_price_source", "showPriceSource", false, function() ns.RefreshHUD() end)
-        y = flag(y, "show_value_bar", "showValueBar", true, function() ns.RefreshHUD() end)
         y = flag(y, "lock_main_frame", "mainLocked", false)
         y = checkbox(y, "minimap_button",
             function() return not db.minimap.hide end,

@@ -4,12 +4,13 @@
 
 ### New
 
-- Item goals: drag items into the new Item Goals window (Settings, Display, Edit Item Goals) and set a target amount for each one, e.g. 20 Arcane Crystals. The item's bar shows the progress, turns green at the target, and the first goal reached pauses the session. The general Item goal stays: its amount (e.g. 1000 of anything) applies to every item without its own goal, except items in the Vendor-Only Filter (they only count with a goal of their own). Goals are stored per profile
+- Item goals: drag items into the new Item Goals window (Settings, Session Limit, Edit Item Goals) and set a target amount for each one, e.g. 20 Arcane Crystals. The item's bar shows the progress, turns green at the target, and the first goal reached pauses the session. The general Item goal stays: its amount (e.g. 1000 of anything) applies to every item without its own goal, except items in the Vendor-Only Filter (they only count with a goal of their own). Goals are stored per profile
 - Two winter color themes: Yule (pine green with berry red) and Snowfall (slate with silver and snow white)
 
 ### Changed
 
-- Session length and Item goals each have a checkbox now (Settings, Display); only one of the two can be active at a time, and the other keeps its values instead of having to be cleared. Existing settings are carried over
+- Session length and Item goals each have a checkbox now (Settings, Session Limit); only one of the two can be active at a time, and the other keeps its values instead of having to be cleared. Existing settings are carried over
+- Settings reorganized: Session length and Item goals moved out of Display into a new Session Limit section; the window height, lock, minimap and addon-menu buttons, Loot Log and Instance Lockout options moved into a new Windows & Buttons section. Display keeps the gold rate, gold format, price source and value bar
 - 6 px between a category header and its first item icon (and the next header), in all windows
 
 ## 1.8.1

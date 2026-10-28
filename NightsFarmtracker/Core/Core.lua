@@ -82,7 +82,7 @@ ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
 ns.SCROLL_STEP = ns.ROW_H
 -- Maximum total window height (header + list + footer) of the main window and
 -- every list window; longer content scrolls. User setting db.maxWindowHeight
--- (Settings -> Display), read through ns.GetMaxWindowH(). The Help window is
+-- (Settings -> Windows & Buttons), read through ns.GetMaxWindowH(). The Help window is
 -- a bit taller (see ns.GetMaxHelpH).
 ns.DEFAULT_MAX_WINDOW_H = 360
 ns.MIN_MAX_WINDOW_H     = 200
