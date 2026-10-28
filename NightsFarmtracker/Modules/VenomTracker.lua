@@ -92,13 +92,23 @@ end
 ------------------------------------------------------------------------
 -- Scan
 ------------------------------------------------------------------------
+-- Inventory slot of the rod, remembered until the equipment changes (the
+-- player casts constantly; scanning every slot each time was wasted work).
+-- Only trusted once the player is logged in: before that the equipment is not
+-- available yet and "not equipped" would stick.
+local rodSlot, rodKnown, loggedIn = nil, false, false
+
 local function FindItemSlot()
+    if rodKnown then return rodSlot end
+    local found
     for slot = 1, 40 do
         if GetInventoryItemID("player", slot) == ITEM_ID then
-            return slot
+            found = slot
+            break
         end
     end
-    return nil
+    if loggedIn then rodSlot, rodKnown = found, true end
+    return found
 end
 
 local function ExtractVenomFromLine(line)
@@ -245,7 +255,8 @@ local function ScanVenomDelayed()
 end
 
 watcher:SetScript("OnEvent", function(_, event, unit)
-    if event == "PLAYER_LOGIN" then UpdateWatcher() end
+    if event == "PLAYER_LOGIN" then loggedIn = true; UpdateWatcher() end
+    if event == "PLAYER_EQUIPMENT_CHANGED" then rodKnown = false end
     if not NightsFarmtrackerDB or NightsFarmtrackerDB.venomTrackerEnabled ~= true then return end
     if event == "TOOLTIP_DATA_UPDATE" then
         -- fires for every tooltip lookup in the game; only our rod's matters
@@ -285,6 +296,7 @@ end
 ------------------------------------------------------------------------
 function ns.SetVenomTrackerEnabled(enabled)
     NightsFarmtrackerDB.venomTrackerEnabled = enabled and true or false
+    rodKnown = false
     UpdateWatcher()
     if enabled then
         NightsFarmtrackerDB.venomUserHidden = false

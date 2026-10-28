@@ -473,7 +473,7 @@ function ns.CreateDropListWindow(cfg)
     -- placed here; Rebuild positions everything below the first section.
     local function EnsureFrame()
         if frame then return end
-        frame = ns.CreateWindowFrame(cfg.frameName, ns.L[cfg.titleKey], { width = ns.FRAME_W })
+        frame = ns.CreateWindowFrame(cfg.frameName, ns.L[cfg.titleKey], { width = ns.FRAME_W, dockChain = "right" })
         frame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", 4, 0)
         ns[cfg.frameKey] = frame  -- other windows anchor to it
 

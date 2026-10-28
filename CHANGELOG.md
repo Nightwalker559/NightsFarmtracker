@@ -13,11 +13,13 @@
 - Settings reorganized: Session length and Item goals moved out of Display into a new Session Limit section; the window height, lock, minimap and addon-menu buttons, Loot Log and Instance Lockout options moved into a new Windows & Buttons section. Display keeps the gold rate, gold format, price source and value bar
 - 4 px (was 10) between a window's border and its content on the sides, in the main window and the list windows; the lists are 12 px wider
 - The value bar starts where the item name starts (4 px right of the icon, was 1 px)
-- Internal cleanup: one helper for scroll lists (main window, History, Log, Settings, drop lists) and one for boxed number fields; the item name and the value bar share one offset constant; the Loot Log docked below the collapsed main window now also moves the window stack up when it opens
+- Internal cleanup: the duplicate-loot-line memory only keeps recent entries, the Venom Tracker remembers where the rod is instead of scanning the equipment on every cast, saved sessions are always converted to day-keyed storage before anything reads them; one helper for scroll lists (main window, History, Log, Settings, drop lists) and one for boxed number fields; the item name and the value bar share one offset constant; the Loot Log docked below the collapsed main window now also moves the window stack up when it opens
 - 6 px between a category header and its first item icon (and the next header), in all windows
 
 ### Fixed
 
+- Closing the Filter, Blacklist, Item Goals or Loot Log window with its X (or Esc) now closes the gap in the row of docked windows at once
+- Miscellaneous items sort after the other categories on equal gold again (the item class priority was filed under the wrong class number)
 - The Loot Log no longer covers the collapsed main window: below it, the log is as wide as the main window and, together with it, the Gold Overview and the Instance Lockout frame, no taller than the max window height; the stack moves up as a whole near the screen bottom
 - Clicking a section in the Settings sidebar leaves the same gap above its title as at the top of the list; the first section no longer jumps up
 - Scrolling with the mouse wheel over one of the addon's windows (title, sidebar, margins) no longer scrolls the chat or other frames behind it

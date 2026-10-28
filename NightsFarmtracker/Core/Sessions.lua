@@ -19,18 +19,13 @@ local function NoVariantKey(quality)
     return "__novariant__" .. tostring(quality or "?")
 end
 
--- Calls fn(session) for every saved session, whether the table is still the
--- old flat array or the current day-keyed one (sessions["YYYY-MM-DD"] = a
--- list of that day's sessions). Order is not defined: callers that need
+-- Calls fn(session) for every saved session (sessions["YYYY-MM-DD"] = a list
+-- of that day's sessions). Order is not defined: callers that need
 -- newest-first (RebuildHistory) sort the day keys themselves.
 function ns.ForEachSession(sessions, fn)
     if not sessions then return end
-    if sessions[1] ~= nil and type(sessions[1]) == "table" and sessions[1].timestamp ~= nil then
-        for _, session in ipairs(sessions) do fn(session) end
-    else
-        for _, dayList in pairs(sessions) do
-            for _, session in ipairs(dayList) do fn(session) end
-        end
+    for _, dayList in pairs(sessions) do
+        for _, session in ipairs(dayList) do fn(session) end
     end
 end
 

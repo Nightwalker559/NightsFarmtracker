@@ -488,8 +488,19 @@ EventFrame = CreateFrame("Frame")
 -- includes the full link, so differently rolled gear never matches). Two real
 -- pickups - several corpses in one loot-all, herb procs - are separate chat
 -- lines with their own lineID and must both count, so the window is tiny.
-local recentLootLine = {}  -- itemID -> { text, at, lineID }
-local DUP_WINDOW     = 0.02  -- seconds, "this frame or the next"
+local recentLootLine  = {}  -- itemID -> { text, at, lineID }
+local recentLootCount = 0
+local DUP_WINDOW      = 0.02  -- seconds, "this frame or the next"
+local LOOT_LINE_PRUNE = 100   -- entries before the stale ones are dropped
+
+local function PruneLootLines(now)
+    for id, rec in pairs(recentLootLine) do
+        if now - rec.at >= DUP_WINDOW then
+            recentLootLine[id] = nil
+            recentLootCount = recentLootCount - 1
+        end
+    end
+end
 
 local function IsDuplicateLootLine(itemID, msg, lineID)
     local now = GetTime()
@@ -498,8 +509,12 @@ local function IsDuplicateLootLine(itemID, msg, lineID)
     if rec then
         lastText, lastAt, lastLineID = rec.text, rec.at, rec.lineID
     else
+        -- an entry older than the window can never match again, so the table
+        -- only holds what was looted in the last moments
+        if recentLootCount >= LOOT_LINE_PRUNE then PruneLootLines(now) end
         rec = {}
         recentLootLine[itemID] = rec
+        recentLootCount = recentLootCount + 1
     end
     rec.text, rec.at, rec.lineID = msg, now, lineID
     if lastAt and lineID and lastLineID and lineID ~= lastLineID then return false end

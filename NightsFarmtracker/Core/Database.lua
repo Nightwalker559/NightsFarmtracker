@@ -338,6 +338,9 @@ function ns.InitAccountDB()
     if not NightsFarmtrackerAccountDB then NightsFarmtrackerAccountDB = {} end
     local acc = NightsFarmtrackerAccountDB
     acc.sessions = acc.sessions or {}
+    -- Day-keyed storage before anything iterates the sessions (an old flat
+    -- array is converted here; already converted data is left alone)
+    ns.MigrateSessionsToDateKeyed(acc.sessions)
     if not acc.itemKeysMigrated then
         ns.ForEachSession(acc.sessions, function(session) MigrateItemKeys(session.items) end)
         acc.itemKeysMigrated = true

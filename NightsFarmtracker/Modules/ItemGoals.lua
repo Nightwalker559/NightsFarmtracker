@@ -126,7 +126,7 @@ end
 
 local function EnsureFrame()
     if frame then return end
-    frame = ns.CreateWindowFrame("NightsFarmtrackerGoalsWnd", ns.L["goals_title"], { width = ns.FRAME_W })
+    frame = ns.CreateWindowFrame("NightsFarmtrackerGoalsWnd", ns.L["goals_title"], { width = ns.FRAME_W, dockChain = "right" })
     frame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", 4, 0)
     ns.GoalsFrame = frame   -- docking chain, see ns.WINDOW_CHAINS
 

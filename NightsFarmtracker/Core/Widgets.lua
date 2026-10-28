@@ -494,7 +494,9 @@ end
 -- button. Callers add their content below the header and can hook extra close
 -- behavior via frame:SetScript("OnHide", ...) or
 -- frame.closeBtn:HookScript("OnClick", ...). opts (all optional): width, pad
--- (default ns.PAD), titleColor (default ns.COL_GOLD), titleY (default -10).
+-- (default ns.PAD), titleColor (default ns.COL_GOLD), titleY (default -10),
+-- dockChain ("right": the window sits in that docking chain, see
+-- ns.WINDOW_CHAINS, and the others close ranks when it hides).
 ------------------------------------------------------------------------
 function ns.CreateWindowFrame(name, title, opts)
     opts = opts or {}
@@ -502,6 +504,9 @@ function ns.CreateWindowFrame(name, title, opts)
 
     local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
     frame:HookScript("OnHide", function(self) ns.HideTooltipOf(self) end)
+    if opts.dockChain then
+        frame:HookScript("OnHide", function() ns.RefreshWindowChain(opts.dockChain) end)
+    end
     if opts.width then frame:SetWidth(opts.width) end
     frame:SetFrameStrata("MEDIUM")
     frame:SetClampedToScreen(true)

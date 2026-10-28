@@ -59,7 +59,7 @@ ns.CLASS_PRIORITY = {
     [8]  = 8,   -- Item Enhancement
     [1]  = 9,   -- Container
     [12] = 10,  -- Quest
-    [14] = 11,  -- Miscellaneous
+    [15] = 11,  -- Miscellaneous
 }
 -- Housing classID is not hardcoded above (varies by patch); ns.InitDB()
 -- registers it at runtime via ns.HOUSING so it always gets the correct

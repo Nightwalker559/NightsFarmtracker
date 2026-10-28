@@ -179,7 +179,7 @@ end
 local function EnsureLogFrame()
     if LogFrame then return end
 
-    LogFrame = ns.CreateWindowFrame("NightsFarmtrackerLogWnd", ns.L["log_title"], {width = LOG_W})
+    LogFrame = ns.CreateWindowFrame("NightsFarmtrackerLogWnd", ns.L["log_title"], {width = LOG_W, dockChain = "right"})
     LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", 4, 0)
     ns.LogFrame = LogFrame  -- exposed so other windows (e.g. Filter) can anchor next to it
     LogFrame.closeBtn:HookScript("OnClick", function()
@@ -237,7 +237,6 @@ function ns.ToggleLogWindow()
     if LogFrame:IsShown() then
         LogFrame:Hide()
         NightsFarmtrackerDB.logWindowShown = false
-        ns.RefreshWindowChain("right")
     else
         RebuildLogList()
         LogFrame:Show()
