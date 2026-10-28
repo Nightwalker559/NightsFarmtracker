@@ -10,7 +10,7 @@ local ART = ns.ART
 -- Layout — history list
 ------------------------------------------------------------------------
 local H_W      = ns.FRAME_W
-local H_PAD    = ns.PAD
+local PAD      = ns.PAD
 local H_HDR_H  = ns.WINDOW_HDR_H
 local H_FTR_H  = 28
 local DAY_H    = ns.CAT_ROW_H
@@ -21,7 +21,6 @@ local SESS_H   = 38
 -- Layout — detail window (matches main frame width)
 ------------------------------------------------------------------------
 local DET_W      = ns.FRAME_W          -- same as main frame
-local DET_PAD    = ns.PAD
 local DET_HDR_H  = ns.WINDOW_HDR_H
 local DET_FTR_H  = 10   -- just padding: the item counts live in the header hover
 local DET_CONT_W = ns.CONTENT_W
@@ -156,7 +155,7 @@ local detRowPool = ns.NewPool(function(parent)
 
     -- Single-line: icon | name | count | gold (y=0 = centered with icon)
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 4, 0)
+    r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", ns.NAME_GAP, 0)
     r.nameText:SetPoint("RIGHT", r,           "RIGHT", -128, 0)
     ns.SetupRowNameText(r.nameText); r.nameText:SetFontHeight(ns.FONT_NORMAL)
 
@@ -252,8 +251,8 @@ local function EnsureDetailFrame()
     -- title row (the close button keeps its place).
     local dateText = DetailFrame.titleFS
     dateText:ClearAllPoints()
-    dateText:SetPoint("TOPLEFT",  DET_PAD, -12)
-    dateText:SetPoint("TOPRIGHT", -DET_PAD, -12)
+    dateText:SetPoint("TOPLEFT",  PAD, -12)
+    dateText:SetPoint("TOPRIGHT", -PAD, -12)
     DetailFrame.dateText = dateText
 
     -- Invisible hitbox over the header line: hovering the combined total
@@ -288,17 +287,10 @@ local function EnsureDetailFrame()
     end)
     headerHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    ns.AddHLine(DetailFrame, "TOP", DET_PAD, -(DET_HDR_H-1))
+    ns.AddHLine(DetailFrame, "TOP", PAD, -(DET_HDR_H-1))
 
-    DScrollFrame = CreateFrame("ScrollFrame",nil,DetailFrame)
-    DScrollFrame:SetPoint("TOPLEFT",DET_PAD,-DET_HDR_H); DScrollFrame:SetWidth(DET_CONT_W)
-    DScrollFrame:EnableMouseWheel(true)
-    DListFrame = CreateFrame("Frame",nil,DScrollFrame)
-    DListFrame:SetWidth(DET_CONT_W); DListFrame:SetHeight(1)
-    DScrollFrame:SetScrollChild(DListFrame)
-    local OnWheel = ns.MakeWheelHandler(DScrollFrame, DListFrame, DET_ROW_H)
-    DScrollFrame:SetScript("OnMouseWheel",OnWheel)
-    DListFrame:EnableMouseWheel(true); DListFrame:SetScript("OnMouseWheel",OnWheel)
+    DScrollFrame, DListFrame = ns.CreateScrollList(DetailFrame, DET_CONT_W, DET_ROW_H)
+    DScrollFrame:SetPoint("TOPLEFT",PAD,-DET_HDR_H); DScrollFrame:SetWidth(DET_CONT_W)
 end
 
 -- Row gold text. Plain rows and rows with a frozen AH/vendor split show
@@ -661,7 +653,7 @@ local function EnsureHistFrame()
         ns.RefreshWindowChain("left")
     end)
 
-    ns.AddHLine(HistFrame, "TOP", H_PAD, -(H_HDR_H-1))
+    ns.AddHLine(HistFrame, "TOP", PAD, -(H_HDR_H-1))
 
     -- Hover on the title: gold of all saved months added up. The right edge
     -- stops short of the close button so the hitbox doesn't swallow its click.
@@ -689,21 +681,14 @@ local function EnsureHistFrame()
     end)
     titleHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    HScrollFrame=CreateFrame("ScrollFrame",nil,HistFrame)
-    HScrollFrame:SetPoint("TOPLEFT",H_PAD,-H_HDR_H); HScrollFrame:SetPoint("BOTTOMRIGHT",-H_PAD,H_FTR_H)
-    HScrollFrame:EnableMouseWheel(true)
+    HScrollFrame, HListFrame = ns.CreateScrollList(HistFrame, ns.CONTENT_W, SESS_H)
+    HScrollFrame:SetPoint("TOPLEFT",PAD,-H_HDR_H); HScrollFrame:SetPoint("BOTTOMRIGHT",-PAD,H_FTR_H)
     HScrollFrame:SetScript("OnVerticalScroll", UpdateHistFooterLine)
-    HListFrame=CreateFrame("Frame",nil,HScrollFrame)
-    HListFrame:SetWidth(ns.CONTENT_W); HListFrame:SetHeight(1)
-    HScrollFrame:SetScrollChild(HListFrame)
-    local OnWheel = ns.MakeWheelHandler(HScrollFrame, HListFrame, SESS_H)
-    HScrollFrame:SetScript("OnMouseWheel",OnWheel)
-    HListFrame:EnableMouseWheel(true); HListFrame:SetScript("OnMouseWheel",OnWheel)
 
-    HistFrame.footerSep = ns.AddHLine(HistFrame, "BOTTOM", H_PAD, H_FTR_H-2)
+    HistFrame.footerSep = ns.AddHLine(HistFrame, "BOTTOM", PAD, H_FTR_H-2)
 
     HistFrame.countLabel = HistFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    HistFrame.countLabel:SetPoint("BOTTOMLEFT",H_PAD,8); HistFrame.countLabel:SetTextColor(0.40,0.40,0.40)
+    HistFrame.countLabel:SetPoint("BOTTOMLEFT",PAD,8); HistFrame.countLabel:SetTextColor(0.40,0.40,0.40)
 
     HistFrame.emptyLabel = HistFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     HistFrame.emptyLabel:SetPoint("TOP",HistFrame,"TOP",0,-(H_HDR_H+22))
@@ -711,7 +696,7 @@ local function EnsureHistFrame()
     HistFrame.emptyLabel:SetTextColor(0.55,0.55,0.55)
     HistFrame.emptyLabel:Hide()
 
-    HistFrame.clrBtn = ns.CreateClearAllButton(HistFrame, H_PAD, function()
+    HistFrame.clrBtn = ns.CreateClearAllButton(HistFrame, PAD, function()
         return NightsFarmtrackerAccountDB.sessions and next(NightsFarmtrackerAccountDB.sessions) ~= nil
     end, "NFT_CONFIRM_CLEAR_ALL_HISTORY")
     HistFrame.clrBtn:HookScript("OnEnter", function(self)

@@ -150,20 +150,10 @@ end
 -- ns.RebuildDropItemList). Returns scrollFrame, listFrame.
 ------------------------------------------------------------------------
 function ns.CreateDropListScroll(window, onDrop)
-    local scrollFrame = CreateFrame("ScrollFrame", nil, window)
+    local scrollFrame, listFrame = ns.CreateScrollList(window, ns.CONTENT_W, ns.ROW_H)
     scrollFrame:SetWidth(ns.CONTENT_W)
-    scrollFrame:EnableMouseWheel(true)
-
-    local listFrame = CreateFrame("Frame", nil, scrollFrame)
-    listFrame:SetWidth(ns.CONTENT_W); listFrame:SetHeight(1)
     listFrame:EnableMouse(true)
-    scrollFrame:SetScrollChild(listFrame)
     ns.EnableItemDrop(listFrame, onDrop)
-
-    local OnWheel = ns.MakeWheelHandler(scrollFrame, listFrame, ns.ROW_H)
-    scrollFrame:SetScript("OnMouseWheel", OnWheel)
-    listFrame:SetScript("OnMouseWheel", OnWheel)
-
     return scrollFrame, listFrame
 end
 

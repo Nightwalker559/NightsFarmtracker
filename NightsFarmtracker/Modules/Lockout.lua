@@ -7,7 +7,7 @@
 -- window shows x/9 plus the time until the oldest one drops off, with a
 -- button that calls ResetInstances().
 -- The limit is per account, so the list lives in the account-wide DB.
--- Off by default; toggled via Settings -> Display.
+-- Off by default; toggled via Settings -> Windows & Buttons.
 ------------------------------------------------------------------------
 local _, ns = ...
 

@@ -168,6 +168,22 @@ function ns.AddRowIcon(row)
 end
 
 ------------------------------------------------------------------------
+-- Boxed EditBox: Enter/Escape release focus; the backdrop frame around the
+-- EditBox is highlighted while it has focus. Extra focus-lost work goes on top
+-- with eb:HookScript("OnEditFocusLost", ...).
+------------------------------------------------------------------------
+function ns.HookEditBoxFocus(frame, eb)
+    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEditFocusGained", function()
+        frame:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
+    end)
+    eb:SetScript("OnEditFocusLost", function()
+        frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+    end)
+end
+
+------------------------------------------------------------------------
 -- Pool of reusable frames / font strings, so list rebuilds don't leak new
 -- widgets. create(parent) builds a fresh one; reset(obj) (optional) clears
 -- per-use state (scripts, texts, stored data) when it goes back.
@@ -351,6 +367,25 @@ function ns.MakeWheelHandler(scroll, child, step)
         local maxS = math.max(0, child:GetHeight() - scroll:GetHeight())
         scroll:SetVerticalScroll(math.max(0, math.min(scroll:GetVerticalScroll() - delta * step, maxS)))
     end
+end
+
+------------------------------------------------------------------------
+-- ScrollFrame plus its scroll child (contentW wide, height set by the caller)
+-- with mouse-wheel scrolling in `step` pixel steps, on the frame and on the
+-- child. The caller anchors the scroll frame. Returns scroll, list, onWheel (for
+-- rows on top of the list that want to pass the wheel on).
+------------------------------------------------------------------------
+function ns.CreateScrollList(parent, contentW, step)
+    local scroll = CreateFrame("ScrollFrame", nil, parent)
+    scroll:EnableMouseWheel(true)
+    local list = CreateFrame("Frame", nil, scroll)
+    list:SetSize(contentW, 1)
+    list:EnableMouseWheel(true)
+    scroll:SetScrollChild(list)
+    local onWheel = ns.MakeWheelHandler(scroll, list, step)
+    scroll:SetScript("OnMouseWheel", onWheel)
+    list:SetScript("OnMouseWheel", onWheel)
+    return scroll, list, onWheel
 end
 
 ------------------------------------------------------------------------

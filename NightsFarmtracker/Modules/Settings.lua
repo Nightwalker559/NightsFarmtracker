@@ -314,19 +314,6 @@ local function MakeDropdown(parent, yOff)
     return frame
 end
 
--- Enter/Escape release focus; the boxed frame around the EditBox is
--- highlighted while it has focus.
-local function HookEditBoxFocus(frame, eb)
-    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEditFocusGained", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
-    end)
-    eb:SetScript("OnEditFocusLost", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
-    end)
-end
-
 ------------------------------------------------------------------------
 -- Helper: EditBox for custom TSM price source
 ------------------------------------------------------------------------
@@ -353,7 +340,7 @@ local function MakeCustomSourceEB(parent, yOff)
         ns.ClearPriceCache()
         ns.RefreshHUD()
     end)
-    HookEditBoxFocus(frame, eb)
+    ns.HookEditBoxFocus(frame, eb)
     frame.eb = eb
     return frame
 end
@@ -446,7 +433,7 @@ local function MakeNumberBox(parent, yOff, maxLetters, unitText)
     eb:SetMaxLetters(maxLetters)
     eb:SetFontObject(GameFontNormalSmall)
     eb:SetTextColor(0.85, 0.85, 0.85)
-    HookEditBoxFocus(frame, eb)
+    ns.HookEditBoxFocus(frame, eb)
 
     local unitLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     unitLbl:SetPoint("LEFT", frame, "RIGHT", 6, 0)
@@ -556,8 +543,8 @@ end
 local THEME_ROW_H = 20
 
 ------------------------------------------------------------------------
--- Helper: "Open Export Window" button (Data Export section) - single
--- persistent instance, reused across rebuilds like gearThresholdEB above.
+-- Helper: button that opens a window ("Open Export Window", "Edit Item Goals") -
+-- single persistent instance, reused across rebuilds like gearThresholdEB above.
 ------------------------------------------------------------------------
 local exportBtn
 local function MakeWindowButton(labelKey, onClick)
@@ -713,7 +700,7 @@ local function MakeThemeDropdown(parent, yOff)
 end
 
 ------------------------------------------------------------------------
--- Helper: custom accent color row (Display section). A swatch opens the
+-- Helper: custom accent color row (Colors section). A swatch opens the
 -- Blizzard color picker; the other theme colors are derived from the pick
 -- (ns.DeriveCustomTheme). Next to it a small preview frame shows the
 -- resulting window/header colors - it updates live while dragging in the
@@ -1590,21 +1577,9 @@ local function EnsureSettingsFrame()
     sidebarSep:SetPoint("BOTTOMLEFT", S_SIDEBAR_W, S_FTR_H)
 
     -- Scroll container — right of the sidebar, below header sep
-    SScrollFrame = CreateFrame("ScrollFrame", nil, SF)
+    SScrollFrame, SListFrame, contentWheel = ns.CreateScrollList(SF, S_W, S_SCROLL_STEP)
     SScrollFrame:SetPoint("TOPLEFT",  S_SIDEBAR_W, -S_HDR_H)
     SScrollFrame:SetPoint("TOPRIGHT", 0, -S_HDR_H)
-    SScrollFrame:EnableMouseWheel(true)
-
-    SListFrame = CreateFrame("Frame", nil, SScrollFrame)
-    SListFrame:SetWidth(S_W)
-    SListFrame:SetHeight(1)
-    SScrollFrame:SetScrollChild(SListFrame)
-
-    local OnWheel = ns.MakeWheelHandler(SScrollFrame, SListFrame, S_SCROLL_STEP)
-    contentWheel = OnWheel
-    SScrollFrame:SetScript("OnMouseWheel", OnWheel)
-    SListFrame:EnableMouseWheel(true)
-    SListFrame:SetScript("OnMouseWheel", OnWheel)
 
     ns.CreateDangerLink(SF, S_PAD, ns.L["reset_addon"], function() StaticPopup_Show("NFT_CONFIRM_RESET_ADDON") end)
 end

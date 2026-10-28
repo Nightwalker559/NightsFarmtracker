@@ -122,7 +122,7 @@ local function NewProfileDefaults()
         itemGoal              = 0,
         itemGoals             = {},
         limitMode             = "off",
-        pos                 = { unpack(DEFAULT_MAIN_POS) },
+        pos                   = { unpack(DEFAULT_MAIN_POS) },
         mainLocked            = false,
         gearAHThresholdSound  = false,
         sessionHistoryMode    = "full",

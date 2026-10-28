@@ -188,18 +188,9 @@ local function EnsureLogFrame()
 
     ns.AddHLine(LogFrame, "TOP", LOG_PAD, -(LOG_HDR_H-1))
 
-    LScrollFrame = CreateFrame("ScrollFrame", nil, LogFrame)
+    LScrollFrame, LListFrame = ns.CreateScrollList(LogFrame, ns.CONTENT_W, ROW_H)
     LScrollFrame:SetPoint("TOPLEFT", LOG_PAD, -LOG_HDR_H)
     LScrollFrame:SetWidth(ns.CONTENT_W)
-    LScrollFrame:EnableMouseWheel(true)
-
-    LListFrame = CreateFrame("Frame", nil, LScrollFrame)
-    LListFrame:SetWidth(ns.CONTENT_W); LListFrame:SetHeight(1)
-    LScrollFrame:SetScrollChild(LListFrame)
-
-    local OnWheel = ns.MakeWheelHandler(LScrollFrame, LListFrame, ROW_H)
-    LScrollFrame:SetScript("OnMouseWheel", OnWheel)
-    LListFrame:SetScript("OnMouseWheel", OnWheel)
 
     LogFrame.emptyLabel = LogFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     LogFrame.emptyLabel:SetPoint("TOP", LogFrame, "TOP", 0, -(LOG_HDR_H+14))
@@ -209,12 +200,11 @@ local function EnsureLogFrame()
 end
 
 ------------------------------------------------------------------------
--- Anchoring — below MainFrame when collapsed (or below the Gold Overview
--- window / Instance Lockout frame if those are also open there, to avoid
--- overlapping them), otherwise
--- part of the Log/Filter/Blacklist right-side chain (see
--- ns.RefreshWindowChain in Widgets.lua), which also re-flows Filter/
--- Blacklist if they're open.
+-- Anchoring — below MainFrame when collapsed, as wide as it (or below the Gold
+-- Overview window / Instance Lockout frame if those are also open there, to
+-- avoid overlapping them), otherwise part of the right-side window chain (see
+-- ns.RefreshWindowChain in Widgets.lua), which also re-flows the Filter,
+-- Blacklist and Item Goals windows if they are open.
 ------------------------------------------------------------------------
 local function ReanchorLogFrame()
     if NightsFarmtrackerDB.expanded == false then
@@ -252,6 +242,7 @@ function ns.ToggleLogWindow()
         RebuildLogList()
         LogFrame:Show()
         ReanchorLogFrame()
+        ns.KeepStackOnScreen()   -- below the collapsed main window the stack just grew
         NightsFarmtrackerDB.logWindowShown = true
     end
 end
@@ -264,6 +255,7 @@ function ns.RestoreLogWindow()
         RebuildLogList()
         LogFrame:Show()
         ReanchorLogFrame()
+        ns.KeepStackOnScreen()
     end
 end
 

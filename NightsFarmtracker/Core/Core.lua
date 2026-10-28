@@ -74,6 +74,7 @@ ns.CAT_GAP     = 5    -- extra space above/below a category's rows: 6 px between
 ns.CAT_ROW_H   = 22
 ns.CTRL_GAP    = 6    -- gap between neighbouring checkboxes / radio buttons (Settings and the list windows)
 ns.CHECKBOX_ROW_H = 12 + ns.CTRL_GAP  -- row height for checkbox-list sections (12 px box + gap): category filters, AH-by-expansion
+ns.NAME_GAP    = 4    -- item name / value bar offset from the row icon's right edge
 ns.ICON_X      = 1    -- row icon offset: its 1 px border then sits flush with the row/header edge
 ns.FOOTER_H    = 32
 ns.ICON_SIZE   = 30

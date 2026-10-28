@@ -20,7 +20,7 @@ local SCROLL_STEP = ns.SCROLL_STEP
 -- of the icon), its bottom edge flush with the icon border's bottom edge
 -- (the border sticks out 1 px on every side of the icon, see ns.AddRowIcon),
 -- running to the row's right edge (the category header's right edge).
-local NAME_GAP   = 4
+local NAME_GAP   = ns.NAME_GAP
 local BAR_H      = 2
 local BAR_LEFT   = ICON_X + ICON_SIZE + NAME_GAP
 local BAR_BOTTOM = (ROW_H - ICON_SIZE) / 2 - 1
@@ -189,20 +189,10 @@ btnRate.text:SetFontHeight(ns.FONT_NORMAL)
 ------------------------------------------------------------------------
 -- Scroll frame (visible only when expanded)
 ------------------------------------------------------------------------
-local ScrollFrame = CreateFrame("ScrollFrame", nil, MainFrame)
+local ScrollFrame, ListFrame, OnWheel = ns.CreateScrollList(MainFrame, CONTENT_W, SCROLL_STEP)
 ScrollFrame:SetPoint("TOPLEFT",     PAD,  -SCROLL_TOP)
 ScrollFrame:SetPoint("BOTTOMRIGHT", -PAD,  FOOTER_H)
 ScrollFrame:Hide()
-
-local ListFrame = CreateFrame("Frame", nil, ScrollFrame)
-ListFrame:SetSize(CONTENT_W, 1)
-ScrollFrame:SetScrollChild(ListFrame)
-
-local OnWheel = ns.MakeWheelHandler(ScrollFrame, ListFrame, SCROLL_STEP)
-ScrollFrame:EnableMouseWheel(true)
-ScrollFrame:SetScript("OnMouseWheel", OnWheel)
-ListFrame:EnableMouseWheel(true)
-ListFrame:SetScript("OnMouseWheel", OnWheel)
 
 ------------------------------------------------------------------------
 -- Gold Overview Frame
@@ -634,7 +624,7 @@ local rowPool = ns.NewPool(function(parent)
     ResetRowLayout(row)
     return row
 end, function(row)
-    row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false
+    row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false; row.barGoal = nil
     row.itemName=nil; row.itemLink=nil; row.itemID=nil; row.baseItemID=nil
     row.isCategoryHeader=nil; row.categoryName=nil; row.isJunkMerged=nil
     ns.ShowHeaderBand(row, false)

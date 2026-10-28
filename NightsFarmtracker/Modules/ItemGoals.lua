@@ -44,11 +44,8 @@ local function CreateGoalRow(parent)
     eb:SetMaxLetters(5)
     eb:SetFontObject(GameFontNormalSmall)
     eb:SetTextColor(0.85, 0.85, 0.85)
-    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEditFocusGained", function() box:SetBackdropBorderColor(unpack(ns.COL_ACCENT)) end)
-    eb:SetScript("OnEditFocusLost", function(self)
-        box:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+    ns.HookEditBoxFocus(box, eb)
+    eb:HookScript("OnEditFocusLost", function(self)
         local goal = r.itemID and ns.GetItemGoals()[r.itemID]
         if not goal then return end
         local v = tonumber(self:GetText()) or 0
