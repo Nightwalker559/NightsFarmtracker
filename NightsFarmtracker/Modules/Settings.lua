@@ -1048,6 +1048,8 @@ local RELEASE_FN = {
 ------------------------------------------------------------------------
 local S_SIDEBAR_W = 92
 local sidebarRows = {}
+local contentWheel   -- mouse-wheel handler of the content scroll area; the sidebar forwards to it
+local function SidebarWheel(_, delta) contentWheel(nil, delta) end
 
 local sidebarPool = ns.NewPool(function(parent)
     local row = CreateFrame("Button", nil, parent)
@@ -1063,6 +1065,8 @@ local sidebarPool = ns.NewPool(function(parent)
     row.txt:SetWordWrap(true)
     row:SetScript("OnEnter", function(self) self.txt:SetTextColor(1, 0.82, 0) end)
     row:SetScript("OnLeave", function(self) self.txt:SetTextColor(0.7, 0.7, 0.7) end)
+    row:EnableMouseWheel(true)
+    row:SetScript("OnMouseWheel", SidebarWheel)
     return row
 end, function(row) row:SetScript("OnClick", nil) end)
 
@@ -1573,6 +1577,9 @@ local function EnsureSettingsFrame()
     SSidebar = CreateFrame("Frame", nil, SF)
     SSidebar:SetPoint("TOPLEFT", 0, -S_HDR_H)
     SSidebar:SetWidth(S_SIDEBAR_W)
+    SSidebar:EnableMouse(true)   -- with the wheel it keeps the sidebar's gaps from passing scrolls to the chat
+    SSidebar:EnableMouseWheel(true)
+    SSidebar:SetScript("OnMouseWheel", SidebarWheel)
 
     local sidebarSep = SF:CreateTexture(nil, "ARTWORK")
     sidebarSep:SetWidth(1); sidebarSep:SetColorTexture(unpack(ns.COL_BORDER))
@@ -1591,6 +1598,7 @@ local function EnsureSettingsFrame()
     SScrollFrame:SetScrollChild(SListFrame)
 
     local OnWheel = ns.MakeWheelHandler(SScrollFrame, SListFrame, S_SCROLL_STEP)
+    contentWheel = OnWheel
     SScrollFrame:SetScript("OnMouseWheel", OnWheel)
     SListFrame:EnableMouseWheel(true)
     SListFrame:SetScript("OnMouseWheel", OnWheel)
