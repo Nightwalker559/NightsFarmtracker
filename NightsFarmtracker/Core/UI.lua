@@ -54,6 +54,7 @@ MainFrame:HookScript("OnHide", function(self) ns.HideTooltipOf(self) end)
 -- Same strata as every other window of the addon.
 MainFrame:SetFrameStrata("MEDIUM")
 MainFrame:SetMovable(true); MainFrame:EnableMouse(true); MainFrame:SetClampedToScreen(true)
+MainFrame:EnableMouseWheel(true)   -- the wheel must not scroll whatever lies behind the window
 ns.ApplyFrameStyle(MainFrame)
 MainFrame:RegisterForDrag("LeftButton")
 MainFrame:SetScript("OnDragStart", function(self)

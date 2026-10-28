@@ -110,6 +110,7 @@ local function EnsureFrame()
     LockoutFrame:SetFrameStrata("MEDIUM")
     LockoutFrame:SetClampedToScreen(true)
     LockoutFrame:EnableMouse(true)
+    LockoutFrame:EnableMouseWheel(true)   -- see ns.CreateWindowFrame
     ns.ApplyFrameStyle(LockoutFrame)
     LockoutFrame:Hide()
     ns.LockoutFrame = LockoutFrame

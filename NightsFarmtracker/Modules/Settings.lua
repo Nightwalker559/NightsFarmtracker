@@ -264,6 +264,7 @@ local function MakePopupList()
     local list = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     list:SetFrameStrata("TOOLTIP")
     list:EnableMouse(true)
+    list:EnableMouseWheel(true)   -- see ns.CreateWindowFrame
     ns.StyleBackdropBox(list, {0.05,0.08,0.09,1})
     list:Hide()
     return list

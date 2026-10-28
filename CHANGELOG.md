@@ -13,6 +13,10 @@
 - Settings reorganized: Session length and Item goals moved out of Display into a new Session Limit section; the window height, lock, minimap and addon-menu buttons, Loot Log and Instance Lockout options moved into a new Windows & Buttons section. Display keeps the gold rate, gold format, price source and value bar
 - 6 px between a category header and its first item icon (and the next header), in all windows
 
+### Fixed
+
+- Scrolling with the mouse wheel over one of the addon's windows (title, sidebar, margins) no longer scrolls the chat or other frames behind it
+
 ## 1.8.1
 
 ### New
