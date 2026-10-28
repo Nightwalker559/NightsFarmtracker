@@ -12,6 +12,7 @@
 - Session length and Item goals each have a checkbox now (Settings, Session Limit); only one of the two can be active at a time, and the other keeps its values instead of having to be cleared. Existing settings are carried over
 - Settings reorganized: Session length and Item goals moved out of Display into a new Session Limit section; the window height, lock, minimap and addon-menu buttons, Loot Log and Instance Lockout options moved into a new Windows & Buttons section. Display keeps the gold rate, gold format, price source and value bar
 - 4 px (was 10) between a window's border and its content on the sides, in the main window and the list windows; the lists are 12 px wider
+- The value bar starts where the item name starts (4 px right of the icon, was 1 px)
 - 6 px between a category header and its first item icon (and the next header), in all windows
 
 ### Fixed

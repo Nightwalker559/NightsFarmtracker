@@ -16,12 +16,13 @@ local ICON_SIZE   = ns.ICON_SIZE
 local CONTENT_W   = ns.CONTENT_W
 local SCROLL_STEP = ns.SCROLL_STEP
 
--- Value bar of an item row: right of the icon border (1 px gap), its bottom
--- edge flush with the border's bottom edge, running to the row's right edge
--- (the category header's right edge). The border sticks out 1 px on every
--- side of the icon (ns.AddRowIcon), hence the extra pixel.
+-- Value bar of an item row: starts where the item name starts (NAME_GAP right
+-- of the icon), its bottom edge flush with the icon border's bottom edge
+-- (the border sticks out 1 px on every side of the icon, see ns.AddRowIcon),
+-- running to the row's right edge (the category header's right edge).
+local NAME_GAP   = 4
 local BAR_H      = 2
-local BAR_LEFT   = ICON_X + ICON_SIZE + 1 + 1
+local BAR_LEFT   = ICON_X + ICON_SIZE + NAME_GAP
 local BAR_BOTTOM = (ROW_H - ICON_SIZE) / 2 - 1
 local BAR_FULL_W = CONTENT_W - BAR_LEFT
 local GOAL_COL   = {0.2, 0.85, 0.2}
@@ -509,7 +510,7 @@ local function ResetRowLayout(row)
     row.icon:ClearAllPoints()
     row.icon:SetPoint("LEFT", ICON_X, 0)
     row.nameText:ClearAllPoints()
-    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
+    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", NAME_GAP, 0)
     row.nameText:SetPoint("RIGHT", row,      "RIGHT", -128, 0)
     row.nameText:SetFontHeight(ns.FONT_NORMAL)
     row.nameText:SetMaxLines(2)
@@ -945,7 +946,7 @@ local function RenderFlatRow(fi, yOffset)
     row:SetPoint("TOPLEFT", 0, -yOffset)
     ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality, {1, 1, 1})
     row.nameText:ClearAllPoints()
-    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
+    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", NAME_GAP, 0)
     row.nameText:SetPoint("RIGHT", row,      "RIGHT", -108, 0)
 
     if fi.isRank then
