@@ -10,7 +10,7 @@ local ART = ns.ART
 -- Layout — history list
 ------------------------------------------------------------------------
 local H_W      = ns.FRAME_W
-local H_PAD    = 10
+local H_PAD    = ns.PAD
 local H_HDR_H  = ns.WINDOW_HDR_H
 local H_FTR_H  = 28
 local DAY_H    = ns.CAT_ROW_H
