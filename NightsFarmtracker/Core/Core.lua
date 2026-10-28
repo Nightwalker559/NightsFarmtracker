@@ -67,6 +67,7 @@ ns.CLASS_PRIORITY = {
 
 -- UI layout
 ns.FRAME_W     = 330
+ns.STACK_GAP   = 4    -- space between the windows stacked below the collapsed main window (the Loot Log)
 ns.PAD         = 4    -- side gap between a window's border and its content
 ns.ROW_H       = 34   -- 30 px icon + 1 px border each side: 2 px between the borders of adjacent rows
 ns.CAT_GAP     = 5    -- extra space above/below a category's rows: 6 px between header and icon border

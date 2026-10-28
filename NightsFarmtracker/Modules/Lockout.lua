@@ -139,20 +139,18 @@ local function EnsureFrame()
     LockoutFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- The Log window chains below this frame while it is visible (main window
-    -- collapsed), so it re-anchors on show and hide. The countdown refreshes
+    -- collapsed), so its size and place follow show and hide. The countdown refreshes
     -- once a second, only while visible.
-    local function ReanchorLog()
-        if ns.LogFrame and ns.LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
-    end
     local ticker
     LockoutFrame:HookScript("OnShow", function()
-        Reanchor(); UpdateText(); ns.KeepStackOnScreen()
+        Reanchor(); UpdateText()
         if not ticker then ticker = C_Timer.NewTicker(1, UpdateText) end
-        ReanchorLog()
+        ns.RefreshLogDock()
+        ns.KeepStackOnScreen()
     end)
     LockoutFrame:HookScript("OnHide", function()
         if ticker then ticker:Cancel(); ticker = nil end
-        ReanchorLog()
+        ns.RefreshLogDock()
     end)
     ns.GoldFrame:HookScript("OnShow", Reanchor)
     ns.GoldFrame:HookScript("OnHide", Reanchor)

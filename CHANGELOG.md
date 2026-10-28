@@ -17,7 +17,7 @@
 
 ### Fixed
 
-- The Loot Log no longer covers the collapsed main window: below it, the log is as wide as the main window and, together with it, no taller than the max window height
+- The Loot Log no longer covers the collapsed main window: below it, the log is as wide as the main window and, together with it, the Gold Overview and the Instance Lockout frame, no taller than the max window height; the stack moves up as a whole near the screen bottom
 - Clicking a section in the Settings sidebar leaves the same gap above its title as at the top of the list; the first section no longer jumps up
 - Scrolling with the mouse wheel over one of the addon's windows (title, sidebar, margins) no longer scrolls the chat or other frames behind it
 

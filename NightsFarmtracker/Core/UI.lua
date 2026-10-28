@@ -267,8 +267,8 @@ function ns.UpdateGoldFrame()
     GoldFrame.totalVal:SetText( cachedGold > 0 and ns.FormatGold(cachedGold) or "0")
 end
 
--- Gold Overview and Lockout frame hang below the main window. Near the bottom
--- of the screen they would be clamped on top of it, so the window moves up by
+-- Gold Overview, Lockout frame and (collapsed) Loot Log hang below the main
+-- window. Near the bottom of the screen they would be clamped on top of it, so the window moves up by
 -- the missing space instead (only on screen, the saved position stays).
 function ns.KeepStackOnScreen()
     local bottom = MainFrame:GetBottom()
@@ -278,6 +278,8 @@ function ns.KeepStackOnScreen()
     if GoldFrame:IsShown() then below = below + GoldFrame:GetHeight() + 2 end
     local lockout = ns.LockoutFrame
     if lockout and lockout:IsShown() then below = below + lockout:GetHeight() + 2 end
+    local log = ns.LogFrame   -- docked below the stack while the main window is collapsed
+    if log and log:IsShown() and NightsFarmtrackerDB.expanded == false then below = below + ns.STACK_GAP + log:GetHeight() end
     local missing = below - bottom
     if missing <= 0 then return end
     local x, y = ns.AnchorToTop(MainFrame)
@@ -287,13 +289,12 @@ end
 function ns.ToggleGoldFrame()
     if ns.DeferInCombat(ns.ToggleGoldFrame) then return end
     if GoldFrame:IsShown() then GoldFrame:Hide()
-    else GoldFrame:Show(); ns.UpdateGoldFrame(); ns.KeepStackOnScreen() end
+    else GoldFrame:Show(); ns.UpdateGoldFrame() end
     -- GoldFrame always sits directly below MainFrame; when MainFrame is
-    -- collapsed, LogFrame also wants that spot, so it needs to know
-    -- whether to chain below GoldFrame instead (avoids overlap).
-    if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
-        ns.ReanchorLogFrame()
-    end
+    -- collapsed, LogFrame also wants that spot, so it chains below GoldFrame
+    -- instead (avoids overlap) and gets less height.
+    ns.RefreshLogDock()
+    if GoldFrame:IsShown() then ns.KeepStackOnScreen() end
 end
 
 -- Closing the main window closes every popout that docks off it, so the
@@ -429,10 +430,8 @@ function ns.SetExpanded(expand)
         SafeSetMainHeight(COLLAPSED_H)
     end
     UpdateFooterLine()
-    if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
-        ns.RebuildLogList()   -- the log's size depends on the state (see RebuildLogList)
-        ns.ReanchorLogFrame()
-    end
+    ns.RefreshLogDock()   -- the log's size and place depend on the state
+    ns.KeepStackOnScreen()
 end
 
 ------------------------------------------------------------------------

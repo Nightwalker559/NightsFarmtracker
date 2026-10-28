@@ -13,7 +13,7 @@ local ROW_H       = ns.ROW_H
 local LOG_FTR_H   = 10
 local MIN_VIS_H   = 30
 local MAX_ENTRIES = 100  -- oldest entries drop off
-local DOCK_GAP    = 4    -- space between windows stacked below each other
+local DOCK_GAP    = ns.STACK_GAP
 
 -- Row layout (the window is as wide as its widest row, see RebuildLogList)
 local TIME_W         = 38
@@ -103,13 +103,17 @@ local function RebuildLogList()
     end
     local frameW   = math.ceil(math.max(minW, widest + 2 * LOG_PAD))
 
-    -- Below the collapsed main window the log is as wide as it and the two
-    -- together stay within the max window height.
+    -- Below the collapsed main window the log is as wide as it and the stack
+    -- (main window, Gold Overview, Lockout frame, log) stays within the max
+    -- window height.
     local collapsed = NightsFarmtrackerDB.expanded == false
     local maxTotal
     if collapsed then
-        frameW   = LOG_W
-        maxTotal = ns.GetMaxWindowH() - ns.COLLAPSED_H - DOCK_GAP
+        frameW = LOG_W
+        local used = ns.COLLAPSED_H + DOCK_GAP
+        if ns.GoldFrame:IsShown() then used = used + ns.GoldFrame:GetHeight() + 2 end
+        if ns.LockoutFrame and ns.LockoutFrame:IsShown() then used = used + ns.LockoutFrame:GetHeight() + 2 end
+        maxTotal = ns.GetMaxWindowH() - used
     end
     local contentW = frameW - 2 * LOG_PAD
     for _, r in ipairs(activeRows) do r:SetWidth(contentW) end
@@ -126,6 +130,7 @@ local function RebuildLogList()
 
     -- Docking decides left/right (or below) by the frame's width: redo it
     if widthChanged and LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
+    if collapsed then ns.KeepStackOnScreen() end   -- the stack grows with the entries
 end
 ns.RebuildLogList = RebuildLogList  -- re-layout after the max window height setting changed
 
@@ -222,6 +227,15 @@ local function ReanchorLogFrame()
     ns.RefreshWindowChain("right")
 end
 ns.ReanchorLogFrame = ReanchorLogFrame
+
+-- Size and place of an open log after the main window collapsed/expanded or a
+-- frame below it appeared/disappeared.
+function ns.RefreshLogDock()
+    if LogFrame and LogFrame:IsShown() then
+        RebuildLogList()
+        ReanchorLogFrame()
+    end
+end
 
 ------------------------------------------------------------------------
 -- Public API - window
