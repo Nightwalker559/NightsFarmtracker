@@ -13,6 +13,7 @@ local ROW_H       = ns.ROW_H
 local LOG_FTR_H   = 10
 local MIN_VIS_H   = 30
 local MAX_ENTRIES = 100  -- oldest entries drop off
+local DOCK_GAP    = 4    -- space between windows stacked below each other
 
 -- Row layout (the window is as wide as its widest row, see RebuildLogList)
 local TIME_W         = 38
@@ -101,6 +102,15 @@ local function RebuildLogList()
         minW = math.max(minW, LogFrame.emptyLabel:GetStringWidth() + 2 * EMPTY_PAD)
     end
     local frameW   = math.ceil(math.max(minW, widest + 2 * LOG_PAD))
+
+    -- Below the collapsed main window the log is as wide as it and the two
+    -- together stay within the max window height.
+    local collapsed = NightsFarmtrackerDB.expanded == false
+    local maxTotal
+    if collapsed then
+        frameW   = LOG_W
+        maxTotal = ns.GetMaxWindowH() - ns.COLLAPSED_H - DOCK_GAP
+    end
     local contentW = frameW - 2 * LOG_PAD
     for _, r in ipairs(activeRows) do r:SetWidth(contentW) end
     LScrollFrame:SetWidth(contentW); LListFrame:SetWidth(contentW)
@@ -109,15 +119,13 @@ local function RebuildLogList()
 
     ns.FitScrollWindow({
         window = LogFrame, scroll = LScrollFrame, list = LListFrame,
-        hdrH = LOG_HDR_H, ftrH = LOG_FTR_H, contentH = yOff, minH = MIN_VIS_H,
+        hdrH = LOG_HDR_H, ftrH = LOG_FTR_H, contentH = yOff, minH = MIN_VIS_H, maxTotal = maxTotal,
     })
 
     LogFrame.emptyLabel:SetShown(#(NightsFarmtrackerDB.logEntries or {}) == 0)
 
-    -- Docking decides left/right (or below/above) by the frame's size: redo it
-    if LogFrame:IsShown() and ns.ReanchorLogFrame and (widthChanged or NightsFarmtrackerDB.expanded == false) then
-        ns.ReanchorLogFrame()
-    end
+    -- Docking decides left/right (or below) by the frame's width: redo it
+    if widthChanged and LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
 end
 ns.RebuildLogList = RebuildLogList  -- re-layout after the max window height setting changed
 
@@ -198,7 +206,7 @@ end
 ------------------------------------------------------------------------
 -- Anchoring — below MainFrame when collapsed (or below the Gold Overview
 -- window / Instance Lockout frame if those are also open there, to avoid
--- overlapping them; above MainFrame when there is no room below), otherwise
+-- overlapping them), otherwise
 -- part of the Log/Filter/Blacklist right-side chain (see
 -- ns.RefreshWindowChain in Widgets.lua), which also re-flows Filter/
 -- Blacklist if they're open.
@@ -209,18 +217,7 @@ local function ReanchorLogFrame()
         local below = ns.MainFrame
         if ns.LockoutFrame and ns.LockoutFrame:IsShown() then below = ns.LockoutFrame
         elseif ns.GoldFrame and ns.GoldFrame:IsShown() then below = ns.GoldFrame end
-
-        -- Windows are clamped to the screen: a log too tall for the room below
-        -- would slide up over the main window, so it goes above it instead.
-        local belowBottom, mainTop = below:GetBottom(), ns.MainFrame:GetTop()
-        local h = LogFrame:GetHeight()
-        local noRoomBelow = belowBottom and UIParent:GetBottom() and (belowBottom - 4 - h) < UIParent:GetBottom()
-        local roomAbove   = mainTop and UIParent:GetTop() and (mainTop + 4 + h) <= UIParent:GetTop()
-        if noRoomBelow and roomAbove then
-            LogFrame:SetPoint("BOTTOMLEFT", ns.MainFrame, "TOPLEFT", 0, 4)
-        else
-            LogFrame:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -4)
-        end
+        LogFrame:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -DOCK_GAP)
     end
     ns.RefreshWindowChain("right")
 end

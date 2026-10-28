@@ -35,6 +35,7 @@ local BTN_BAR_H  = 26
 local HDR_TOTAL  = ns.WINDOW_HDR_H  -- same header height as every other window
 local SCROLL_TOP = HDR_TOTAL + 1
 local COLLAPSED_H = HDR_TOTAL + 1 + FOOTER_H
+ns.COLLAPSED_H = COLLAPSED_H   -- the Loot Log docked below the collapsed window shares the height cap with it
 
 ------------------------------------------------------------------------
 -- State
@@ -429,6 +430,7 @@ function ns.SetExpanded(expand)
     end
     UpdateFooterLine()
     if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
+        ns.RebuildLogList()   -- the log's size depends on the state (see RebuildLogList)
         ns.ReanchorLogFrame()
     end
 end
