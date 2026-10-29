@@ -258,8 +258,9 @@ function ns.UpdateGoldFrame()
 end
 
 -- Gold Overview, Lockout frame and (collapsed) Loot Log hang below the main
--- window. Near the bottom of the screen they would be clamped on top of it, so the window moves up by
--- the missing space instead (only on screen, the saved position stays).
+-- window. Near the bottom of the screen they would be clamped on top of it, so
+-- the window moves up by the missing space instead (only on screen, the saved
+-- position stays).
 function ns.KeepStackOnScreen()
     local bottom = MainFrame:GetBottom()
     if not bottom or not MainFrame:IsShown() then return end

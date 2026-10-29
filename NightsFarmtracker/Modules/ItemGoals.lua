@@ -8,9 +8,8 @@
 ------------------------------------------------------------------------
 local _, ns = ...
 
-local MIN_VIS_H = 30   -- room for the "list empty" label
-local DZ_H      = 34   -- drop zone height
-local FTR_H     = 26   -- footer strip (Clear All)
+local MIN_VIS_H = ns.DROPLIST_MIN_VIS_H
+local FTR_H     = ns.DROPLIST_FTR_H
 local NOTE_H    = 16   -- inactive note, sits above the footer strip
 local BOX_W     = 52   -- amount box on the right of each row
 
@@ -78,15 +77,7 @@ function ns.RebuildGoalsList()
     end
     table.sort(list, function(a, b) return (a.goal.name or "") < (b.goal.name or "") end)
 
-    frame.DropZone:ClearAllPoints()
-    frame.DropZone:SetPoint("TOPLEFT", 0, 0)
-    frame.DropZone:SetPoint("TOPRIGHT", 0, 0)
-    local sepTop = DZ_H + 4
-    frame.dzSep:ClearAllPoints()
-    frame.dzSep:SetPoint("TOPLEFT", 0, -sepTop)
-    frame.dzSep:SetPoint("TOPRIGHT", 0, -sepTop)
-
-    local yOff = sepTop + 1 + 4
+    local yOff = ns.PlaceDropZoneRow(frame, 0)
     for _, e in ipairs(list) do
         local r = rowPool.acquire(listFrame)
         r:SetPoint("TOPLEFT", 0, -yOff)
@@ -139,8 +130,7 @@ local function EnsureFrame()
     scrollFrame, listFrame = ns.CreateDropListScroll(frame, HandleDrop)
     scrollFrame:SetPoint("TOPLEFT", pad, -hdrH)
 
-    frame.DropZone = ns.CreateDropZone(listFrame, DZ_H, HandleDrop)
-    frame.dzSep = ns.AddHLine(listFrame, "TOP", 0, 0)
+    ns.CreateDropZoneRow(frame, listFrame, HandleDrop)
 
     frame.emptyLabel = listFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     frame.emptyLabel:SetWidth(ns.CONTENT_W)

@@ -4,7 +4,6 @@
 -- one session or month. The data model is in Core/Sessions.lua.
 ------------------------------------------------------------------------
 local _, ns = ...
-local ART = ns.ART
 
 ------------------------------------------------------------------------
 -- Layout — history list

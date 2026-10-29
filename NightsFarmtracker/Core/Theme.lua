@@ -273,6 +273,20 @@ function ns.StyleBackdropBox(frame, bgColor)
     frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
 end
 
+-- Square box (size px) with the accent-colored mark inside: the checkbox look of
+-- Settings, the Gear AH Threshold popup and the category/expansion lists, and
+-- the radio dot (its mark is the fill). The caller anchors the returned box and
+-- shows or hides the returned mark.
+function ns.CreateMarkBox(parent, size)
+    local box = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    box:SetSize(size, size)
+    ns.StyleBackdropBox(box)
+    local mark = box:CreateTexture(nil, "ARTWORK")
+    mark:SetPoint("TOPLEFT", 1, -1); mark:SetPoint("BOTTOMRIGHT", -1, 1)
+    mark:SetColorTexture(unpack(ns.COL_ACCENT))
+    return box, mark
+end
+
 -- Best-effort early apply in case SavedVariables already happen to be
 -- available (e.g. on repeated /reload during dev). On a normal login this
 -- runs before SavedVariables are loaded and falls back to "default"; the

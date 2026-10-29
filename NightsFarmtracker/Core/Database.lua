@@ -441,8 +441,8 @@ ns.IsBlacklistCategory          = blacklistStore.hasCategory
 
 ------------------------------------------------------------------------
 -- Item goals (profile scope): itemID -> { name, icon, quality, amount }, on
--- top of db.itemGoal (the amount for every item without an entry). Only
--- active while db.limitMode == "goal" (see ns.GetItemGoal).
+-- top of db.itemGoal (the amount for every item without an entry). They count
+-- while db.limitMode == "goal" and db.itemGoalsEnabled (see ns.GetItemGoal).
 ------------------------------------------------------------------------
 function ns.GetItemGoals()
     local db = NightsFarmtrackerDB

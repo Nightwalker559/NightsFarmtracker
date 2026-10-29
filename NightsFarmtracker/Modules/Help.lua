@@ -52,12 +52,9 @@ function ns.ToggleHelpWindow()
         ns.AddHLine(HelpFrame, "TOP", ns.PAD, -(hdrH - 1))
         -- The text scrolls once the window reaches ns.GetMaxHelpH()
         local textW  = W - 2 * ns.PAD
-        local scroll = CreateFrame("ScrollFrame", nil, HelpFrame)
+        local scroll, child = ns.CreateScrollList(HelpFrame, textW, 24)
         scroll:SetPoint("TOPLEFT", ns.PAD, -(hdrH + 8))
         scroll:SetWidth(textW)
-        local child = CreateFrame("Frame", nil, scroll)
-        child:SetWidth(textW)
-        scroll:SetScrollChild(child)
         local fs = child:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         fs:SetPoint("TOPLEFT")
         fs:SetWidth(textW)
@@ -73,8 +70,6 @@ function ns.ToggleHelpWindow()
             })
         end
         HelpFrame.fit()
-        scroll:EnableMouseWheel(true)
-        scroll:SetScript("OnMouseWheel", ns.MakeWheelHandler(scroll, child, 24))
     end
     HelpFrame:SetShown(not HelpFrame:IsShown())
 end

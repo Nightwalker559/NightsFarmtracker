@@ -57,13 +57,8 @@ function ns.CreateCheckboxRow(parent, width, height)
     r:SetSize(width, height)
     r:EnableMouse(true)
 
-    local box = CreateFrame("Frame", nil, r, "BackdropTemplate")
-    box:SetSize(12, 12); box:SetPoint("LEFT", 0, 0)
-    ns.StyleBackdropBox(box)
-
-    local mark = box:CreateTexture(nil,"ARTWORK")
-    mark:SetPoint("TOPLEFT", 1, -1); mark:SetPoint("BOTTOMRIGHT", -1, 1)
-    mark:SetColorTexture(unpack(ns.COL_ACCENT))
+    local box, mark = ns.CreateMarkBox(r, 12)
+    box:SetPoint("LEFT", 0, 0)
     r.mark = mark
 
     local lbl = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -155,6 +150,32 @@ function ns.CreateDropListScroll(window, onDrop)
     listFrame:EnableMouse(true)
     ns.EnableItemDrop(listFrame, onDrop)
     return scrollFrame, listFrame
+end
+
+------------------------------------------------------------------------
+-- Drop zone plus the separator line below it, at the top of a drop-list
+-- window's list (Filter, Blacklist, Item Goals). CreateDropZoneRow builds them
+-- once (frame.DropZone, frame.dzSep); PlaceDropZoneRow puts them at `top` (Y
+-- inside listFrame) and returns the Y where the item rows start.
+------------------------------------------------------------------------
+local DZ_H = 34   -- drop zone height
+ns.DROPLIST_MIN_VIS_H = 30   -- room for the "list empty" label
+ns.DROPLIST_FTR_H     = 26   -- footer strip (Clear All)
+
+function ns.CreateDropZoneRow(frame, listFrame, onDrop)
+    frame.DropZone = ns.CreateDropZone(listFrame, DZ_H, onDrop)
+    frame.dzSep = ns.AddHLine(listFrame, "TOP", 0, 0)
+end
+
+function ns.PlaceDropZoneRow(frame, top)
+    frame.DropZone:ClearAllPoints()
+    frame.DropZone:SetPoint("TOPLEFT", 0, -top)
+    frame.DropZone:SetPoint("TOPRIGHT", 0, -top)
+    local sepTop = top + DZ_H + 4
+    frame.dzSep:ClearAllPoints()
+    frame.dzSep:SetPoint("TOPLEFT", 0, -sepTop)
+    frame.dzSep:SetPoint("TOPRIGHT", 0, -sepTop)
+    return sepTop + 1 + 4
 end
 
 ------------------------------------------------------------------------
@@ -362,9 +383,8 @@ end
 --   add(itemID, name, icon, quality), remove(itemID), clear()
 --   expansions (optional)    { titleKey, hintKey, collapsedKey }: AH-by-expansion section
 ------------------------------------------------------------------------
-local MIN_VIS_H = 30   -- room for the "list empty" label
-local DZ_H      = 34   -- drop zone height
-local FTR_H     = 26   -- footer strip (Clear All)
+local MIN_VIS_H = ns.DROPLIST_MIN_VIS_H
+local FTR_H     = ns.DROPLIST_FTR_H
 local SEC_GAP   = 4 + 1 + 4  -- space, separator, space between sections
 
 function ns.CreateDropListWindow(cfg)
@@ -437,18 +457,11 @@ function ns.CreateDropListWindow(cfg)
         if not listFrame then return end
         local dzTop = RebuildSections()
 
-        frame.DropZone:ClearAllPoints()
-        frame.DropZone:SetPoint("TOPLEFT", 0, -dzTop)
-        frame.DropZone:SetPoint("TOPRIGHT", 0, -dzTop)
-
-        local dzSepTop = dzTop + DZ_H + 4
-        frame.dzSep:ClearAllPoints()
-        frame.dzSep:SetPoint("TOPLEFT", 0, -dzSepTop)
-        frame.dzSep:SetPoint("TOPRIGHT", 0, -dzSepTop)
+        local itemsTop = ns.PlaceDropZoneRow(frame, dzTop)
 
         ns.RebuildDropItemList({
             window = frame, listFrame = listFrame, scrollFrame = scrollFrame, emptyLabel = frame.emptyLabel,
-            itemPool = itemPool, rows = itemRows, padX = pad, bodyTop = hdrH, itemsTop = dzSepTop + 1 + 4,
+            itemPool = itemPool, rows = itemRows, padX = pad, bodyTop = hdrH, itemsTop = itemsTop,
             ftrH = FTR_H, minVisH = MIN_VIS_H, items = Items(),
             headers = headers,
             collapsed = ns.GetCollapsedTable(cfg.groupsCollapsedKey),
@@ -492,8 +505,7 @@ function ns.CreateDropListWindow(cfg)
         end
         frame.sectionSep = ns.AddHLine(listFrame, "TOP", 0, 0)   -- separator lines: Rebuild positions them
 
-        frame.DropZone = ns.CreateDropZone(listFrame, DZ_H, HandleDrop)
-        frame.dzSep = ns.AddHLine(listFrame, "TOP", 0, 0)
+        ns.CreateDropZoneRow(frame, listFrame, HandleDrop)
 
         frame.emptyLabel = listFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         frame.emptyLabel:SetJustifyH("CENTER")

@@ -530,12 +530,13 @@ local recentEncounterLoot = {}  -- ENCOUNTER_LOOT_RECEIVED waiting for its chat 
 local CROSS_DEDUP_TTL     = 2   -- seconds
 local ENCOUNTER_WAIT      = 0.4 -- seconds to wait for the chat line
 
+-- Takes one open count of itemID out of t; an entry that reaches 0 is dropped,
+-- so the tables only hold what is still waiting.
 local function ConsumePending(t, itemID)
-    if t[itemID] and t[itemID] > 0 then
-        t[itemID] = t[itemID] - 1
-        return true
-    end
-    return false
+    local n = t[itemID]
+    if not n or n <= 0 then return false end
+    t[itemID] = n > 1 and n - 1 or nil
+    return true
 end
 
 EventFrame:RegisterEvent("ADDON_LOADED")
@@ -695,11 +696,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         -- a late encounter event for this item is skipped.
         ConsumePending(recentEncounterLoot, itemID)
         recentChatLoot[itemID] = (recentChatLoot[itemID] or 0) + 1
-        C_Timer.After(CROSS_DEDUP_TTL, function()
-            if recentChatLoot[itemID] and recentChatLoot[itemID] > 0 then
-                recentChatLoot[itemID] = recentChatLoot[itemID] - 1
-            end
-        end)
+        C_Timer.After(CROSS_DEDUP_TTL, function() ConsumePending(recentChatLoot, itemID) end)
 
         ProcessLoot({ NewPendingLoot(itemID, qty, fullLink, itemName, color) })
 

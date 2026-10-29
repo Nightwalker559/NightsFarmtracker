@@ -55,14 +55,9 @@ local function CreateRadio(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(S_W - S_PAD*2, CTRL_SIZE + CTRL_GAP)
 
-    local dot = CreateFrame("Frame", nil, row, "BackdropTemplate")
-    dot:SetSize(CTRL_SIZE, CTRL_SIZE)
+    local dot, fill = ns.CreateMarkBox(row, CTRL_SIZE)
     dot:SetPoint("TOPLEFT", 0, -4)
-    ns.StyleBackdropBox(dot)
-
-    local fill = dot:CreateTexture(nil,"ARTWORK")
-    fill:SetPoint("TOPLEFT", 1, -1); fill:SetPoint("BOTTOMRIGHT", -1, 1)
-    fill:SetColorTexture(unpack(ns.COL_ACCENT)); fill:Hide()
+    fill:Hide()
     dot.fill = fill
 
     local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -191,6 +186,7 @@ local gearThresholdEB
 local sessionLengthEB
 local itemGoalEB
 local goalsBtn, goalsCheck
+local exportBtn
 local maxHeightEB
 local profileDropdown
 local profileButtons
@@ -377,12 +373,8 @@ function ns.ToggleGearThresholdConfig(anchor)
             row:SetPoint("TOPLEFT", 10, -(26 + (i - 1) * TC_ROW_H))
             row:SetPoint("TOPRIGHT", -10, -(26 + (i - 1) * TC_ROW_H))
 
-            local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
-            box:SetSize(14, 14); box:SetPoint("LEFT", 0, 0)
-            ns.StyleBackdropBox(box)
-            local check = box:CreateTexture(nil, "ARTWORK")
-            check:SetPoint("TOPLEFT", 1, -1); check:SetPoint("BOTTOMRIGHT", -1, 1)
-            check:SetColorTexture(unpack(ns.COL_ACCENT))
+            local box, check = ns.CreateMarkBox(row, 14)
+            box:SetPoint("LEFT", 0, 0)
 
             local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             lbl:SetPoint("LEFT", box, "RIGHT", 8, 0)
@@ -547,7 +539,6 @@ local THEME_ROW_H = 20
 -- single persistent instance, reused across rebuilds like gearThresholdEB above.
 -- btn:SetActive(false) greys it out and makes it inert.
 ------------------------------------------------------------------------
-local exportBtn
 local function MakeWindowButton(labelKey, onClick)
     return function(parent)
         local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
@@ -573,12 +564,7 @@ local MakeGoalsButton  = MakeWindowButton("goals_open_btn",  function() ns.Toggl
 -- Label-less checkbox for db.itemGoalsEnabled; it also greys out the Item
 -- Goals button next to it. Single persistent instance like the button.
 local function MakeGoalsCheck(parent)
-    local box = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    box:SetSize(CTRL_SIZE, CTRL_SIZE)
-    ns.StyleBackdropBox(box)
-    local check = box:CreateTexture(nil, "ARTWORK")
-    check:SetPoint("TOPLEFT", 1, -1); check:SetPoint("BOTTOMRIGHT", -1, 1)
-    check:SetColorTexture(unpack(ns.COL_ACCENT))
+    local box, check = ns.CreateMarkBox(parent, CTRL_SIZE)
 
     function box:Sync()
         local on = NightsFarmtrackerDB.itemGoalsEnabled ~= false
@@ -983,13 +969,8 @@ local function CreateCheckbox(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(S_W - S_PAD*2, CTRL_SIZE + CTRL_GAP)
 
-    local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
-    box:SetSize(CTRL_SIZE, CTRL_SIZE); box:SetPoint("TOPLEFT", 0, -4)
-    ns.StyleBackdropBox(box)
-
-    local check = box:CreateTexture(nil,"ARTWORK")
-    check:SetPoint("TOPLEFT", 1, -1); check:SetPoint("BOTTOMRIGHT", -1, 1)
-    check:SetColorTexture(unpack(ns.COL_ACCENT))
+    local box, check = ns.CreateMarkBox(row, CTRL_SIZE)
+    box:SetPoint("TOPLEFT", 0, -4)
     row.check = check
 
     local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1338,7 +1319,6 @@ function ns.RebuildSettingsContent()
         local goal = tonumber(db.itemGoal) or 0
         itemGoalEB.eb:SetText(goal > 0 and tostring(goal) or "")
         track(itemGoalEB, "other")
-
 
         -- Right of the amount box: checkbox for the own goals (the list stays
         -- when off), then the Item Goals window button, greyed out while off
