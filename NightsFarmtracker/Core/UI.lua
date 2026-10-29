@@ -306,14 +306,15 @@ end)
 ------------------------------------------------------------------------
 -- Item goals and session length are mutually exclusive: db.limitMode picks
 -- which one is active ("goal" | "session" | "off"), the other keeps its value.
--- The goal of one item (pieces) or nil: its own amount from db.itemGoals, else
+-- The goal of one item (pieces) or nil: its own amount from db.itemGoals (only
+-- while db.itemGoalsEnabled, so the list can stay without being emptied), else
 -- the general db.itemGoal that covers every other item (0 = none), except
 -- items in the Vendor-Only Filter: they only get a goal of their own. See
 -- ApplyValueBars. Goals run the normal count-up timer.
 function ns.GetItemGoal(itemID)
     local db = NightsFarmtrackerDB
     if db.limitMode ~= "goal" or not itemID then return nil end
-    local entry = db.itemGoals and db.itemGoals[itemID]
+    local entry = db.itemGoalsEnabled ~= false and db.itemGoals and db.itemGoals[itemID]
     local amount = entry and tonumber(entry.amount) or 0
     if amount <= 0 and not ns.IsForceVendor(itemID) then amount = tonumber(db.itemGoal) or 0 end
     return amount > 0 and amount or nil

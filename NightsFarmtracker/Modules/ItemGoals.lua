@@ -1,8 +1,9 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Item Goals
 -- Items dragged in here get a target amount; while Item goals is the active
--- limit (Settings, Session Limit) their bars show the progress and the session
--- pauses as soon as one of them reaches its amount. Per profile; the goals
+-- limit (Settings, Session Limit) and their own goals are switched on, their
+-- bars show the progress and the session pauses as soon as one of them reaches
+-- its amount. Per profile; the goals
 -- themselves live in db.itemGoals (see ns.SetItemGoal, ns.GetItemGoal).
 ------------------------------------------------------------------------
 local _, ns = ...
@@ -109,7 +110,7 @@ function ns.RebuildGoalsList()
     frame.emptyLabel:ClearAllPoints()
     frame.emptyLabel:SetPoint("TOP", listFrame, "TOP", 0, -(yOff + 14))
     frame.emptyLabel:SetShown(#list == 0)
-    frame.inactiveNote:SetShown(NightsFarmtrackerDB.limitMode ~= "goal")
+    frame.inactiveNote:SetShown(NightsFarmtrackerDB.limitMode ~= "goal" or NightsFarmtrackerDB.itemGoalsEnabled == false)
 end
 
 local function HandleDrop()

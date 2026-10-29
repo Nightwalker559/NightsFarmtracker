@@ -143,6 +143,7 @@ L["item_goal_reached_resume"] = "Item goal reached. Reset to start a new session
 L["minutes_suffix"]    = "min"
 L["pieces_suffix"]     = "pcs"
 L["item_goal_general_hint"] = "Target amount for every item without its own goal (0 = none), e.g. 1000 of anything. Items in the Vendor-Only Filter are left out. Own goals are set in the Item Goals window"
+L["goals_use_own"]     = "Use own goals per item"
 L["goals_open_btn"]    = "Edit Item Goals"
 L["goals_title"]       = "Item Goals"
 L["goals_list_empty"]  = "No own goals yet. Drop an item here and set its target amount"

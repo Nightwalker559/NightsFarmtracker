@@ -1303,12 +1303,16 @@ function ns.RebuildSettingsContent()
         itemGoalEB.eb:SetText(goal > 0 and tostring(goal) or "")
         track(itemGoalEB, "other")
 
-        -- Item Goals window button, right of the amount box
-        goalsBtn = PlaceWidget(goalsBtn, MakeGoalsButton, y)
-        goalsBtn:ClearAllPoints()
-        goalsBtn:SetPoint("LEFT", itemGoalEB.unitLbl, "RIGHT", 16, 0)
-        track(goalsBtn, "other")
         y = y - 40
+
+        -- Own goals per item on/off (the list stays), then its window button
+        y = flag(y, "goals_use_own", "itemGoalsEnabled", true, function()
+            if ns.RebuildGoalsList then ns.RebuildGoalsList() end
+            ns.RefreshHUD()
+        end)
+        goalsBtn = PlaceWidget(goalsBtn, MakeGoalsButton, y)
+        track(goalsBtn, "other")
+        y = y - 30
 
         return y
     end)

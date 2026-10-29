@@ -85,7 +85,7 @@ ns.PROFILE_KEYS = {
     venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
-    showPriceSource=true, showValueBar=true, itemGoal=true, itemGoals=true, limitMode=true,
+    showPriceSource=true, showValueBar=true, itemGoal=true, itemGoals=true, itemGoalsEnabled=true, limitMode=true,
     pos=true, mainLocked=true, gearAHThresholdSound=true, sessionHistoryMode=true, sessionHistoryAvg=true,
 }
 
@@ -121,6 +121,7 @@ local function NewProfileDefaults()
         showValueBar          = true,
         itemGoal              = 0,
         itemGoals             = {},
+        itemGoalsEnabled      = true,
         limitMode             = "off",
         pos                   = { unpack(DEFAULT_MAIN_POS) },
         mainLocked            = false,

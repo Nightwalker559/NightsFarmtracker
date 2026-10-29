@@ -4,7 +4,7 @@
 
 ### New
 
-- Item goals: set a target amount per item in the new Item Goals window (Settings, Session Limit), e.g. 20 Arcane Crystals. The bar shows the progress, turns green at the target, and the first goal reached pauses the session. The general goal covers every other item, except those in the Vendor-Only Filter
+- Item goals: set a target amount per item in the new Item Goals window (Settings, Session Limit), e.g. 20 Arcane Crystals. The bar shows the progress, turns green at the target, and the first goal reached pauses the session. The general goal covers every other item, except those in the Vendor-Only Filter. A checkbox switches the own goals off without emptying the list, so only the general goal counts
 - Two winter color themes: Yule (pine green with berry red) and Snowfall (slate with silver and snow white)
 
 ### Changed
