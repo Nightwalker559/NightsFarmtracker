@@ -36,6 +36,8 @@ local S_PAD        = 14
 local S_HDR_H      = ns.WINDOW_HDR_H
 local S_FTR_H       = 26   -- footer strip height (Reset to Default button)
 local S_SCROLL_STEP = 22
+local TOP_PAD       = 8    -- small top padding within the scroll area
+local settingsMarks = {}   -- name -> y of a spot ns.OpenSettingsAt can scroll to
 
 -- Checkboxes and radio dots are CTRL_SIZE squares with CTRL_GAP between the
 -- rows of a group. CHECK_RUN_TAIL is the extra space after the last checkbox of
@@ -984,14 +986,18 @@ local function CreateCheckbox(parent)
     return row
 end
 
-local checkboxPool = ns.NewPool(CreateCheckbox, function(row) row:SetScript("OnMouseUp", nil) end)
+local checkboxPool = ns.NewPool(CreateCheckbox, function(row)
+    row:SetScript("OnMouseUp", nil); row:SetScript("OnEnter", nil); row:SetScript("OnLeave", nil)
+end)
 
 -- (Re-)configures a pooled checkbox row: label text, position, and the
 -- getValue/setValue accessors driving its checked state and click handler.
--- indent shifts the row right (an option under another checkbox); disabled
--- greys it out and ignores clicks, the checked state stays visible.
-local function ConfigureCheckbox(row, label, yOff, getValue, setValue, indent, disabled)
-    indent = indent or 0
+-- opts (optional): indent shifts the row right (an option under another
+-- checkbox); disabled greys it out and ignores clicks, the checked state
+-- stays visible; tip is a tooltip text shown on hover.
+local function ConfigureCheckbox(row, label, yOff, getValue, setValue, opts)
+    opts = opts or {}
+    local indent, disabled, tip = opts.indent or 0, opts.disabled, opts.tip
     row:SetPoint("TOPLEFT", S_PAD + indent, yOff)
     row:SetWidth(S_W - S_PAD*2 - indent)
     row.label:SetWidth(S_W - S_PAD*2 - indent - CTRL_SIZE - 8)
@@ -1009,6 +1015,12 @@ local function ConfigureCheckbox(row, label, yOff, getValue, setValue, indent, d
     Refresh()
     row:EnableMouse(not disabled)
     row:SetScript("OnMouseUp", not disabled and function() setValue(not getValue()); Refresh() end or nil)
+    row:SetScript("OnEnter", tip and not disabled and function(self)
+        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
+        GameTooltip:AddLine(tip, 0.5, 0.5, 0.5, true)
+        GameTooltip:Show()
+    end or nil)
+    row:SetScript("OnLeave", tip and not disabled and function() GameTooltip:Hide() end or nil)
     return row
 end
 
@@ -1162,12 +1174,14 @@ function ns.RebuildSettingsContent()
 
     -- Checkbox row at y; returns the y below it: CTRL_GAP below the box or
     -- the (possibly wrapped) label, whichever is taller.
-    -- opts (optional): indent, disabled (see ConfigureCheckbox), arg (fills the
-    -- %d of the label).
+    -- opts (optional): indent, disabled (see ConfigureCheckbox), tip (locale key
+    -- of the tooltip), arg (fills the %d of the label and the tooltip).
     local function checkbox(y, labelKey, get, set, opts)
         opts = opts or {}
         local label = opts.arg and string.format(ns.L[labelKey], opts.arg) or ns.L[labelKey]
-        local row = ConfigureCheckbox(track(checkboxPool.acquire(SListFrame), "checkbox"), label, y, get, set, opts.indent, opts.disabled)
+        local tip = opts.tip and string.format(ns.L[opts.tip], opts.arg)
+        local row = ConfigureCheckbox(track(checkboxPool.acquire(SListFrame), "checkbox"), label, y, get, set,
+            { indent = opts.indent, disabled = opts.disabled, tip = tip })
         return y - math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())) - CTRL_GAP
     end
 
@@ -1385,16 +1399,18 @@ function ns.RebuildSettingsContent()
         -- Sell list at vendors: its two options only count while it is on
         -- (the same two sit in the sell window itself)
         y = y - CHECK_RUN_TAIL
+        settingsMarks.sellList = y
         hintLabel(S_PAD, y, ns.L["vendor_sell_group"], 0.6)
         y = y - 18
         y = flag(y, "vendor_sell_enabled", "vendorSellEnabled", true, function(v)
             if not v then ns.OnVendorSellDisabled() end
             RunNextFrame(ns.RebuildSettingsContent)   -- the pooled row still refreshes itself after this returns
         end)
-        local sub = { indent = CTRL_SIZE + 8, disabled = db.vendorSellEnabled == false }
-        y = flag(y, "vendor_sell_warband", "vendorSellKeepWarband", true, ns.RefreshVendorSell, sub)
-        sub = { indent = sub.indent, disabled = sub.disabled, arg = ns.VENDOR_SELL_PROTECT_MAX }
-        y = flag(y, "vendor_sell_protect", "vendorSellProtect", true, ns.RefreshVendorSell, sub)
+        local indent, off = CTRL_SIZE + 8, db.vendorSellEnabled == false
+        y = flag(y, "vendor_sell_warband", "vendorSellKeepWarband", true, ns.RefreshVendorSell,
+            { indent = indent, disabled = off, tip = "vendor_sell_warband_tip" })
+        y = flag(y, "vendor_sell_protect", "vendorSellProtect", true, ns.RefreshVendorSell,
+            { indent = indent, disabled = off, tip = "vendor_sell_protect_tip", arg = ns.VENDOR_SELL_PROTECT_MAX })
 
         return y
     end)
@@ -1569,7 +1585,6 @@ function ns.RebuildSettingsContent()
         return a.title:lower() < b.title:lower()
     end)
 
-    local TOP_PAD = 8   -- small top padding within the scroll area
     local y = -TOP_PAD
     local jumpTargets = {}
     for _, sec in ipairs(sections) do
@@ -1653,4 +1668,14 @@ function ns.ToggleSettings()
         SF:Show()
         ns.RefreshWindowChain("left")
     end
+end
+
+-- Opens Settings (builds it when closed) scrolled to a marked spot, e.g.
+-- "sellList" for the sell list options.
+function ns.OpenSettingsAt(markKey)
+    if not (SF and SF:IsShown()) then ns.ToggleSettings() end
+    local y = settingsMarks[markKey]
+    if not (y and SF and SF:IsShown()) then return end
+    local maxS = math.max(0, SListFrame:GetHeight() - SScrollFrame:GetHeight())
+    SScrollFrame:SetVerticalScroll(math.max(0, math.min(-y - TOP_PAD, maxS)))
 end

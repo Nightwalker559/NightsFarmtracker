@@ -16,10 +16,8 @@ local LAST_BAG      = 5      -- backpack (0), four bags, reagent bag
 
 local pad, hdrH = ns.PAD, ns.WINDOW_HDR_H
 local MIN_VIS_H = ns.DROPLIST_MIN_VIS_H
-local CHECK_H   = 14
 local BTN_H     = 22
-local OPT_GAP   = 4          -- between two option rows
-local FTR_H     = 8 + BTN_H + 6 + 2 * CHECK_H + OPT_GAP + 6
+local FTR_H     = 8 + BTN_H + 8
 local VALUE_W   = 96         -- value column on the right of each row
 
 local FRAME_NAME = "NightsFarmtrackerVendorSellWnd"
@@ -27,13 +25,7 @@ local frame, scrollFrame, listFrame
 local items, rows = {}, {}   -- bag items to sell (most gold first) and their active rows
 local selling                -- ticker of the running sale
 
--- The two window options, lowest row first; both are on until switched off.
--- `arg` fills the %d of the label and tooltip.
-local OPTIONS = {
-    { dbKey = "vendorSellProtect",     label = "vendor_sell_protect", tip = "vendor_sell_protect_tip", arg = PROTECT_MAX },
-    { dbKey = "vendorSellKeepWarband", label = "vendor_sell_warband", tip = "vendor_sell_warband_tip" },
-}
-
+-- Both options (Settings, Windows & Buttons) are on until switched off.
 local function IsOn(dbKey)
     return NightsFarmtrackerDB[dbKey] ~= false
 end
@@ -214,11 +206,6 @@ local function Rebuild()
         hdrH = hdrH, ftrH = FTR_H, contentH = yOff, minH = MIN_VIS_H,
     })
     frame.emptyLabel:SetShown(#items == 0)
-    for _, r in ipairs(frame.optionRows) do
-        local on = IsOn(r.dbKey)
-        r.mark:SetShown(on)
-        r.lbl:SetTextColor(on and 1 or 0.85, on and 0.82 or 0.85, on and 0 or 0.85)
-    end
     UpdateSellButton()
     ns.DockFrame(frame, MerchantFrame, "right")
 end
@@ -241,23 +228,18 @@ local function CreateSellButton(parent)
     return btn
 end
 
-local function CreateOptionRow(parent, opt)
-    local r = ns.CreateCheckboxRow(parent, ns.CONTENT_W, CHECK_H)
-    r.dbKey = opt.dbKey
-    r.lbl:SetFontHeight(ns.FONT_NORMAL)
-    r.lbl:SetText(string.format(ns.L[opt.label], opt.arg))
-    r:SetScript("OnMouseUp", function()
-        NightsFarmtrackerDB[opt.dbKey] = not IsOn(opt.dbKey)
-        Rebuild()
-    end)
-    r:SetScript("OnEnter", function(self)
+-- Gear icon left of the close button: opens Settings at the sell list options
+local function CreateConfigButton(parent)
+    local btn = ns.MakeBtn(parent, 16, "btn_settings.png")
+    btn:SetPoint("RIGHT", parent.closeBtn, "LEFT", -6, 0)
+    btn:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:AddLine(string.format(ns.L[opt.label], opt.arg), 1, 1, 1)
-        GameTooltip:AddLine(string.format(ns.L[opt.tip], opt.arg), 0.5, 0.5, 0.5, true)
+        GameTooltip:SetText(ns.L["vendor_sell_config"])
         GameTooltip:Show()
     end)
-    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    return r
+    btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    btn:SetScript("OnClick", function() ns.OpenSettingsAt("sellList") end)
+    return btn
 end
 
 local function EnsureFrame()
@@ -282,12 +264,7 @@ local function EnsureFrame()
     frame.emptyLabel:SetTextColor(0.55, 0.55, 0.55)
     frame.emptyLabel:SetText(ns.L["vendor_sell_empty"])
 
-    frame.optionRows = {}
-    for i, opt in ipairs(OPTIONS) do
-        local r = CreateOptionRow(frame, opt)
-        r:SetPoint("BOTTOMLEFT", pad, 8 + BTN_H + 6 + (i - 1) * (CHECK_H + OPT_GAP))
-        frame.optionRows[i] = r
-    end
+    CreateConfigButton(frame)
 
     frame.sellBtn = CreateSellButton(frame)
     frame.sellBtn:SetPoint("BOTTOMLEFT", pad, 8)
