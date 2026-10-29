@@ -38,6 +38,11 @@ ns.QUEST_CLASS    = Enum.ItemClass.Questitem
 ns.BIND_ON_EQUIP  = 2
 ns.BIND_ON_PICKUP = 1
 ns.BIND_ON_USE    = 3
+-- Real account-bound ("Warband"/BoA) bindTypes per current Enum.ItemBind:
+-- 7 = ToWoWAccount, 8 = ToBnetAccount, 9 = ToBnetAccountUntilEquipped.
+-- (Some items still report bindType 7 despite showing "Binds to Warband"
+-- in the tooltip - all three are treated the same.)
+ns.BIND_TO_ACCOUNT = { [7] = true, [8] = true, [9] = true }
 ns.FALLBACK_ICON  = 134400
 -- Housing classID: Enum.ItemClass.Housing if defined (12.0.0+), else runtime-detected
 ns.HOUSING = Enum.ItemClass and Enum.ItemClass.Housing or nil

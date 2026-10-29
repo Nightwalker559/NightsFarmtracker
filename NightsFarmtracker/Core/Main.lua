@@ -13,11 +13,7 @@ local BIND_ON_PICKUP = ns.BIND_ON_PICKUP
 local MainFrame      = ns.MainFrame
 local EventFrame
 
--- Real account-bound ("Warband"/BoA) bindTypes per current Enum.ItemBind:
--- 7 = ToWoWAccount, 8 = ToBnetAccount, 9 = ToBnetAccountUntilEquipped.
--- (Some items still report bindType 7 despite showing "Binds to Warband"
--- in the tooltip - all three are treated the same here.)
-local BIND_TO_ACCOUNT = { [7] = true, [8] = true, [9] = true }
+local BIND_TO_ACCOUNT = ns.BIND_TO_ACCOUNT
 
 ------------------------------------------------------------------------
 -- Loot processing

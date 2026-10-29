@@ -77,7 +77,7 @@ end
 -- no other file needs to change.
 ns.PROFILE_KEYS = {
     goldRateMode=true, sessionLength=true, sessionHistoryEnabled=true, logWindowEnabled=true,
-    vendorFilterEnabled=true, blacklistEnabled=true, mergeDaily=true,
+    vendorFilterEnabled=true, blacklistEnabled=true, vendorSellEnabled=true, vendorSellProtect=true, mergeDaily=true,
     splitTradeGoods=true, splitGearByBinding=true, ahSource=true,
     gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
     tsmCustomSource=true, colorTheme=true, customAccent=true, headerGradient=true, themedButtons=true,
@@ -99,6 +99,8 @@ local function NewProfileDefaults()
         logWindowEnabled      = false,
         vendorFilterEnabled   = true,
         blacklistEnabled      = true,
+        vendorSellEnabled     = true,
+        vendorSellProtect     = true,
         mergeDaily            = true,
         splitTradeGoods       = false,
         splitGearByBinding    = false,

@@ -1475,6 +1475,9 @@ function ns.RebuildSettingsContent()
         local function filterChanged() ns.RefreshLeftButtons(); ns.RefreshHUD() end
         y = flag(y, "vendor_filter_enabled", "vendorFilterEnabled", true, filterChanged)
         y = flag(y, "blacklist_enabled", "blacklistEnabled", true, filterChanged)
+        y = flag(y, "vendor_sell_enabled", "vendorSellEnabled", true, function(v)
+            if not v then ns.OnVendorSellDisabled() end
+        end)
 
         return y
     end)

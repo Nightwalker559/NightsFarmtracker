@@ -488,6 +488,18 @@ function ns.HideTooltipOf(frame)
     end
 end
 
+-- Hover tooltip for a pooled row that keeps its item's link in row.itemLink
+-- (nothing is shown while it is nil). Used by the Loot Log and the Sell List.
+function ns.HookRowLinkTooltip(row)
+    row:EnableMouse(true)
+    row:SetScript("OnEnter", function(self)
+        if self.itemLink then
+            ns.ShowItemTooltipNoCompare(self, ns.SmartAnchor(self, "RIGHT"), self.itemLink)
+        end
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
 ------------------------------------------------------------------------
 -- Window shell shared by every top-level window: border and background,
 -- movable, clamped to the screen, closable with ESC, title text and close

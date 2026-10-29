@@ -21,7 +21,7 @@ local helpSections = {
     { title = ns.L["help_gold"],       lines = { ns.L["help_gold_click"] } },
     { title = ns.L["help_reset"],      lines = { ns.L["help_reset_shift"] } },
     { title = ns.L["help_histlog"],    lines = { ns.L["help_histlog_left"], ns.L["help_histlog_right"] } },
-    { title = ns.L["help_filter"],     lines = { ns.L["help_filter_left"], ns.L["help_filter_right"] } },
+    { title = ns.L["help_filter"],     lines = { ns.L["help_filter_left"], ns.L["help_filter_right"], ns.L["help_filter_sell"] } },
     { title = ns.L["help_fishing"],    lines = { ns.L["help_fishing_hint"] } },
     { title = ns.L["help_export"],     lines = { ns.L["help_export_hint"] } },
     { title = ns.L["help_commands"],   lines = { ns.L["help_cmd_nft"], ns.L["help_cmd_filter"], ns.L["help_cmd_hud"], ns.L["help_cmd_export"], ns.L["help_cmd_fishing"] } },

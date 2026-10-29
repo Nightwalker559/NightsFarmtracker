@@ -57,13 +57,7 @@ local rowPool = ns.NewPool(function(parent)
     r.countText:SetJustifyH("LEFT"); r.countText:SetFontHeight(ns.FONT_NORMAL)
     r.countText:SetTextColor(unpack(ns.COL_GOLD))
 
-    r:EnableMouse(true)
-    r:SetScript("OnEnter", function(self)
-        if self.itemLink then
-            ns.ShowItemTooltipNoCompare(self, ns.SmartAnchor(self, "RIGHT"), self.itemLink)
-        end
-    end)
-    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.HookRowLinkTooltip(r)
     return r
 end, function(r)
     r.itemLink = nil
