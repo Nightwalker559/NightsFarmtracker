@@ -190,7 +190,7 @@ local themeDropdown
 local gearThresholdEB
 local sessionLengthEB
 local itemGoalEB
-local goalsBtn
+local goalsBtn, goalsCheck
 local maxHeightEB
 local profileDropdown
 local profileButtons
@@ -545,6 +545,7 @@ local THEME_ROW_H = 20
 ------------------------------------------------------------------------
 -- Helper: button that opens a window ("Open Export Window", "Edit Item Goals") -
 -- single persistent instance, reused across rebuilds like gearThresholdEB above.
+-- btn:SetActive(false) greys it out and makes it inert.
 ------------------------------------------------------------------------
 local exportBtn
 local function MakeWindowButton(labelKey, onClick)
@@ -556,14 +557,49 @@ local function MakeWindowButton(labelKey, onClick)
         text:SetTextColor(unpack(ns.COL_ACCENT))
         text:SetText(ns.L[labelKey])
         btn:SetSize(text:GetStringWidth() + 20, 20)
-        btn:SetScript("OnEnter", function() text:SetTextColor(1,1,1) end)
-        btn:SetScript("OnLeave", function() text:SetTextColor(unpack(ns.COL_ACCENT)) end)
+        btn:SetScript("OnEnter", function(self) if self:IsEnabled() then text:SetTextColor(1,1,1) end end)
+        btn:SetScript("OnLeave", function(self) if self:IsEnabled() then text:SetTextColor(unpack(ns.COL_ACCENT)) end end)
         btn:SetScript("OnClick", onClick)
+        function btn:SetActive(on)
+            self:SetEnabled(on)
+            if on then text:SetTextColor(unpack(ns.COL_ACCENT)) else text:SetTextColor(0.4, 0.4, 0.4) end
+        end
         return btn
     end
 end
 local MakeExportButton = MakeWindowButton("export_open_btn", function() ns.ToggleExportWindow() end)
 local MakeGoalsButton  = MakeWindowButton("goals_open_btn",  function() ns.ToggleGoalsWindow() end)
+
+-- Label-less checkbox for db.itemGoalsEnabled; it also greys out the Item
+-- Goals button next to it. Single persistent instance like the button.
+local function MakeGoalsCheck(parent)
+    local box = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    box:SetSize(CTRL_SIZE, CTRL_SIZE)
+    ns.StyleBackdropBox(box)
+    local check = box:CreateTexture(nil, "ARTWORK")
+    check:SetPoint("TOPLEFT", 1, -1); check:SetPoint("BOTTOMRIGHT", -1, 1)
+    check:SetColorTexture(unpack(ns.COL_ACCENT))
+
+    function box:Sync()
+        local on = NightsFarmtrackerDB.itemGoalsEnabled ~= false
+        check:SetShown(on)
+        if goalsBtn then goalsBtn:SetActive(on) end
+    end
+    box:EnableMouse(true)
+    box:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(ns.L["goals_use_own"])
+        GameTooltip:Show()
+    end)
+    box:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    box:SetScript("OnMouseUp", function(self)
+        NightsFarmtrackerDB.itemGoalsEnabled = NightsFarmtrackerDB.itemGoalsEnabled == false
+        self:Sync()
+        if ns.RebuildGoalsList then ns.RebuildGoalsList() end
+        ns.RefreshHUD()
+    end)
+    return box
+end
 
 -- Miniature window (frame colors, header strip - flat or gradient depending
 -- on the Header gradient option - accent text) used by the theme list's
@@ -1303,16 +1339,20 @@ function ns.RebuildSettingsContent()
         itemGoalEB.eb:SetText(goal > 0 and tostring(goal) or "")
         track(itemGoalEB, "other")
 
-        y = y - 40
 
-        -- Own goals per item on/off (the list stays), then its window button
-        y = flag(y, "goals_use_own", "itemGoalsEnabled", true, function()
-            if ns.RebuildGoalsList then ns.RebuildGoalsList() end
-            ns.RefreshHUD()
-        end)
+        -- Right of the amount box: checkbox for the own goals (the list stays
+        -- when off), then the Item Goals window button, greyed out while off
+        goalsCheck = PlaceWidget(goalsCheck, MakeGoalsCheck, y)
+        goalsCheck:ClearAllPoints()
+        goalsCheck:SetPoint("LEFT", itemGoalEB.unitLbl, "RIGHT", 14, 0)
+        track(goalsCheck, "other")
+
         goalsBtn = PlaceWidget(goalsBtn, MakeGoalsButton, y)
+        goalsBtn:ClearAllPoints()
+        goalsBtn:SetPoint("LEFT", goalsCheck, "RIGHT", 8, 0)
         track(goalsBtn, "other")
-        y = y - 30
+        goalsCheck:Sync()
+        y = y - 40
 
         return y
     end)
