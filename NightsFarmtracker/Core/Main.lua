@@ -359,7 +359,7 @@ function ns.UpdatePricesFromBags()
     end
 
     if next(byID) then
-        for bag = 0, 5 do
+        for bag = 0, ns.LAST_BAG do
             for slot = 1, C_Container.GetContainerNumSlots(bag) do
                 local ci = C_Container.GetContainerItemInfo(bag, slot)
                 local data = ci and byID[ci.itemID]

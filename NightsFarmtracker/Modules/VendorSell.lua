@@ -5,14 +5,14 @@
 -- them. With the protection on, one click sells at most PROTECT_MAX items,
 -- as many as the merchant's buyback list holds, so a wrong click can still be
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
--- unless that option is switched off. Both options sit in the window itself.
+-- unless that option is switched off. Both options live in Settings (Windows &
+-- Buttons); the window only has a gear icon that jumps there.
 ------------------------------------------------------------------------
 local _, ns = ...
 
 ns.VENDOR_SELL_PROTECT_MAX = 12   -- the buyback list keeps the last 12 sold items
 local PROTECT_MAX   = ns.VENDOR_SELL_PROTECT_MAX
 local SELL_INTERVAL = 0.1    -- seconds between two sales, so the server keeps up
-local LAST_BAG      = 5      -- backpack (0), four bags, reagent bag
 
 local pad, hdrH = ns.PAD, ns.WINDOW_HDR_H
 local MIN_VIS_H = ns.DROPLIST_MIN_VIS_H
@@ -49,12 +49,14 @@ end
 -- Vendor-Only Filter (items, categories, AH-by-expansion), or Equipment under
 -- the Gear AH Threshold. Only real weapons/armor take the threshold path:
 -- ns.IsGear also counts every soulbound item, which must not be sold on a
--- missing AH price.
+-- missing AH price. Without a price source every piece would count as below
+-- the threshold, so that path is off then.
 local function IsVendorGood(data, count)
     if ns.IsForceVendor(data.itemID) or ns.IsForceVendorCategory(data) or ns.IsForceVendorExpansion(data) then
         return true
     end
     if not ns.IsGearClass(data.classID) then return false end
+    if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then return false end
     local ahPrice = ns.GetAHPriceForID(data.itemID, data.itemLink)
     return ns.IsGearThresholdVendorOnly(data, ahPrice and ahPrice * count)
 end
@@ -74,7 +76,7 @@ end
 
 local function CollectItems()
     local list = {}
-    for bag = 0, LAST_BAG do
+    for bag = 0, ns.LAST_BAG do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local info = C_Container.GetContainerItemInfo(bag, slot)
             if info and info.hyperlink and not info.isLocked and not info.hasNoValue then
@@ -228,28 +230,11 @@ local function CreateSellButton(parent)
     return btn
 end
 
--- Gear icon left of the close button: opens Settings at the sell list options
-local function CreateConfigButton(parent)
-    local btn = ns.MakeBtn(parent, 16, "btn_settings.png")
-    btn:SetPoint("RIGHT", parent.closeBtn, "LEFT", -6, 0)
-    btn:HookScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:SetText(ns.L["vendor_sell_config"])
-        GameTooltip:Show()
-    end)
-    btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
-    btn:SetScript("OnClick", function() ns.OpenSettingsAt("sellList") end)
-    return btn
-end
-
 local function EnsureFrame()
     if frame then return end
-    frame = ns.CreateWindowFrame(FRAME_NAME, ns.L["vendor_sell_title"], { width = ns.FRAME_W })
     -- It belongs to the merchant window, not to the docking chains: Esc must
     -- close the merchant in one press, which takes this window with it.
-    for i = #UISpecialFrames, 1, -1 do
-        if UISpecialFrames[i] == FRAME_NAME then table.remove(UISpecialFrames, i) end
-    end
+    frame = ns.CreateWindowFrame(FRAME_NAME, ns.L["vendor_sell_title"], { width = ns.FRAME_W, noEsc = true })
     ns.VendorSellFrame = frame
 
     ns.AddHLine(frame, "TOP", pad, -(hdrH - 1))
@@ -264,7 +249,10 @@ local function EnsureFrame()
     frame.emptyLabel:SetTextColor(0.55, 0.55, 0.55)
     frame.emptyLabel:SetText(ns.L["vendor_sell_empty"])
 
-    CreateConfigButton(frame)
+    -- Gear icon left of the close button: opens Settings at the sell list options
+    local cfgBtn = ns.CreateConfigButton(frame, ns.L["vendor_sell_config"])
+    cfgBtn:SetPoint("RIGHT", frame.closeBtn, "LEFT", -6, 0)
+    cfgBtn:SetScript("OnClick", function() ns.OpenSettingsAt("sellList") end)
 
     frame.sellBtn = CreateSellButton(frame)
     frame.sellBtn:SetPoint("BOTTOMLEFT", pad, 8)

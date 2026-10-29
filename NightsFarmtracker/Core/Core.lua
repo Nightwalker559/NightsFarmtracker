@@ -44,6 +44,7 @@ ns.BIND_ON_USE    = 3
 -- in the tooltip - all three are treated the same.)
 ns.BIND_TO_ACCOUNT = { [7] = true, [8] = true, [9] = true }
 ns.FALLBACK_ICON  = 134400
+ns.LAST_BAG       = 5   -- bag indexes 0 (backpack) to 5: four bags plus the reagent bag
 -- Housing classID: Enum.ItemClass.Housing if defined (12.0.0+), else runtime-detected
 ns.HOUSING = Enum.ItemClass and Enum.ItemClass.Housing or nil
 

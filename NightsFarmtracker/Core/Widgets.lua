@@ -488,6 +488,21 @@ function ns.HideTooltipOf(frame)
     end
 end
 
+-- Small gear icon button with a tooltip (white title, optional grey text): the
+-- "configure" icon of the Gear AH Threshold and the Sell List. The caller
+-- anchors it and sets OnClick.
+function ns.CreateConfigButton(parent, title, tip)
+    local btn = ns.MakeBtn(parent, 16, "btn_settings.png")
+    btn:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
+        GameTooltip:AddLine(title, 1, 1, 1)
+        if tip then GameTooltip:AddLine(tip, 0.5, 0.5, 0.5, true) end
+        GameTooltip:Show()
+    end)
+    btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    return btn
+end
+
 -- Hover tooltip for a pooled row that keeps its item's link in row.itemLink
 -- (nothing is shown while it is nil). Used by the Loot Log and the Sell List.
 function ns.HookRowLinkTooltip(row)
@@ -508,7 +523,8 @@ end
 -- frame.closeBtn:HookScript("OnClick", ...). opts (all optional): width, pad
 -- (default ns.PAD), titleColor (default ns.COL_GOLD), titleY (default -10),
 -- dockChain ("right": the window sits in that docking chain, see
--- ns.WINDOW_CHAINS, and the others close ranks when it hides).
+-- ns.WINDOW_CHAINS, and the others close ranks when it hides), noEsc (Esc does
+-- not close it: it is closed by whatever owns it).
 ------------------------------------------------------------------------
 function ns.CreateWindowFrame(name, title, opts)
     opts = opts or {}
@@ -529,7 +545,7 @@ function ns.CreateWindowFrame(name, title, opts)
     frame:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
     ns.ApplyFrameStyle(frame)
     frame:Hide()
-    table.insert(UISpecialFrames, name)
+    if not opts.noEsc then table.insert(UISpecialFrames, name) end
 
     local titleFS = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     titleFS:SetPoint("TOPLEFT", pad, opts.titleY or -10)
@@ -648,12 +664,13 @@ end
 -- the clipboard, so the player presses Ctrl+C). Shared by the data export and
 -- the debug dumps. ns.CreateCopyTextWindow(name, title) builds it once;
 -- ns.ShowCopyText(frame, text) fills and shows it, docked next to Settings if
--- that is open, else centered.
+-- that is open, else centered. noEsc: Esc does not close it (see
+-- ns.CreateWindowFrame).
 ------------------------------------------------------------------------
-function ns.CreateCopyTextWindow(name, title)
+function ns.CreateCopyTextWindow(name, title, noEsc)
     local W, HDR_H, FTR_H = 460, ns.WINDOW_HDR_H, 12
 
-    local frame = ns.CreateWindowFrame(name, title, {width = W, pad = ns.PAD, titleColor = ns.COL_ACCENT})
+    local frame = ns.CreateWindowFrame(name, title, {width = W, pad = ns.PAD, titleColor = ns.COL_ACCENT, noEsc = noEsc})
     frame:SetHeight(360)
     frame:SetScript("OnHide", function() ns.RefreshWindowChain("left") end)
 

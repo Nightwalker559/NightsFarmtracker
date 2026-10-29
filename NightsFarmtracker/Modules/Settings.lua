@@ -457,22 +457,8 @@ local function MakeGearThresholdEB(parent, yOff)
 
     -- Config icon: opens a small popup to pick which Equipment categories
     -- the threshold applies to (see ns.GEAR_THRESHOLD_GROUPS).
-    local cfgBtn = CreateFrame("Button", nil, parent)
-    cfgBtn:SetSize(16, 16)
+    local cfgBtn = ns.CreateConfigButton(parent, ns.L["gear_ah_threshold_config_title"], ns.L["gear_ah_threshold_config_tip"])
     cfgBtn:SetPoint("LEFT", frame.unitLbl, "RIGHT", 8, 0)
-    local cfgTex = cfgBtn:CreateTexture(nil, "ARTWORK")
-    cfgTex:SetAllPoints()
-    cfgTex:SetTexture(ns.ART.."btn_settings.png")
-    cfgTex:SetAlpha(0.75)
-    ns.RegisterTintTex(cfgTex)
-    cfgBtn:SetScript("OnEnter", function(self)
-        cfgTex:SetAlpha(1)
-        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:AddLine(ns.L["gear_ah_threshold_config_title"], 1, 1, 1)
-        GameTooltip:AddLine(ns.L["gear_ah_threshold_config_tip"], 0.5, 0.5, 0.5, true)
-        GameTooltip:Show()
-    end)
-    cfgBtn:SetScript("OnLeave", function() cfgTex:SetAlpha(0.75); GameTooltip:Hide() end)
     cfgBtn:SetScript("OnClick", function(self) ns.ToggleGearThresholdConfig(self) end)
 
     -- Same sync as the unit label (see MakeNumberBox); hiding also closes the popup.

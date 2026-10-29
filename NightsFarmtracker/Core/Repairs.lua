@@ -404,7 +404,7 @@ function ns.MigrateGearVariantsFromBags(items)
     end
     if not next(targets) then return end
 
-    for bag = 0, 5 do
+    for bag = 0, ns.LAST_BAG do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local ci = C_Container.GetContainerItemInfo(bag, slot)
             if ci and targets[ci.itemID] then

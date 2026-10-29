@@ -4,11 +4,11 @@
 
 ### New
 
-- Sell List: at a vendor, a window opens next to the merchant window with the bag items the Vendor-Only Filter (items, categories, AH by expansion) and the Gear AH Threshold mark as vendor goods, most gold first, and a button that sells them. Items in an equipment set and items without a sell price are left out, and so are Warband items (bound to the Warband, or until equipped) while "Keep Warband items" is checked in the window (default). With the protection on (default), one click sells at most 12 items, as many as the vendor's buyback list holds, so you can buy back everything of that click; with it off, one click sells the whole list. The window only opens when there is something to sell, and Settings, Windows & Buttons can switch it off (its two options, Keep Warband items and the protection, sit there too and are greyed out while it is off; a gear icon in the Sell List window jumps to them)
+- Sell List: at a vendor, a window opens next to the merchant window with the bag items the Vendor-Only Filter (items, categories, AH by expansion) and the Gear AH Threshold mark as vendor goods, most gold first, and a button that sells them. Items in an equipment set and items without a sell price are left out, the Gear AH Threshold part stays empty while there is no price source (no AH addon, or source "None"), and so are Warband items (bound to the Warband, or until equipped) while "Keep Warband items" is checked in the window (default). With the protection on (default), one click sells at most 12 items, as many as the vendor's buyback list holds, so you can buy back everything of that click; with it off, one click sells the whole list. The window only opens when there is something to sell, and Settings, Windows & Buttons can switch it off (its two options, Keep Warband items and the protection, sit there too and are greyed out while it is off; a gear icon in the Sell List window jumps to them)
 
 ### Changed
 
-- Internal: the Loot Log and the Sell List share one row tooltip helper, and the Warband bind types live in one shared table
+- Internal: the Loot Log and the Sell List share one row tooltip helper, the Gear AH Threshold and the Sell List one gear icon button, windows can opt out of closing with Esc (Debug log, Sell List), and the Warband bind types and the last bag index live in one shared place
 
 ## 1.8.2
 
