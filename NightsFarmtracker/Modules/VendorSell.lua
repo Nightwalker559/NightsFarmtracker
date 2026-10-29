@@ -4,7 +4,8 @@
 -- Filter and the Gear AH Threshold treat as vendor goods; one button sells
 -- them. With the protection on, one click sells at most PROTECT_MAX items,
 -- as many as the merchant's buyback list holds, so a wrong click can still be
--- undone. Off, one click sells the whole list.
+-- undone. Off, one click sells the whole list. Warband items stay in the bags
+-- unless that option is switched off. Both options sit in the window itself.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -16,7 +17,8 @@ local pad, hdrH = ns.PAD, ns.WINDOW_HDR_H
 local MIN_VIS_H = ns.DROPLIST_MIN_VIS_H
 local CHECK_H   = 14
 local BTN_H     = 22
-local FTR_H     = 8 + BTN_H + 6 + CHECK_H + 6
+local OPT_GAP   = 4          -- between two option rows
+local FTR_H     = 8 + BTN_H + 6 + 2 * CHECK_H + OPT_GAP + 6
 local VALUE_W   = 96         -- value column on the right of each row
 
 local FRAME_NAME = "NightsFarmtrackerVendorSellWnd"
@@ -24,8 +26,15 @@ local frame, scrollFrame, listFrame
 local items, rows = {}, {}   -- bag items to sell (most gold first) and their active rows
 local selling                -- ticker of the running sale
 
-local function IsProtected()
-    return NightsFarmtrackerDB.vendorSellProtect ~= false
+-- The two window options, lowest row first; both are on until switched off.
+-- `arg` fills the %d of the label and tooltip.
+local OPTIONS = {
+    { dbKey = "vendorSellProtect",     label = "vendor_sell_protect", tip = "vendor_sell_protect_tip", arg = PROTECT_MAX },
+    { dbKey = "vendorSellKeepWarband", label = "vendor_sell_warband", tip = "vendor_sell_warband_tip" },
+}
+
+local function IsOn(dbKey)
+    return NightsFarmtrackerDB[dbKey] ~= false
 end
 
 ------------------------------------------------------------------------
@@ -57,6 +66,15 @@ local function IsVendorGood(data, count)
     return ns.IsGearThresholdVendorOnly(data, ahPrice and ahPrice * count)
 end
 
+-- Bound to the Warband, or until equipped (older clients report the latter as
+-- plain BoE, so the bag slot is asked as well, like ApplyBagItemInfo does).
+local function IsWarband(data, bag, slot)
+    if data.isBoA then return true end
+    if not C_Item.IsBoundToAccountUntilEquip then return false end
+    local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
+    return loc ~= nil and loc:IsValid() and C_Item.IsBoundToAccountUntilEquip(loc) == true
+end
+
 local function InEquipmentSet(bag, slot)
     return C_Container.GetContainerItemEquipmentSetInfo(bag, slot) == true
 end
@@ -68,7 +86,8 @@ local function CollectItems()
             local info = C_Container.GetContainerItemInfo(bag, slot)
             if info and info.hyperlink and not info.isLocked and not info.hasNoValue then
                 local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
-                if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot) then
+                if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot)
+                   and not (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot)) then
                     list[#list + 1] = {
                         bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink, name = data.name,
                         count = info.stackCount, value = sellPrice * info.stackCount,
@@ -89,7 +108,7 @@ end
 -- How many items one click sells, and what they bring.
 local function BatchInfo()
     local n = #items
-    if IsProtected() then n = math.min(n, PROTECT_MAX) end
+    if IsOn("vendorSellProtect") then n = math.min(n, PROTECT_MAX) end
     local total = 0
     for i = 1, n do total = total + items[i].value end
     return n, total
@@ -194,8 +213,11 @@ local function Rebuild()
         hdrH = hdrH, ftrH = FTR_H, contentH = yOff, minH = MIN_VIS_H,
     })
     frame.emptyLabel:SetShown(#items == 0)
-    frame.protectRow.mark:SetShown(IsProtected())
-    frame.protectRow.lbl:SetTextColor(IsProtected() and 1 or 0.85, IsProtected() and 0.82 or 0.85, IsProtected() and 0 or 0.85)
+    for _, r in ipairs(frame.optionRows) do
+        local on = IsOn(r.dbKey)
+        r.mark:SetShown(on)
+        r.lbl:SetTextColor(on and 1 or 0.85, on and 0.82 or 0.85, on and 0 or 0.85)
+    end
     UpdateSellButton()
     ns.DockFrame(frame, MerchantFrame, "right")
 end
@@ -218,18 +240,19 @@ local function CreateSellButton(parent)
     return btn
 end
 
-local function CreateProtectRow(parent)
+local function CreateOptionRow(parent, opt)
     local r = ns.CreateCheckboxRow(parent, ns.CONTENT_W, CHECK_H)
+    r.dbKey = opt.dbKey
     r.lbl:SetFontHeight(ns.FONT_NORMAL)
-    r.lbl:SetText(string.format(ns.L["vendor_sell_protect"], PROTECT_MAX))
+    r.lbl:SetText(string.format(ns.L[opt.label], opt.arg))
     r:SetScript("OnMouseUp", function()
-        NightsFarmtrackerDB.vendorSellProtect = not IsProtected()
+        NightsFarmtrackerDB[opt.dbKey] = not IsOn(opt.dbKey)
         Rebuild()
     end)
     r:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:AddLine(string.format(ns.L["vendor_sell_protect"], PROTECT_MAX), 1, 1, 1)
-        GameTooltip:AddLine(string.format(ns.L["vendor_sell_protect_tip"], PROTECT_MAX), 0.5, 0.5, 0.5, true)
+        GameTooltip:AddLine(string.format(ns.L[opt.label], opt.arg), 1, 1, 1)
+        GameTooltip:AddLine(string.format(ns.L[opt.tip], opt.arg), 0.5, 0.5, 0.5, true)
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -258,8 +281,12 @@ local function EnsureFrame()
     frame.emptyLabel:SetTextColor(0.55, 0.55, 0.55)
     frame.emptyLabel:SetText(ns.L["vendor_sell_empty"])
 
-    frame.protectRow = CreateProtectRow(frame)
-    frame.protectRow:SetPoint("BOTTOMLEFT", pad, 8 + BTN_H + 6)
+    frame.optionRows = {}
+    for i, opt in ipairs(OPTIONS) do
+        local r = CreateOptionRow(frame, opt)
+        r:SetPoint("BOTTOMLEFT", pad, 8 + BTN_H + 6 + (i - 1) * (CHECK_H + OPT_GAP))
+        frame.optionRows[i] = r
+    end
 
     frame.sellBtn = CreateSellButton(frame)
     frame.sellBtn:SetPoint("BOTTOMLEFT", pad, 8)

@@ -4,7 +4,7 @@
 
 ### New
 
-- Sell List: at a vendor, a window opens next to the merchant window with the bag items the Vendor-Only Filter (items, categories, AH by expansion) and the Gear AH Threshold mark as vendor goods, most gold first, and a button that sells them. Items in an equipment set and items without a sell price are left out. With the protection on (default), one click sells at most 12 items, as many as the vendor's buyback list holds, so you can buy back everything of that click; with it off, one click sells the whole list. The window only opens when there is something to sell, and Settings, Filters can switch it off
+- Sell List: at a vendor, a window opens next to the merchant window with the bag items the Vendor-Only Filter (items, categories, AH by expansion) and the Gear AH Threshold mark as vendor goods, most gold first, and a button that sells them. Items in an equipment set and items without a sell price are left out, and so are Warband items (bound to the Warband, or until equipped) while "Keep Warband items" is checked in the window (default). With the protection on (default), one click sells at most 12 items, as many as the vendor's buyback list holds, so you can buy back everything of that click; with it off, one click sells the whole list. The window only opens when there is something to sell, and Settings, Filters can switch it off
 
 ### Changed
 
