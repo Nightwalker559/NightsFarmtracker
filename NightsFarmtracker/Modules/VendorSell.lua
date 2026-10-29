@@ -9,7 +9,8 @@
 ------------------------------------------------------------------------
 local _, ns = ...
 
-local PROTECT_MAX   = 12     -- the buyback list keeps the last 12 sold items
+ns.VENDOR_SELL_PROTECT_MAX = 12   -- the buyback list keeps the last 12 sold items
+local PROTECT_MAX   = ns.VENDOR_SELL_PROTECT_MAX
 local SELL_INTERVAL = 0.1    -- seconds between two sales, so the server keeps up
 local LAST_BAG      = 5      -- backpack (0), four bags, reagent bag
 
@@ -308,6 +309,11 @@ end
 local function OnMerchantHide()
     StopSelling()
     if frame then frame:Hide() end
+end
+
+-- Called from Settings when one of the window options changed
+function ns.RefreshVendorSell()
+    if frame and frame:IsShown() then Rebuild() end
 end
 
 -- Called from Settings when the feature is switched off

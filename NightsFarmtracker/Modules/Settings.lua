@@ -971,6 +971,7 @@ local function CreateCheckbox(parent)
 
     local box, check = ns.CreateMarkBox(row, CTRL_SIZE)
     box:SetPoint("TOPLEFT", 0, -4)
+    row.box   = box
     row.check = check
 
     local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -987,18 +988,27 @@ local checkboxPool = ns.NewPool(CreateCheckbox, function(row) row:SetScript("OnM
 
 -- (Re-)configures a pooled checkbox row: label text, position, and the
 -- getValue/setValue accessors driving its checked state and click handler.
-local function ConfigureCheckbox(row, label, yOff, getValue, setValue)
-    row:SetPoint("TOPLEFT", S_PAD, yOff)
+-- indent shifts the row right (an option under another checkbox); disabled
+-- greys it out and ignores clicks, the checked state stays visible.
+local function ConfigureCheckbox(row, label, yOff, getValue, setValue, indent, disabled)
+    indent = indent or 0
+    row:SetPoint("TOPLEFT", S_PAD + indent, yOff)
+    row:SetWidth(S_W - S_PAD*2 - indent)
+    row.label:SetWidth(S_W - S_PAD*2 - indent - CTRL_SIZE - 8)
     row.label:SetText(label)
     row:SetHeight(4 + math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())))   -- hit area follows a wrapped label
 
+    row.check:SetAlpha(disabled and 0.35 or 1)
+    row.box:SetBackdropBorderColor(unpack(disabled and {0.2, 0.2, 0.2, 0.5} or ns.COL_BORDER))
     local function Refresh()
-        if getValue() then row.check:Show(); row.label:SetTextColor(1,0.82,0)
-        else                row.check:Hide(); row.label:SetTextColor(0.85,0.85,0.85) end
+        if disabled then row.label:SetTextColor(0.4,0.4,0.4)
+        elseif getValue() then row.label:SetTextColor(1,0.82,0)
+        else row.label:SetTextColor(0.85,0.85,0.85) end
+        row.check:SetShown(getValue() and true or false)
     end
     Refresh()
-    row:EnableMouse(true)
-    row:SetScript("OnMouseUp", function() setValue(not getValue()); Refresh() end)
+    row:EnableMouse(not disabled)
+    row:SetScript("OnMouseUp", not disabled and function() setValue(not getValue()); Refresh() end or nil)
     return row
 end
 
@@ -1152,14 +1162,18 @@ function ns.RebuildSettingsContent()
 
     -- Checkbox row at y; returns the y below it: CTRL_GAP below the box or
     -- the (possibly wrapped) label, whichever is taller.
-    local function checkbox(y, labelKey, get, set)
-        local row = ConfigureCheckbox(track(checkboxPool.acquire(SListFrame), "checkbox"), ns.L[labelKey], y, get, set)
+    -- opts (optional): indent, disabled (see ConfigureCheckbox), arg (fills the
+    -- %d of the label).
+    local function checkbox(y, labelKey, get, set, opts)
+        opts = opts or {}
+        local label = opts.arg and string.format(ns.L[labelKey], opts.arg) or ns.L[labelKey]
+        local row = ConfigureCheckbox(track(checkboxPool.acquire(SListFrame), "checkbox"), label, y, get, set, opts.indent, opts.disabled)
         return y - math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())) - CTRL_GAP
     end
 
     -- Checkbox bound to db[key]. With defaultOn an unset value counts as
     -- checked. after(v) runs once the value is stored.
-    local function flag(y, labelKey, key, defaultOn, after)
+    local function flag(y, labelKey, key, defaultOn, after, opts)
         return checkbox(y, labelKey,
             function()
                 if defaultOn then return db[key] ~= false end
@@ -1168,7 +1182,7 @@ function ns.RebuildSettingsContent()
             function(v)
                 db[key] = v
                 if after then after(v) end
-            end)
+            end, opts)
     end
 
     -- Radio group, one row per { labelKey, value }; `after` is the distance from
@@ -1368,6 +1382,20 @@ function ns.RebuildSettingsContent()
             function() return db.instanceLockoutEnabled == true end,
             function(v) ns.SetInstanceLockoutEnabled(v) end)
 
+        -- Sell list at vendors: its two options only count while it is on
+        -- (the same two sit in the sell window itself)
+        y = y - CHECK_RUN_TAIL
+        hintLabel(S_PAD, y, ns.L["vendor_sell_group"], 0.6)
+        y = y - 18
+        y = flag(y, "vendor_sell_enabled", "vendorSellEnabled", true, function(v)
+            if not v then ns.OnVendorSellDisabled() end
+            RunNextFrame(ns.RebuildSettingsContent)   -- the pooled row still refreshes itself after this returns
+        end)
+        local sub = { indent = CTRL_SIZE + 8, disabled = db.vendorSellEnabled == false }
+        y = flag(y, "vendor_sell_warband", "vendorSellKeepWarband", true, ns.RefreshVendorSell, sub)
+        sub = { indent = sub.indent, disabled = sub.disabled, arg = ns.VENDOR_SELL_PROTECT_MAX }
+        y = flag(y, "vendor_sell_protect", "vendorSellProtect", true, ns.RefreshVendorSell, sub)
+
         return y
     end)
 
@@ -1475,9 +1503,6 @@ function ns.RebuildSettingsContent()
         local function filterChanged() ns.RefreshLeftButtons(); ns.RefreshHUD() end
         y = flag(y, "vendor_filter_enabled", "vendorFilterEnabled", true, filterChanged)
         y = flag(y, "blacklist_enabled", "blacklistEnabled", true, filterChanged)
-        y = flag(y, "vendor_sell_enabled", "vendorSellEnabled", true, function(v)
-            if not v then ns.OnVendorSellDisabled() end
-        end)
 
         return y
     end)
