@@ -85,7 +85,7 @@ ns.PROFILE_KEYS = {
     venomTrackerEnabled=true,
     baitFrameEnabled=true, mergeJunkEntries=true, instanceLockoutEnabled=true,
     hudEnabled=true, hudSize=true, hudScale=true, hudAlpha=true, hudRotate=true,
-    showPriceSource=true, showValueBar=true, itemGoal=true,
+    showPriceSource=true, showValueBar=true, itemGoal=true, itemGoals=true, itemGoalsEnabled=true, limitMode=true,
     pos=true, mainLocked=true, gearAHThresholdSound=true, sessionHistoryMode=true, sessionHistoryAvg=true,
 }
 
@@ -120,6 +120,9 @@ local function NewProfileDefaults()
         showPriceSource       = false,
         showValueBar          = true,
         itemGoal              = 0,
+        itemGoals             = {},
+        itemGoalsEnabled      = true,
+        limitMode             = "off",
         pos                   = { unpack(DEFAULT_MAIN_POS) },
         mainLocked            = false,
         gearAHThresholdSound  = false,
@@ -182,6 +185,13 @@ function ns.CopyProfile(name, sourceName)
             for k, v in pairs(src[key]) do copy[key][k] = v end
         end
     end
+    -- itemGoals holds one table per item
+    if type(src.itemGoals) == "table" then
+        copy.itemGoals = {}
+        for itemID, goal in pairs(src.itemGoals) do
+            copy.itemGoals[itemID] = { name = goal.name, icon = goal.icon, quality = goal.quality, amount = goal.amount }
+        end
+    end
     profiles[name] = copy
     return true
 end
@@ -233,6 +243,17 @@ function ns.InitDB()
             end
         end
         rawset(NightsFarmtrackerDB, "profileKey", ns.DEFAULT_PROFILE)
+    end
+
+    -- limitMode ("session" | "goal" | "off") picks which of sessionLength /
+    -- itemGoal / itemGoals is active. Profiles saved before it existed keep
+    -- whichever value was set (an item goal used to win over a session length).
+    for _, profile in pairs(NightsFarmtrackerAccountDB.profiles) do
+        if profile.limitMode == nil then
+            if (tonumber(profile.itemGoal) or 0) > 0 then profile.limitMode = "goal"
+            elseif (tonumber(profile.sessionLength) or 0) > 0 then profile.limitMode = "session"
+            else profile.limitMode = "off" end
+        end
     end
 
     if not getmetatable(NightsFarmtrackerDB) then
@@ -318,6 +339,9 @@ function ns.InitAccountDB()
     if not NightsFarmtrackerAccountDB then NightsFarmtrackerAccountDB = {} end
     local acc = NightsFarmtrackerAccountDB
     acc.sessions = acc.sessions or {}
+    -- Day-keyed storage before anything iterates the sessions (an old flat
+    -- array is converted here; already converted data is left alone)
+    ns.MigrateSessionsToDateKeyed(acc.sessions)
     if not acc.itemKeysMigrated then
         ns.ForEachSession(acc.sessions, function(session) MigrateItemKeys(session.items) end)
         acc.itemKeysMigrated = true
@@ -414,6 +438,30 @@ ns.ClearBlacklist               = blacklistStore.clear
 ns.IsBlacklistCategoryEnabled   = blacklistStore.categoryEnabled
 ns.SetBlacklistCategory         = blacklistStore.setCategory
 ns.IsBlacklistCategory          = blacklistStore.hasCategory
+
+------------------------------------------------------------------------
+-- Item goals (profile scope): itemID -> { name, icon, quality, amount }, on
+-- top of db.itemGoal (the amount for every item without an entry). They count
+-- while db.limitMode == "goal" and db.itemGoalsEnabled (see ns.GetItemGoal).
+------------------------------------------------------------------------
+function ns.GetItemGoals()
+    local db = NightsFarmtrackerDB
+    if type(db.itemGoals) ~= "table" then db.itemGoals = {} end
+    return db.itemGoals
+end
+
+function ns.SetItemGoal(itemID, name, icon, quality, amount)
+    if not itemID then return end
+    ns.GetItemGoals()[itemID] = { name = name, icon = icon, quality = quality, amount = amount }
+end
+
+function ns.RemoveItemGoal(itemID)
+    if itemID then ns.GetItemGoals()[itemID] = nil end
+end
+
+function ns.ClearItemGoals()
+    wipe(ns.GetItemGoals())
+end
 
 ------------------------------------------------------------------------
 -- AH price by expansion: an opt-in whitelist. With nothing selected the

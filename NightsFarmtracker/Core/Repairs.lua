@@ -472,9 +472,9 @@ end
 ------------------------------------------------------------------------
 
 -- Account-wide repairs, applied to NightsFarmtrackerAccountDB.sessions.
--- Repairs 1-5 all use ns.ForEachSession (Sessions.lua) so they work
--- unchanged on either the old flat array or the current day-keyed
--- storage - only the migration itself (6) cares which shape it finds.
+-- InitAccountDB converts an old flat sessions array to day-keyed storage
+-- before any of these run, so they all iterate with ns.ForEachSession
+-- (Sessions.lua); entry 6 stays registered for the numbering.
 ns.ACCOUNT_REPAIRS = {
     { 1, "qTotals",               function() return ns.RepairSessionTotals(NightsFarmtrackerAccountDB.sessions) end },
     { 2, "tierBreakdowns",        function() return ns.RepairCorruptedTierBreakdowns(NightsFarmtrackerAccountDB.sessions) end },

@@ -73,7 +73,7 @@ end
 -- call ns.RefreshWindowChain(side) after showing or hiding it.
 ------------------------------------------------------------------------
 ns.WINDOW_CHAINS = {
-    right = { "LogFrame", "FilterFrame", "BlacklistFrame" },
+    right = { "LogFrame", "FilterFrame", "BlacklistFrame", "GoalsFrame" },
     left  = { "HistFrame", "SettingsFrame", "ExportPickFrame", "ExportFrame", "DebugFrame" },
 }
 
@@ -165,6 +165,22 @@ function ns.AddRowIcon(row)
     border:Hide()
     row.iconBorder = border
     return icon
+end
+
+------------------------------------------------------------------------
+-- Boxed EditBox: Enter/Escape release focus; the backdrop frame around the
+-- EditBox is highlighted while it has focus. Extra focus-lost work goes on top
+-- with eb:HookScript("OnEditFocusLost", ...).
+------------------------------------------------------------------------
+function ns.HookEditBoxFocus(frame, eb)
+    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEditFocusGained", function()
+        frame:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
+    end)
+    eb:SetScript("OnEditFocusLost", function()
+        frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+    end)
 end
 
 ------------------------------------------------------------------------
@@ -354,6 +370,25 @@ function ns.MakeWheelHandler(scroll, child, step)
 end
 
 ------------------------------------------------------------------------
+-- ScrollFrame plus its scroll child (contentW wide, height set by the caller)
+-- with mouse-wheel scrolling in `step` pixel steps, on the frame and on the
+-- child. The caller anchors the scroll frame. Returns scroll, list, onWheel (for
+-- rows on top of the list that want to pass the wheel on).
+------------------------------------------------------------------------
+function ns.CreateScrollList(parent, contentW, step)
+    local scroll = CreateFrame("ScrollFrame", nil, parent)
+    scroll:EnableMouseWheel(true)
+    local list = CreateFrame("Frame", nil, scroll)
+    list:SetSize(contentW, 1)
+    list:EnableMouseWheel(true)
+    scroll:SetScrollChild(list)
+    local onWheel = ns.MakeWheelHandler(scroll, list, step)
+    scroll:SetScript("OnMouseWheel", onWheel)
+    list:SetScript("OnMouseWheel", onWheel)
+    return scroll, list, onWheel
+end
+
+------------------------------------------------------------------------
 -- Window height rule shared by every list window: header + list + footer
 -- grows with the content up to ns.GetMaxWindowH() in total, then the list
 -- scrolls.
@@ -459,7 +494,9 @@ end
 -- button. Callers add their content below the header and can hook extra close
 -- behavior via frame:SetScript("OnHide", ...) or
 -- frame.closeBtn:HookScript("OnClick", ...). opts (all optional): width, pad
--- (default ns.PAD), titleColor (default ns.COL_GOLD), titleY (default -10).
+-- (default ns.PAD), titleColor (default ns.COL_GOLD), titleY (default -10),
+-- dockChain ("right": the window sits in that docking chain, see
+-- ns.WINDOW_CHAINS, and the others close ranks when it hides).
 ------------------------------------------------------------------------
 function ns.CreateWindowFrame(name, title, opts)
     opts = opts or {}
@@ -467,10 +504,14 @@ function ns.CreateWindowFrame(name, title, opts)
 
     local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
     frame:HookScript("OnHide", function(self) ns.HideTooltipOf(self) end)
+    if opts.dockChain then
+        frame:HookScript("OnHide", function() ns.RefreshWindowChain(opts.dockChain) end)
+    end
     if opts.width then frame:SetWidth(opts.width) end
     frame:SetFrameStrata("MEDIUM")
     frame:SetClampedToScreen(true)
     frame:SetMovable(true); frame:EnableMouse(true)
+    frame:EnableMouseWheel(true)   -- the wheel must not scroll whatever lies behind the window (chat, ...)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function(s) s:StartMoving() end)
     frame:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
@@ -509,6 +550,7 @@ function ns.CreateOverlayFrame(name, posKey, onClose)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:EnableMouse(true)
+    frame:EnableMouseWheel(true)   -- see CreateWindowFrame
     frame:RegisterForDrag("LeftButton")
     ns.ApplyFrameStyle(frame)
     frame:Hide()

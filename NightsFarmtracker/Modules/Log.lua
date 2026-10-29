@@ -13,6 +13,7 @@ local ROW_H       = ns.ROW_H
 local LOG_FTR_H   = 10
 local MIN_VIS_H   = 30
 local MAX_ENTRIES = 100  -- oldest entries drop off
+local DOCK_GAP    = ns.STACK_GAP
 
 -- Row layout (the window is as wide as its widest row, see RebuildLogList)
 local TIME_W         = 38
@@ -101,6 +102,19 @@ local function RebuildLogList()
         minW = math.max(minW, LogFrame.emptyLabel:GetStringWidth() + 2 * EMPTY_PAD)
     end
     local frameW   = math.ceil(math.max(minW, widest + 2 * LOG_PAD))
+
+    -- Below the collapsed main window the log is as wide as it and the stack
+    -- (main window, Gold Overview, Lockout frame, log) stays within the max
+    -- window height.
+    local collapsed = NightsFarmtrackerDB.expanded == false
+    local maxTotal
+    if collapsed then
+        frameW = LOG_W
+        local used = ns.COLLAPSED_H + DOCK_GAP
+        if ns.GoldFrame:IsShown() then used = used + ns.GoldFrame:GetHeight() + 2 end
+        if ns.LockoutFrame and ns.LockoutFrame:IsShown() then used = used + ns.LockoutFrame:GetHeight() + 2 end
+        maxTotal = ns.GetMaxWindowH() - used
+    end
     local contentW = frameW - 2 * LOG_PAD
     for _, r in ipairs(activeRows) do r:SetWidth(contentW) end
     LScrollFrame:SetWidth(contentW); LListFrame:SetWidth(contentW)
@@ -109,13 +123,14 @@ local function RebuildLogList()
 
     ns.FitScrollWindow({
         window = LogFrame, scroll = LScrollFrame, list = LListFrame,
-        hdrH = LOG_HDR_H, ftrH = LOG_FTR_H, contentH = yOff, minH = MIN_VIS_H,
+        hdrH = LOG_HDR_H, ftrH = LOG_FTR_H, contentH = yOff, minH = MIN_VIS_H, maxTotal = maxTotal,
     })
 
     LogFrame.emptyLabel:SetShown(#(NightsFarmtrackerDB.logEntries or {}) == 0)
 
     -- Docking decides left/right (or below) by the frame's width: redo it
     if widthChanged and LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
+    if collapsed then ns.KeepStackOnScreen() end   -- the stack grows with the entries
 end
 ns.RebuildLogList = RebuildLogList  -- re-layout after the max window height setting changed
 
@@ -164,7 +179,7 @@ end
 local function EnsureLogFrame()
     if LogFrame then return end
 
-    LogFrame = ns.CreateWindowFrame("NightsFarmtrackerLogWnd", ns.L["log_title"], {width = LOG_W})
+    LogFrame = ns.CreateWindowFrame("NightsFarmtrackerLogWnd", ns.L["log_title"], {width = LOG_W, dockChain = "right"})
     LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", 4, 0)
     ns.LogFrame = LogFrame  -- exposed so other windows (e.g. Filter) can anchor next to it
     LogFrame.closeBtn:HookScript("OnClick", function()
@@ -173,18 +188,9 @@ local function EnsureLogFrame()
 
     ns.AddHLine(LogFrame, "TOP", LOG_PAD, -(LOG_HDR_H-1))
 
-    LScrollFrame = CreateFrame("ScrollFrame", nil, LogFrame)
+    LScrollFrame, LListFrame = ns.CreateScrollList(LogFrame, ns.CONTENT_W, ROW_H)
     LScrollFrame:SetPoint("TOPLEFT", LOG_PAD, -LOG_HDR_H)
     LScrollFrame:SetWidth(ns.CONTENT_W)
-    LScrollFrame:EnableMouseWheel(true)
-
-    LListFrame = CreateFrame("Frame", nil, LScrollFrame)
-    LListFrame:SetWidth(ns.CONTENT_W); LListFrame:SetHeight(1)
-    LScrollFrame:SetScrollChild(LListFrame)
-
-    local OnWheel = ns.MakeWheelHandler(LScrollFrame, LListFrame, ROW_H)
-    LScrollFrame:SetScript("OnMouseWheel", OnWheel)
-    LListFrame:SetScript("OnMouseWheel", OnWheel)
 
     LogFrame.emptyLabel = LogFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     LogFrame.emptyLabel:SetPoint("TOP", LogFrame, "TOP", 0, -(LOG_HDR_H+14))
@@ -194,27 +200,32 @@ local function EnsureLogFrame()
 end
 
 ------------------------------------------------------------------------
--- Anchoring — below MainFrame when collapsed (or below the Gold Overview
--- window / Instance Lockout frame if those are also open there, to avoid
--- overlapping them), otherwise
--- part of the Log/Filter/Blacklist right-side chain (see
--- ns.RefreshWindowChain in Widgets.lua), which also re-flows Filter/
--- Blacklist if they're open.
+-- Anchoring — below MainFrame when collapsed, as wide as it (or below the Gold
+-- Overview window / Instance Lockout frame if those are also open there, to
+-- avoid overlapping them), otherwise part of the right-side window chain (see
+-- ns.RefreshWindowChain in Widgets.lua), which also re-flows the Filter,
+-- Blacklist and Item Goals windows if they are open.
 ------------------------------------------------------------------------
 local function ReanchorLogFrame()
     if NightsFarmtrackerDB.expanded == false then
         LogFrame:ClearAllPoints()
-        if ns.LockoutFrame and ns.LockoutFrame:IsShown() then
-            LogFrame:SetPoint("TOPLEFT", ns.LockoutFrame, "BOTTOMLEFT", 0, -4)
-        elseif ns.GoldFrame and ns.GoldFrame:IsShown() then
-            LogFrame:SetPoint("TOPLEFT", ns.GoldFrame, "BOTTOMLEFT", 0, -4)
-        else
-            LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "BOTTOMLEFT", 0, -4)
-        end
+        local below = ns.MainFrame
+        if ns.LockoutFrame and ns.LockoutFrame:IsShown() then below = ns.LockoutFrame
+        elseif ns.GoldFrame and ns.GoldFrame:IsShown() then below = ns.GoldFrame end
+        LogFrame:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -DOCK_GAP)
     end
     ns.RefreshWindowChain("right")
 end
 ns.ReanchorLogFrame = ReanchorLogFrame
+
+-- Size and place of an open log after the main window collapsed/expanded or a
+-- frame below it appeared/disappeared.
+function ns.RefreshLogDock()
+    if LogFrame and LogFrame:IsShown() then
+        RebuildLogList()
+        ReanchorLogFrame()
+    end
+end
 
 ------------------------------------------------------------------------
 -- Public API - window
@@ -226,11 +237,11 @@ function ns.ToggleLogWindow()
     if LogFrame:IsShown() then
         LogFrame:Hide()
         NightsFarmtrackerDB.logWindowShown = false
-        ns.RefreshWindowChain("right")
     else
         RebuildLogList()
         LogFrame:Show()
         ReanchorLogFrame()
+        ns.KeepStackOnScreen()   -- below the collapsed main window the stack just grew
         NightsFarmtrackerDB.logWindowShown = true
     end
 end
@@ -243,6 +254,7 @@ function ns.RestoreLogWindow()
         RebuildLogList()
         LogFrame:Show()
         ReanchorLogFrame()
+        ns.KeepStackOnScreen()
     end
 end
 

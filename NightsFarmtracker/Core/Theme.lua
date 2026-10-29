@@ -137,12 +137,30 @@ ns.COLOR_THEMES = {
         accent = {1.00, 0.50, 0.08},
         decor  = "pumpkin",
     },
+    yule = {
+        name     = "Yule",
+        labelKey = "theme_yule",
+        descKey  = "theme_yule_desc",
+        bg     = {0.04, 0.09, 0.07, 0.92},
+        border = {0.55, 0.16, 0.18, 0.85},
+        catBg  = {0.07, 0.15, 0.11, 0.80},
+        accent = {0.96, 0.34, 0.34},
+    },
+    snowfall = {
+        name     = "Snowfall",
+        labelKey = "theme_snowfall",
+        descKey  = "theme_snowfall_desc",
+        bg     = {0.07, 0.09, 0.12, 0.92},
+        border = {0.55, 0.62, 0.72, 0.85},
+        catBg  = {0.12, 0.15, 0.20, 0.80},
+        accent = {0.92, 0.96, 1.00},
+    },
 }
 -- Display order for the Settings dropdown
 ns.COLOR_THEME_ORDER = {
     "default", "void", "silvermoon", "fel", "frost", "bloodmoon",
     "molten", "emerald", "arcane", "bronze", "plague", "nether", "argent",
-    "halloween", "custom",
+    "halloween", "yule", "snowfall", "custom",
 }
 ns.COL_GOLD = {1.00, 0.82, 0.00}
 
@@ -253,6 +271,20 @@ function ns.StyleBackdropBox(frame, bgColor)
         tile=true,tileSize=8,edgeSize=1,insets={left=1,right=1,top=1,bottom=1}})
     frame:SetBackdropColor(unpack(bgColor or {0.06,0.09,0.10,1}))
     frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
+end
+
+-- Square box (size px) with the accent-colored mark inside: the checkbox look of
+-- Settings, the Gear AH Threshold popup and the category/expansion lists, and
+-- the radio dot (its mark is the fill). The caller anchors the returned box and
+-- shows or hides the returned mark.
+function ns.CreateMarkBox(parent, size)
+    local box = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    box:SetSize(size, size)
+    ns.StyleBackdropBox(box)
+    local mark = box:CreateTexture(nil, "ARTWORK")
+    mark:SetPoint("TOPLEFT", 1, -1); mark:SetPoint("BOTTOMRIGHT", -1, 1)
+    mark:SetColorTexture(unpack(ns.COL_ACCENT))
+    return box, mark
 end
 
 -- Best-effort early apply in case SavedVariables already happen to be

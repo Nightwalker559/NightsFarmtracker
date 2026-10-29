@@ -16,7 +16,7 @@ For World of Warcraft: Midnight (game versions 12.1 and 12.1.5). English and Ger
 - **One compact window.** `/nft` or the minimap button opens it; a toolbar on top, the total, timer and gold rate below.
 - **Real values.** Every item is worth the higher of its AH and vendor price, with filters for everything that should only count at vendor price.
 - **History and export.** Sessions are saved per day and month, and can be exported as JSON.
-- **Profiles and themes.** Settings live in switchable profiles; 13 color themes plus your own color.
+- **Profiles and themes.** Settings live in switchable profiles; 16 color themes plus your own color.
 - **Optional extras** (Minimap HUD, fishing helpers, lockout counter) are all off by default.
 
 ---
@@ -45,8 +45,8 @@ Rows show icon, name, amount and value, colored by item quality. Hover an item f
 - Scaling gear is listed per item level and quality, so rolls of different value never mix.
 - Gold dropped directly by mobs is tracked separately.
 - Every item row has a thin value bar showing its share of the most valuable item, in the theme color (can be switched off in the settings).
-- The session timer can run for a fixed length: it counts down and pauses itself at 0.
-- Alternatively set an **item goal** (pieces per item): the bars then show the progress to it, turn green when an item reaches it, and the session pauses. The timer counts up in that case, so the fixed length is not available.
+- The session timer can run for a fixed length: it counts down and pauses itself at 0 (Settings → Session Limit).
+- Alternatively set **item goals**: one amount for every item, plus own amounts for single items in the Item Goals window. The bars then show the progress, turn green when an item reaches its goal, and the session pauses. The timer counts up in that case, so the fixed length is not available.
 - `/reload` pauses the session; a relog saves it to the history and starts fresh.
 - Gold per hour or per minute, shown in classic (coin icons) or modern (colored text) format.
 
@@ -74,13 +74,13 @@ Every item is valued at the higher of its AH and vendor price. Vendor-only items
 
 ## Look and feel
 
-- 13 color themes plus a custom color with live preview (Settings → Colors), an optional gradient on section headers and optional theme-colored toolbar icons.
+- 16 color themes plus a custom color with live preview (Settings → Colors), an optional gradient on section headers and optional theme-colored toolbar icons.
 - Windows dock next to each other without overlapping (below or above when there is no room beside) and can be dragged. The maximum window height is adjustable; longer lists scroll.
 - A minimap button (movable) and an entry in the minimap addon menu, both optional.
 
 ## Settings
 
-Everything is in one window (Settings button or right-click on the minimap button), with a sidebar to jump between sections: AH Price Source, Display, Colors, Session History, Categories & Grouping, Filters, Fishing, Minimap HUD, Data Export and Profiles.
+Everything is in one window (Settings button or right-click on the minimap button), with a sidebar to jump between sections: AH Price Source, Display, Session Limit, Windows & Buttons, Colors, Session History, Categories & Grouping, Filters, Fishing, Minimap HUD, Data Export and Profiles.
 
 Most settings belong to a **profile**: create, copy, rename and delete profiles, and switch between them at any time. Window positions and the current session are stored per character. *Reset all* at the bottom wipes every saved setting and list.
 
@@ -114,7 +114,7 @@ Tip: pair with [Better Fishing](https://www.curseforge.com/wow/addons/better-fis
 
 ### Instance lockout counter
 
-A small frame below the main window with the resets in the last hour (x/9), the time until the oldest one expires, and a button to reset instances. Settings → Display.
+A small frame below the main window with the resets in the last hour (x/9), the time until the oldest one expires, and a button to reset instances. Settings → Windows & Buttons.
 
 ---
 

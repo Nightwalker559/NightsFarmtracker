@@ -55,14 +55,9 @@ local function CreateRadio(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(S_W - S_PAD*2, CTRL_SIZE + CTRL_GAP)
 
-    local dot = CreateFrame("Frame", nil, row, "BackdropTemplate")
-    dot:SetSize(CTRL_SIZE, CTRL_SIZE)
+    local dot, fill = ns.CreateMarkBox(row, CTRL_SIZE)
     dot:SetPoint("TOPLEFT", 0, -4)
-    ns.StyleBackdropBox(dot)
-
-    local fill = dot:CreateTexture(nil,"ARTWORK")
-    fill:SetPoint("TOPLEFT", 1, -1); fill:SetPoint("BOTTOMRIGHT", -1, 1)
-    fill:SetColorTexture(unpack(ns.COL_ACCENT)); fill:Hide()
+    fill:Hide()
     dot.fill = fill
 
     local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -190,6 +185,8 @@ local themeDropdown
 local gearThresholdEB
 local sessionLengthEB
 local itemGoalEB
+local goalsBtn, goalsCheck
+local exportBtn
 local maxHeightEB
 local profileDropdown
 local profileButtons
@@ -263,6 +260,7 @@ local function MakePopupList()
     local list = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     list:SetFrameStrata("TOOLTIP")
     list:EnableMouse(true)
+    list:EnableMouseWheel(true)   -- see ns.CreateWindowFrame
     ns.StyleBackdropBox(list, {0.05,0.08,0.09,1})
     list:Hide()
     return list
@@ -312,19 +310,6 @@ local function MakeDropdown(parent, yOff)
     return frame
 end
 
--- Enter/Escape release focus; the boxed frame around the EditBox is
--- highlighted while it has focus.
-local function HookEditBoxFocus(frame, eb)
-    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEditFocusGained", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_ACCENT))
-    end)
-    eb:SetScript("OnEditFocusLost", function()
-        frame:SetBackdropBorderColor(unpack(ns.COL_BORDER))
-    end)
-end
-
 ------------------------------------------------------------------------
 -- Helper: EditBox for custom TSM price source
 ------------------------------------------------------------------------
@@ -351,7 +336,7 @@ local function MakeCustomSourceEB(parent, yOff)
         ns.ClearPriceCache()
         ns.RefreshHUD()
     end)
-    HookEditBoxFocus(frame, eb)
+    ns.HookEditBoxFocus(frame, eb)
     frame.eb = eb
     return frame
 end
@@ -388,12 +373,8 @@ function ns.ToggleGearThresholdConfig(anchor)
             row:SetPoint("TOPLEFT", 10, -(26 + (i - 1) * TC_ROW_H))
             row:SetPoint("TOPRIGHT", -10, -(26 + (i - 1) * TC_ROW_H))
 
-            local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
-            box:SetSize(14, 14); box:SetPoint("LEFT", 0, 0)
-            ns.StyleBackdropBox(box)
-            local check = box:CreateTexture(nil, "ARTWORK")
-            check:SetPoint("TOPLEFT", 1, -1); check:SetPoint("BOTTOMRIGHT", -1, 1)
-            check:SetColorTexture(unpack(ns.COL_ACCENT))
+            local box, check = ns.CreateMarkBox(row, 14)
+            box:SetPoint("LEFT", 0, 0)
 
             local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             lbl:SetPoint("LEFT", box, "RIGHT", 8, 0)
@@ -444,7 +425,7 @@ local function MakeNumberBox(parent, yOff, maxLetters, unitText)
     eb:SetMaxLetters(maxLetters)
     eb:SetFontObject(GameFontNormalSmall)
     eb:SetTextColor(0.85, 0.85, 0.85)
-    HookEditBoxFocus(frame, eb)
+    ns.HookEditBoxFocus(frame, eb)
 
     local unitLbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     unitLbl:SetPoint("LEFT", frame, "RIGHT", 6, 0)
@@ -502,7 +483,7 @@ local function MakeGearThresholdEB(parent, yOff)
     return frame
 end
 
--- Fixed session length in minutes (0 = off)
+-- Fixed session length in minutes
 local function MakeSessionLengthEB(parent, yOff)
     local frame, eb = MakeNumberBox(parent, yOff, 4, ns.L["minutes_suffix"])
     eb:SetScript("OnTextChanged", function(self, userInput)
@@ -514,26 +495,16 @@ local function MakeSessionLengthEB(parent, yOff)
     return frame
 end
 
--- Session length has no meaning while an item goal runs the count-up timer.
-local function UpdateSessionLengthLock()
-    if not sessionLengthEB then return end
-    local locked = ns.GetItemGoal() ~= nil
-    sessionLengthEB.eb:SetEnabled(not locked)
-    sessionLengthEB:SetAlpha(locked and 0.4 or 1)
-    sessionLengthEB.unitLbl:SetAlpha(locked and 0.4 or 1)
-end
-
--- Item goal (pieces per item, 0 = off). Applied when the field loses focus /
--- Enter is pressed, not per keystroke - typing "5" on the way to "500" would
--- otherwise reach the goal and pause the session on the first digit.
+-- General item goal (pieces for every item without an own goal in the Item
+-- Goals window, 0 = none). Applied when the field loses focus / Enter is
+-- pressed, not per keystroke - typing "5" on the way to "500" would otherwise
+-- reach the goal and pause the session on the first digit.
 local function MakeItemGoalEB(parent, yOff)
     local frame, eb = MakeNumberBox(parent, yOff, 6, ns.L["pieces_suffix"])
     eb:HookScript("OnEditFocusLost", function(self)
         local v = tonumber(self:GetText()) or 0
         self:SetText(v > 0 and tostring(v) or "")
         NightsFarmtrackerDB.itemGoal = v
-        UpdateSessionLengthLock()
-        ns.UpdateTimerDisplay()
         ns.RefreshHUD()
     end)
     return frame
@@ -564,22 +535,56 @@ end
 local THEME_ROW_H = 20
 
 ------------------------------------------------------------------------
--- Helper: "Open Export Window" button (Data Export section) - single
--- persistent instance, reused across rebuilds like gearThresholdEB above.
+-- Helper: button that opens a window ("Open Export Window", "Edit Item Goals") -
+-- single persistent instance, reused across rebuilds like gearThresholdEB above.
+-- btn:SetActive(false) greys it out and makes it inert.
 ------------------------------------------------------------------------
-local exportBtn
-local function MakeExportButton(parent)
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    ns.StyleBackdropBox(btn)
-    local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    text:SetPoint("CENTER")
-    text:SetTextColor(unpack(ns.COL_ACCENT))
-    text:SetText(ns.L["export_open_btn"])
-    btn:SetSize(text:GetStringWidth() + 20, 20)
-    btn:SetScript("OnEnter", function() text:SetTextColor(1,1,1) end)
-    btn:SetScript("OnLeave", function() text:SetTextColor(unpack(ns.COL_ACCENT)) end)
-    btn:SetScript("OnClick", function() ns.ToggleExportWindow() end)
-    return btn
+local function MakeWindowButton(labelKey, onClick)
+    return function(parent)
+        local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+        ns.StyleBackdropBox(btn)
+        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        text:SetPoint("CENTER")
+        text:SetTextColor(unpack(ns.COL_ACCENT))
+        text:SetText(ns.L[labelKey])
+        btn:SetSize(text:GetStringWidth() + 20, 20)
+        btn:SetScript("OnEnter", function(self) if self:IsEnabled() then text:SetTextColor(1,1,1) end end)
+        btn:SetScript("OnLeave", function(self) if self:IsEnabled() then text:SetTextColor(unpack(ns.COL_ACCENT)) end end)
+        btn:SetScript("OnClick", onClick)
+        function btn:SetActive(on)
+            self:SetEnabled(on)
+            if on then text:SetTextColor(unpack(ns.COL_ACCENT)) else text:SetTextColor(0.4, 0.4, 0.4) end
+        end
+        return btn
+    end
+end
+local MakeExportButton = MakeWindowButton("export_open_btn", function() ns.ToggleExportWindow() end)
+local MakeGoalsButton  = MakeWindowButton("goals_open_btn",  function() ns.ToggleGoalsWindow() end)
+
+-- Label-less checkbox for db.itemGoalsEnabled; it also greys out the Item
+-- Goals button next to it. Single persistent instance like the button.
+local function MakeGoalsCheck(parent)
+    local box, check = ns.CreateMarkBox(parent, CTRL_SIZE)
+
+    function box:Sync()
+        local on = NightsFarmtrackerDB.itemGoalsEnabled ~= false
+        check:SetShown(on)
+        if goalsBtn then goalsBtn:SetActive(on) end
+    end
+    box:EnableMouse(true)
+    box:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(ns.L["goals_use_own"])
+        GameTooltip:Show()
+    end)
+    box:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    box:SetScript("OnMouseUp", function(self)
+        NightsFarmtrackerDB.itemGoalsEnabled = NightsFarmtrackerDB.itemGoalsEnabled == false
+        self:Sync()
+        if ns.RebuildGoalsList then ns.RebuildGoalsList() end
+        ns.RefreshHUD()
+    end)
+    return box
 end
 
 -- Miniature window (frame colors, header strip - flat or gradient depending
@@ -717,7 +722,7 @@ local function MakeThemeDropdown(parent, yOff)
 end
 
 ------------------------------------------------------------------------
--- Helper: custom accent color row (Display section). A swatch opens the
+-- Helper: custom accent color row (Colors section). A swatch opens the
 -- Blizzard color picker; the other theme colors are derived from the pick
 -- (ns.DeriveCustomTheme). Next to it a small preview frame shows the
 -- resulting window/header colors - it updates live while dragging in the
@@ -964,13 +969,8 @@ local function CreateCheckbox(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(S_W - S_PAD*2, CTRL_SIZE + CTRL_GAP)
 
-    local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
-    box:SetSize(CTRL_SIZE, CTRL_SIZE); box:SetPoint("TOPLEFT", 0, -4)
-    ns.StyleBackdropBox(box)
-
-    local check = box:CreateTexture(nil,"ARTWORK")
-    check:SetPoint("TOPLEFT", 1, -1); check:SetPoint("BOTTOMRIGHT", -1, 1)
-    check:SetColorTexture(unpack(ns.COL_ACCENT))
+    local box, check = ns.CreateMarkBox(row, CTRL_SIZE)
+    box:SetPoint("TOPLEFT", 0, -4)
     row.check = check
 
     local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1052,6 +1052,8 @@ local RELEASE_FN = {
 ------------------------------------------------------------------------
 local S_SIDEBAR_W = 92
 local sidebarRows = {}
+local contentWheel   -- mouse-wheel handler of the content scroll area; the sidebar forwards to it
+local function SidebarWheel(_, delta) contentWheel(nil, delta) end
 
 local sidebarPool = ns.NewPool(function(parent)
     local row = CreateFrame("Button", nil, parent)
@@ -1067,6 +1069,8 @@ local sidebarPool = ns.NewPool(function(parent)
     row.txt:SetWordWrap(true)
     row:SetScript("OnEnter", function(self) self.txt:SetTextColor(1, 0.82, 0) end)
     row:SetScript("OnLeave", function(self) self.txt:SetTextColor(0.7, 0.7, 0.7) end)
+    row:EnableMouseWheel(true)
+    row:SetScript("OnMouseWheel", SidebarWheel)
     return row
 end, function(row) row:SetScript("OnClick", nil) end)
 
@@ -1253,7 +1257,7 @@ function ns.RebuildSettingsContent()
     end)
 
     -- ----------------------------------------------------------------
-    -- Section: Display
+    -- Section: Display (what the main window shows and how)
     -- ----------------------------------------------------------------
     addSection("display", function(y)
         y = sectionTitle(y, "display", TITLE_STEP_CTRL)
@@ -1262,27 +1266,82 @@ function ns.RebuildSettingsContent()
             db.goldRateMode == "min" and "min" or "hour",
             function(v) db.goldRateMode = v; ns.UpdateGoldRate() end, 32)
 
-        -- Fixed session length (0 = off): the timer counts down and the
-        -- session pauses at 0.
-        wrappedHint(y, ns.L["session_length_hint"])
-        y = y - 28
+        y = radioGroup(y, { {"gold_display_classic", "classic"}, {"gold_display_modern", "modern"} },
+            db.goldDisplayMode == "modern" and "modern" or "classic",
+            function(v) db.goldDisplayMode = v; ns.RefreshHUD() end)
+
+        y = flag(y, "show_price_source", "showPriceSource", false, function() ns.RefreshHUD() end)
+        y = flag(y, "show_value_bar", "showValueBar", true, function() ns.RefreshHUD() end)
+
+        return y
+    end)
+
+    -- ----------------------------------------------------------------
+    -- Section: Session limit (session length or item goals)
+    -- ----------------------------------------------------------------
+    addSection("sec_session_limit", function(y)
+        y = sectionTitle(y, "sec_session_limit", TITLE_STEP_CTRL)
+
+        -- Session length and item goal exclude each other (db.limitMode);
+        -- the checkbox picks the active one, the other keeps its value.
+        -- Rebuilt next frame: the click handler still refreshes its own
+        -- (pooled) row after the setter returns.
+        local function limitCheckbox(y, labelKey, mode)
+            return checkbox(y, labelKey,
+                function() return db.limitMode == mode end,
+                function(v)
+                    db.limitMode = v and mode or "off"
+                    ns.UpdateTimerDisplay()
+                    ns.ApplyPauseVisuals()
+                    ns.RefreshHUD()
+                    if ns.RebuildGoalsList then ns.RebuildGoalsList() end
+                    RunNextFrame(ns.RebuildSettingsContent)
+                end)
+        end
+
+        -- Fixed session length: the timer counts down and the session pauses at 0.
+        y = limitCheckbox(y, "session_length_hint", "session")
 
         sessionLengthEB = PlaceWidget(sessionLengthEB, MakeSessionLengthEB, y)
         local lenMin = tonumber(db.sessionLength) or 0
         sessionLengthEB.eb:SetText(lenMin > 0 and tostring(lenMin) or "")
         track(sessionLengthEB, "other")
-        UpdateSessionLengthLock()
         y = y - 40
 
-        -- Item goal: per-item progress bar, green and timer stop at the goal.
-        local goalHint = wrappedHint(y, ns.L["item_goal_hint"])
+        -- Item goals: per-item progress bar, green and timer stop at the goal.
+        y = limitCheckbox(y, "item_goal_hint", "goal")
+
+        -- General goal for every item without an own one (see GetItemGoal)
+        local goalHint = wrappedHint(y, ns.L["item_goal_general_hint"])
         y = y - math.ceil(goalHint:GetStringHeight()) - 6
 
         itemGoalEB = PlaceWidget(itemGoalEB, MakeItemGoalEB, y)
         local goal = tonumber(db.itemGoal) or 0
         itemGoalEB.eb:SetText(goal > 0 and tostring(goal) or "")
         track(itemGoalEB, "other")
+
+        -- Right of the amount box: checkbox for the own goals (the list stays
+        -- when off), then the Item Goals window button, greyed out while off
+        goalsCheck = PlaceWidget(goalsCheck, MakeGoalsCheck, y)
+        goalsCheck:ClearAllPoints()
+        goalsCheck:SetPoint("LEFT", itemGoalEB.unitLbl, "RIGHT", 14, 0)
+        track(goalsCheck, "other")
+
+        goalsBtn = PlaceWidget(goalsBtn, MakeGoalsButton, y)
+        goalsBtn:ClearAllPoints()
+        goalsBtn:SetPoint("LEFT", goalsCheck, "RIGHT", 8, 0)
+        track(goalsBtn, "other")
+        goalsCheck:Sync()
         y = y - 40
+
+        return y
+    end)
+
+    -- ----------------------------------------------------------------
+    -- Section: Windows and buttons (height, lock, optional windows, launchers)
+    -- ----------------------------------------------------------------
+    addSection("sec_windows", function(y)
+        y = sectionTitle(y, "sec_windows", TITLE_STEP)
 
         -- Max window height: windows grow up to this, then their lists scroll.
         local heightHint = wrappedHint(y, string.format(ns.L["max_window_height_hint"],
@@ -1294,12 +1353,6 @@ function ns.RebuildSettingsContent()
         track(maxHeightEB, "other")
         y = y - 40
 
-        y = radioGroup(y, { {"gold_display_classic", "classic"}, {"gold_display_modern", "modern"} },
-            db.goldDisplayMode == "modern" and "modern" or "classic",
-            function(v) db.goldDisplayMode = v; ns.RefreshHUD() end)
-
-        y = flag(y, "show_price_source", "showPriceSource", false, function() ns.RefreshHUD() end)
-        y = flag(y, "show_value_bar", "showValueBar", true, function() ns.RefreshHUD() end)
         y = flag(y, "lock_main_frame", "mainLocked", false)
         y = checkbox(y, "minimap_button",
             function() return not db.minimap.hide end,
@@ -1488,10 +1541,13 @@ function ns.RebuildSettingsContent()
         return a.title:lower() < b.title:lower()
     end)
 
-    local y = -8   -- start with small top padding within scroll area
+    local TOP_PAD = 8   -- small top padding within the scroll area
+    local y = -TOP_PAD
     local jumpTargets = {}
     for _, sec in ipairs(sections) do
-        jumpTargets[#jumpTargets + 1] = {title = sec.title, y = -y}
+        -- keeps the same gap above the title as at the very top, so jumping to
+        -- the first section doesn't scroll at all
+        jumpTargets[#jumpTargets + 1] = {title = sec.title, y = -y - TOP_PAD}
         y = sec.builder(y)
         local last = settingsContent[#settingsContent]
         if last and last.kind == "checkbox" then y = y - CHECK_RUN_TAIL end   -- air before the next section title
@@ -1535,6 +1591,9 @@ local function EnsureSettingsFrame()
     SSidebar = CreateFrame("Frame", nil, SF)
     SSidebar:SetPoint("TOPLEFT", 0, -S_HDR_H)
     SSidebar:SetWidth(S_SIDEBAR_W)
+    SSidebar:EnableMouse(true)   -- with the wheel it keeps the sidebar's gaps from passing scrolls to the chat
+    SSidebar:EnableMouseWheel(true)
+    SSidebar:SetScript("OnMouseWheel", SidebarWheel)
 
     local sidebarSep = SF:CreateTexture(nil, "ARTWORK")
     sidebarSep:SetWidth(1); sidebarSep:SetColorTexture(unpack(ns.COL_BORDER))
@@ -1542,20 +1601,9 @@ local function EnsureSettingsFrame()
     sidebarSep:SetPoint("BOTTOMLEFT", S_SIDEBAR_W, S_FTR_H)
 
     -- Scroll container — right of the sidebar, below header sep
-    SScrollFrame = CreateFrame("ScrollFrame", nil, SF)
+    SScrollFrame, SListFrame, contentWheel = ns.CreateScrollList(SF, S_W, S_SCROLL_STEP)
     SScrollFrame:SetPoint("TOPLEFT",  S_SIDEBAR_W, -S_HDR_H)
     SScrollFrame:SetPoint("TOPRIGHT", 0, -S_HDR_H)
-    SScrollFrame:EnableMouseWheel(true)
-
-    SListFrame = CreateFrame("Frame", nil, SScrollFrame)
-    SListFrame:SetWidth(S_W)
-    SListFrame:SetHeight(1)
-    SScrollFrame:SetScrollChild(SListFrame)
-
-    local OnWheel = ns.MakeWheelHandler(SScrollFrame, SListFrame, S_SCROLL_STEP)
-    SScrollFrame:SetScript("OnMouseWheel", OnWheel)
-    SListFrame:EnableMouseWheel(true)
-    SListFrame:SetScript("OnMouseWheel", OnWheel)
 
     ns.CreateDangerLink(SF, S_PAD, ns.L["reset_addon"], function() StaticPopup_Show("NFT_CONFIRM_RESET_ADDON") end)
 end

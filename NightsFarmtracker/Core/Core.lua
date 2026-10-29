@@ -59,7 +59,7 @@ ns.CLASS_PRIORITY = {
     [8]  = 8,   -- Item Enhancement
     [1]  = 9,   -- Container
     [12] = 10,  -- Quest
-    [14] = 11,  -- Miscellaneous
+    [15] = 11,  -- Miscellaneous
 }
 -- Housing classID is not hardcoded above (varies by patch); ns.InitDB()
 -- registers it at runtime via ns.HOUSING so it always gets the correct
@@ -67,12 +67,14 @@ ns.CLASS_PRIORITY = {
 
 -- UI layout
 ns.FRAME_W     = 330
-ns.PAD         = 10
+ns.STACK_GAP   = 4    -- space between the windows stacked below the collapsed main window (the Loot Log)
+ns.PAD         = 4    -- side gap between a window's border and its content
 ns.ROW_H       = 34   -- 30 px icon + 1 px border each side: 2 px between the borders of adjacent rows
-ns.CAT_GAP     = 1    -- extra space above/below a category's rows: 2 px between header and icon border
+ns.CAT_GAP     = 5    -- extra space above/below a category's rows: 6 px between header and icon border
 ns.CAT_ROW_H   = 22
 ns.CTRL_GAP    = 6    -- gap between neighbouring checkboxes / radio buttons (Settings and the list windows)
 ns.CHECKBOX_ROW_H = 12 + ns.CTRL_GAP  -- row height for checkbox-list sections (12 px box + gap): category filters, AH-by-expansion
+ns.NAME_GAP    = 4    -- item name / value bar offset from the row icon's right edge
 ns.ICON_X      = 1    -- row icon offset: its 1 px border then sits flush with the row/header edge
 ns.FOOTER_H    = 32
 ns.ICON_SIZE   = 30
@@ -82,7 +84,7 @@ ns.CONTENT_W   = ns.FRAME_W - ns.PAD * 2
 ns.SCROLL_STEP = ns.ROW_H
 -- Maximum total window height (header + list + footer) of the main window and
 -- every list window; longer content scrolls. User setting db.maxWindowHeight
--- (Settings -> Display), read through ns.GetMaxWindowH(). The Help window is
+-- (Settings -> Windows & Buttons), read through ns.GetMaxWindowH(). The Help window is
 -- a bit taller (see ns.GetMaxHelpH).
 ns.DEFAULT_MAX_WINDOW_H = 360
 ns.MIN_MAX_WINDOW_H     = 200
@@ -106,6 +108,7 @@ function ns.ApplyWindowHeightSetting()
     if ns.HistFrame and ns.HistFrame:IsShown() and ns.RebuildHistory then ns.RebuildHistory() end
     if ns.FilterFrame and ns.FilterFrame:IsShown() and ns.RebuildFilterList then ns.RebuildFilterList() end
     if ns.BlacklistFrame and ns.BlacklistFrame:IsShown() and ns.RebuildBlacklistList then ns.RebuildBlacklistList() end
+    if ns.GoalsFrame and ns.GoalsFrame:IsShown() and ns.RebuildGoalsList then ns.RebuildGoalsList() end
     if ns.LogFrame and ns.LogFrame:IsShown() and ns.RebuildLogList then ns.RebuildLogList() end
     if ns.RefitHelpWindow then ns.RefitHelpWindow() end
     if ns.SettingsFrame and ns.SettingsFrame:IsShown() and ns.RebuildSettingsContent then ns.RebuildSettingsContent() end

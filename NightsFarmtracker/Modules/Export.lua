@@ -220,14 +220,9 @@ local function EnsurePickFrame()
 
     ns.AddHLine(PickFrame, "TOP", ns.PAD, -(ns.WINDOW_HDR_H - 1))
 
-    local scroll = CreateFrame("ScrollFrame", nil, PickFrame)
+    local scroll, content = ns.CreateScrollList(PickFrame, PICK_W - ns.PAD * 2 - 4, PICK_ROW_H)
     scroll:SetPoint("TOPLEFT", ns.PAD, -(ns.WINDOW_HDR_H + 4))
     scroll:SetPoint("BOTTOMRIGHT", -ns.PAD, 10)
-    scroll:EnableMouseWheel(true)
-    local content = CreateFrame("Frame", nil, scroll)
-    content:SetWidth(PICK_W - ns.PAD * 2 - 4)
-    scroll:SetScrollChild(content)
-    scroll:SetScript("OnMouseWheel", ns.MakeWheelHandler(scroll, content, PICK_ROW_H))
     PickFrame.scroll, PickFrame.content = scroll, content
 end
 

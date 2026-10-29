@@ -16,12 +16,13 @@ local ICON_SIZE   = ns.ICON_SIZE
 local CONTENT_W   = ns.CONTENT_W
 local SCROLL_STEP = ns.SCROLL_STEP
 
--- Value bar of an item row: right of the icon border (1 px gap), its bottom
--- edge flush with the border's bottom edge, running to the row's right edge
--- (the category header's right edge). The border sticks out 1 px on every
--- side of the icon (ns.AddRowIcon), hence the extra pixel.
+-- Value bar of an item row: starts where the item name starts (NAME_GAP right
+-- of the icon), its bottom edge flush with the icon border's bottom edge
+-- (the border sticks out 1 px on every side of the icon, see ns.AddRowIcon),
+-- running to the row's right edge (the category header's right edge).
+local NAME_GAP   = ns.NAME_GAP
 local BAR_H      = 2
-local BAR_LEFT   = ICON_X + ICON_SIZE + 1 + 1
+local BAR_LEFT   = ICON_X + ICON_SIZE + NAME_GAP
 local BAR_BOTTOM = (ROW_H - ICON_SIZE) / 2 - 1
 local BAR_FULL_W = CONTENT_W - BAR_LEFT
 local GOAL_COL   = {0.2, 0.85, 0.2}
@@ -34,6 +35,7 @@ local BTN_BAR_H  = 26
 local HDR_TOTAL  = ns.WINDOW_HDR_H  -- same header height as every other window
 local SCROLL_TOP = HDR_TOTAL + 1
 local COLLAPSED_H = HDR_TOTAL + 1 + FOOTER_H
+ns.COLLAPSED_H = COLLAPSED_H   -- the Loot Log docked below the collapsed window shares the height cap with it
 
 ------------------------------------------------------------------------
 -- State
@@ -54,6 +56,7 @@ MainFrame:HookScript("OnHide", function(self) ns.HideTooltipOf(self) end)
 -- Same strata as every other window of the addon.
 MainFrame:SetFrameStrata("MEDIUM")
 MainFrame:SetMovable(true); MainFrame:EnableMouse(true); MainFrame:SetClampedToScreen(true)
+MainFrame:EnableMouseWheel(true)   -- the wheel must not scroll whatever lies behind the window
 ns.ApplyFrameStyle(MainFrame)
 MainFrame:RegisterForDrag("LeftButton")
 MainFrame:SetScript("OnDragStart", function(self)
@@ -186,20 +189,10 @@ btnRate.text:SetFontHeight(ns.FONT_NORMAL)
 ------------------------------------------------------------------------
 -- Scroll frame (visible only when expanded)
 ------------------------------------------------------------------------
-local ScrollFrame = CreateFrame("ScrollFrame", nil, MainFrame)
+local ScrollFrame, ListFrame, OnWheel = ns.CreateScrollList(MainFrame, CONTENT_W, SCROLL_STEP)
 ScrollFrame:SetPoint("TOPLEFT",     PAD,  -SCROLL_TOP)
 ScrollFrame:SetPoint("BOTTOMRIGHT", -PAD,  FOOTER_H)
 ScrollFrame:Hide()
-
-local ListFrame = CreateFrame("Frame", nil, ScrollFrame)
-ListFrame:SetSize(CONTENT_W, 1)
-ScrollFrame:SetScrollChild(ListFrame)
-
-local OnWheel = ns.MakeWheelHandler(ScrollFrame, ListFrame, SCROLL_STEP)
-ScrollFrame:EnableMouseWheel(true)
-ScrollFrame:SetScript("OnMouseWheel", OnWheel)
-ListFrame:EnableMouseWheel(true)
-ListFrame:SetScript("OnMouseWheel", OnWheel)
 
 ------------------------------------------------------------------------
 -- Gold Overview Frame
@@ -264,9 +257,10 @@ function ns.UpdateGoldFrame()
     GoldFrame.totalVal:SetText( cachedGold > 0 and ns.FormatGold(cachedGold) or "0")
 end
 
--- Gold Overview and Lockout frame hang below the main window. Near the bottom
--- of the screen they would be clamped on top of it, so the window moves up by
--- the missing space instead (only on screen, the saved position stays).
+-- Gold Overview, Lockout frame and (collapsed) Loot Log hang below the main
+-- window. Near the bottom of the screen they would be clamped on top of it, so
+-- the window moves up by the missing space instead (only on screen, the saved
+-- position stays).
 function ns.KeepStackOnScreen()
     local bottom = MainFrame:GetBottom()
     if not bottom or not MainFrame:IsShown() then return end
@@ -275,6 +269,8 @@ function ns.KeepStackOnScreen()
     if GoldFrame:IsShown() then below = below + GoldFrame:GetHeight() + 2 end
     local lockout = ns.LockoutFrame
     if lockout and lockout:IsShown() then below = below + lockout:GetHeight() + 2 end
+    local log = ns.LogFrame   -- docked below the stack while the main window is collapsed
+    if log and log:IsShown() and NightsFarmtrackerDB.expanded == false then below = below + ns.STACK_GAP + log:GetHeight() end
     local missing = below - bottom
     if missing <= 0 then return end
     local x, y = ns.AnchorToTop(MainFrame)
@@ -284,18 +280,17 @@ end
 function ns.ToggleGoldFrame()
     if ns.DeferInCombat(ns.ToggleGoldFrame) then return end
     if GoldFrame:IsShown() then GoldFrame:Hide()
-    else GoldFrame:Show(); ns.UpdateGoldFrame(); ns.KeepStackOnScreen() end
+    else GoldFrame:Show(); ns.UpdateGoldFrame() end
     -- GoldFrame always sits directly below MainFrame; when MainFrame is
-    -- collapsed, LogFrame also wants that spot, so it needs to know
-    -- whether to chain below GoldFrame instead (avoids overlap).
-    if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
-        ns.ReanchorLogFrame()
-    end
+    -- collapsed, LogFrame also wants that spot, so it chains below GoldFrame
+    -- instead (avoids overlap) and gets less height.
+    ns.RefreshLogDock()
+    if GoldFrame:IsShown() then ns.KeepStackOnScreen() end
 end
 
 -- Closing the main window closes every popout that docks off it, so the
 -- user doesn't end up with orphaned windows floating on screen.
-local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "BlacklistFrame",
+local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "BlacklistFrame", "GoalsFrame",
                          "HistFrame", "DetailFrame", "VenomFrame" }
 
 MainFrame:HookScript("OnHide", function()
@@ -310,16 +305,26 @@ end)
 ------------------------------------------------------------------------
 -- Timer / rate
 ------------------------------------------------------------------------
--- Optional item goal (db.itemGoal pieces per item, 0 = off): see ApplyValueBars.
-function ns.GetItemGoal()
-    local goal = tonumber(NightsFarmtrackerDB.itemGoal) or 0
-    return goal > 0 and goal or nil
+-- Item goals and session length are mutually exclusive: db.limitMode picks
+-- which one is active ("goal" | "session" | "off"), the other keeps its value.
+-- The goal of one item (pieces) or nil: its own amount from db.itemGoals (only
+-- while db.itemGoalsEnabled, so the list can stay without being emptied), else
+-- the general db.itemGoal that covers every other item (0 = none), except
+-- items in the Vendor-Only Filter: they only get a goal of their own. See
+-- ApplyValueBars. Goals run the normal count-up timer.
+function ns.GetItemGoal(itemID)
+    local db = NightsFarmtrackerDB
+    if db.limitMode ~= "goal" or not itemID then return nil end
+    local entry = db.itemGoalsEnabled ~= false and db.itemGoals and db.itemGoals[itemID]
+    local amount = entry and tonumber(entry.amount) or 0
+    if amount <= 0 and not ns.IsForceVendor(itemID) then amount = tonumber(db.itemGoal) or 0 end
+    return amount > 0 and amount or nil
 end
 
--- Optional fixed session length (db.sessionLength minutes, 0 = off): the
--- timer then counts down and the session pauses itself at 0.
+-- Optional fixed session length (db.sessionLength minutes): the timer then
+-- counts down and the session pauses itself at 0.
 function ns.GetSessionLimit()
-    if ns.GetItemGoal() then return nil end   -- a goal runs the normal count-up timer
+    if NightsFarmtrackerDB.limitMode ~= "session" then return nil end
     local minutes = tonumber(NightsFarmtrackerDB.sessionLength) or 0
     return minutes > 0 and minutes * 60 or nil
 end
@@ -417,9 +422,8 @@ function ns.SetExpanded(expand)
         SafeSetMainHeight(COLLAPSED_H)
     end
     UpdateFooterLine()
-    if ns.ReanchorLogFrame and ns.LogFrame and ns.LogFrame:IsShown() then
-        ns.ReanchorLogFrame()
-    end
+    ns.RefreshLogDock()   -- the log's size and place depend on the state
+    ns.KeepStackOnScreen()
 end
 
 ------------------------------------------------------------------------
@@ -499,7 +503,7 @@ local function ResetRowLayout(row)
     row.icon:ClearAllPoints()
     row.icon:SetPoint("LEFT", ICON_X, 0)
     row.nameText:ClearAllPoints()
-    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
+    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", NAME_GAP, 0)
     row.nameText:SetPoint("RIGHT", row,      "RIGHT", -128, 0)
     row.nameText:SetFontHeight(ns.FONT_NORMAL)
     row.nameText:SetMaxLines(2)
@@ -622,7 +626,7 @@ local rowPool = ns.NewPool(function(parent)
     ResetRowLayout(row)
     return row
 end, function(row)
-    row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false
+    row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false; row.barGoal = nil
     row.itemName=nil; row.itemLink=nil; row.itemID=nil; row.baseItemID=nil
     row.isCategoryHeader=nil; row.categoryName=nil; row.isJunkMerged=nil
     ns.ShowHeaderBand(row, false)
@@ -695,42 +699,42 @@ local function DrawBar(row, frac, r, g, b)
     row.barBg:Show(); row.bar:Show()
 end
 
--- With an item goal (db.itemGoal) the bar is the item's count relative to the
--- goal instead, and turns green once it is reached; goalReached then tells
+-- Rows of an item with a goal (db.itemGoals / db.itemGoal) show their count relative to the
+-- goal instead, and turn green once it is reached; goalReached then tells
 -- BuildHUD to pause the session (also with the bars switched off). The merged
--- junk row is a sum of many items, so it has no goal bar.
+-- junk row is a sum of many items, so it has no goal. Every other row keeps
+-- the value bar, scaled among the rows without a goal.
 local function ApplyValueBars()
-    local goal = ns.GetItemGoal()
     goalReached = false
     barsShown = NightsFarmtrackerDB.showValueBar ~= false
-    if goal then
-        for _, row in pairs(itemRows) do
-            local c = row.barCount
-            if c and c > 0 and not row.isJunkMerged then
-                if c >= goal then
-                    goalReached = true
-                    DrawBar(row, 1, unpack(GOAL_COL))
-                else
-                    DrawBar(row, c / goal, unpack(ns.COL_ACCENT))
-                end
-            end
-        end
-        return
-    end
-    if not barsShown then return end
 
     local maxValue, maxMerged = 0, 0
     for _, row in pairs(itemRows) do
-        local v = row.barValue
-        if v then
-            if row.isJunkMerged then maxMerged = math.max(maxMerged, v)
-            else maxValue = math.max(maxValue, v) end
+        local goal = not row.isJunkMerged and row.barCount and ns.GetItemGoal(row.itemID)
+        if goal then
+            local c = row.barCount
+            row.barGoal = goal
+            if c >= goal then
+                goalReached = true
+                DrawBar(row, 1, unpack(GOAL_COL))
+            else
+                DrawBar(row, c / goal, unpack(ns.COL_ACCENT))
+            end
+        else
+            row.barGoal = nil
+            local v = row.barValue
+            if v then
+                if row.isJunkMerged then maxMerged = math.max(maxMerged, v)
+                else maxValue = math.max(maxValue, v) end
+            end
         end
     end
+    if not barsShown then return end
+
     if maxValue == 0 then maxValue = maxMerged end
     for _, row in pairs(itemRows) do
         local v = row.barValue
-        if v and v > 0 and maxValue > 0 then
+        if not row.barGoal and v and v > 0 and maxValue > 0 then
             DrawBar(row, v / maxValue, unpack(ns.COL_ACCENT))
         end
     end
@@ -935,7 +939,7 @@ local function RenderFlatRow(fi, yOffset)
     row:SetPoint("TOPLEFT", 0, -yOffset)
     ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality, {1, 1, 1})
     row.nameText:ClearAllPoints()
-    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", 4, 0)
+    row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", NAME_GAP, 0)
     row.nameText:SetPoint("RIGHT", row,      "RIGHT", -108, 0)
 
     if fi.isRank then

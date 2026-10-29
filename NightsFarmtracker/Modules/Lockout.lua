@@ -7,7 +7,7 @@
 -- window shows x/9 plus the time until the oldest one drops off, with a
 -- button that calls ResetInstances().
 -- The limit is per account, so the list lives in the account-wide DB.
--- Off by default; toggled via Settings -> Display.
+-- Off by default; toggled via Settings -> Windows & Buttons.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -110,6 +110,7 @@ local function EnsureFrame()
     LockoutFrame:SetFrameStrata("MEDIUM")
     LockoutFrame:SetClampedToScreen(true)
     LockoutFrame:EnableMouse(true)
+    LockoutFrame:EnableMouseWheel(true)   -- see ns.CreateWindowFrame
     ns.ApplyFrameStyle(LockoutFrame)
     LockoutFrame:Hide()
     ns.LockoutFrame = LockoutFrame
@@ -138,20 +139,18 @@ local function EnsureFrame()
     LockoutFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- The Log window chains below this frame while it is visible (main window
-    -- collapsed), so it re-anchors on show and hide. The countdown refreshes
+    -- collapsed), so its size and place follow show and hide. The countdown refreshes
     -- once a second, only while visible.
-    local function ReanchorLog()
-        if ns.LogFrame and ns.LogFrame:IsShown() and ns.ReanchorLogFrame then ns.ReanchorLogFrame() end
-    end
     local ticker
     LockoutFrame:HookScript("OnShow", function()
-        Reanchor(); UpdateText(); ns.KeepStackOnScreen()
+        Reanchor(); UpdateText()
         if not ticker then ticker = C_Timer.NewTicker(1, UpdateText) end
-        ReanchorLog()
+        ns.RefreshLogDock()
+        ns.KeepStackOnScreen()
     end)
     LockoutFrame:HookScript("OnHide", function()
         if ticker then ticker:Cancel(); ticker = nil end
-        ReanchorLog()
+        ns.RefreshLogDock()
     end)
     ns.GoldFrame:HookScript("OnShow", Reanchor)
     ns.GoldFrame:HookScript("OnHide", Reanchor)

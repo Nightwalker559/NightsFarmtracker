@@ -488,8 +488,19 @@ EventFrame = CreateFrame("Frame")
 -- includes the full link, so differently rolled gear never matches). Two real
 -- pickups - several corpses in one loot-all, herb procs - are separate chat
 -- lines with their own lineID and must both count, so the window is tiny.
-local recentLootLine = {}  -- itemID -> { text, at, lineID }
-local DUP_WINDOW     = 0.02  -- seconds, "this frame or the next"
+local recentLootLine  = {}  -- itemID -> { text, at, lineID }
+local recentLootCount = 0
+local DUP_WINDOW      = 0.02  -- seconds, "this frame or the next"
+local LOOT_LINE_PRUNE = 100   -- entries before the stale ones are dropped
+
+local function PruneLootLines(now)
+    for id, rec in pairs(recentLootLine) do
+        if now - rec.at >= DUP_WINDOW then
+            recentLootLine[id] = nil
+            recentLootCount = recentLootCount - 1
+        end
+    end
+end
 
 local function IsDuplicateLootLine(itemID, msg, lineID)
     local now = GetTime()
@@ -498,8 +509,12 @@ local function IsDuplicateLootLine(itemID, msg, lineID)
     if rec then
         lastText, lastAt, lastLineID = rec.text, rec.at, rec.lineID
     else
+        -- an entry older than the window can never match again, so the table
+        -- only holds what was looted in the last moments
+        if recentLootCount >= LOOT_LINE_PRUNE then PruneLootLines(now) end
         rec = {}
         recentLootLine[itemID] = rec
+        recentLootCount = recentLootCount + 1
     end
     rec.text, rec.at, rec.lineID = msg, now, lineID
     if lastAt and lineID and lastLineID and lineID ~= lastLineID then return false end
@@ -515,12 +530,13 @@ local recentEncounterLoot = {}  -- ENCOUNTER_LOOT_RECEIVED waiting for its chat 
 local CROSS_DEDUP_TTL     = 2   -- seconds
 local ENCOUNTER_WAIT      = 0.4 -- seconds to wait for the chat line
 
+-- Takes one open count of itemID out of t; an entry that reaches 0 is dropped,
+-- so the tables only hold what is still waiting.
 local function ConsumePending(t, itemID)
-    if t[itemID] and t[itemID] > 0 then
-        t[itemID] = t[itemID] - 1
-        return true
-    end
-    return false
+    local n = t[itemID]
+    if not n or n <= 0 then return false end
+    t[itemID] = n > 1 and n - 1 or nil
+    return true
 end
 
 EventFrame:RegisterEvent("ADDON_LOADED")
@@ -680,11 +696,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         -- a late encounter event for this item is skipped.
         ConsumePending(recentEncounterLoot, itemID)
         recentChatLoot[itemID] = (recentChatLoot[itemID] or 0) + 1
-        C_Timer.After(CROSS_DEDUP_TTL, function()
-            if recentChatLoot[itemID] and recentChatLoot[itemID] > 0 then
-                recentChatLoot[itemID] = recentChatLoot[itemID] - 1
-            end
-        end)
+        C_Timer.After(CROSS_DEDUP_TTL, function() ConsumePending(recentChatLoot, itemID) end)
 
         ProcessLoot({ NewPendingLoot(itemID, qty, fullLink, itemName, color) })
 
