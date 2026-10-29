@@ -10,7 +10,8 @@ local _, ns = ...
 
 local MIN_VIS_H = 30   -- room for the "list empty" label
 local DZ_H      = 34   -- drop zone height
-local FTR_H     = 26   -- footer strip (Clear All, inactive note)
+local FTR_H     = 26   -- footer strip (Clear All)
+local NOTE_H    = 16   -- inactive note, sits above the footer strip
 local BOX_W     = 52   -- amount box on the right of each row
 
 local pad, hdrH = ns.PAD, ns.WINDOW_HDR_H
@@ -99,18 +100,19 @@ function ns.RebuildGoalsList()
         yOff = yOff + ns.ROW_H
     end
 
+    local inactive = NightsFarmtrackerDB.limitMode ~= "goal" or NightsFarmtrackerDB.itemGoalsEnabled == false
     scrollFrame:ClearAllPoints()
     scrollFrame:SetPoint("TOPLEFT", pad, -hdrH)
     ns.FitScrollWindow({
         window = frame, scroll = scrollFrame, list = listFrame,
-        hdrH = hdrH, ftrH = FTR_H,
+        hdrH = hdrH, ftrH = FTR_H + (inactive and NOTE_H or 0),
         contentH = yOff + (#list == 0 and MIN_VIS_H or 0),
     })
 
     frame.emptyLabel:ClearAllPoints()
     frame.emptyLabel:SetPoint("TOP", listFrame, "TOP", 0, -(yOff + 14))
     frame.emptyLabel:SetShown(#list == 0)
-    frame.inactiveNote:SetShown(NightsFarmtrackerDB.limitMode ~= "goal" or NightsFarmtrackerDB.itemGoalsEnabled == false)
+    frame.inactiveNote:SetShown(inactive)
 end
 
 local function HandleDrop()
@@ -147,7 +149,7 @@ local function EnsureFrame()
     frame.emptyLabel:SetText(ns.L["goals_list_empty"])
 
     frame.inactiveNote = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    frame.inactiveNote:SetPoint("BOTTOMLEFT", pad, 10)
+    frame.inactiveNote:SetPoint("BOTTOMLEFT", pad, FTR_H)
     frame.inactiveNote:SetTextColor(0.85, 0.3, 0.3)
     frame.inactiveNote:SetText(ns.L["goals_inactive"])
 
