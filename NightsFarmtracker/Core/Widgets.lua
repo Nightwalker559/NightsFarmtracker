@@ -74,7 +74,7 @@ end
 -- call ns.RefreshWindowChain(side) after showing or hiding it.
 ------------------------------------------------------------------------
 ns.WINDOW_CHAINS = {
-    right = { "LogFrame", "FilterFrame", "BlacklistFrame", "GoalsFrame" },
+    right = { "LogFrame", "FilterFrame", "GoalsFrame" },
     left  = { "HistFrame", "SettingsFrame", "SellConfigFrame", "ExportPickFrame", "ExportFrame", "DebugFrame" },
 }
 

@@ -34,6 +34,7 @@ Modules\Export.lua
 Modules\Debug.lua
 Modules\Log.lua
 Modules\Settings.lua
+Modules\FilterWindow.lua
 Modules\Filter.lua
 Modules\Blacklist.lua
 Modules\ItemGoals.lua

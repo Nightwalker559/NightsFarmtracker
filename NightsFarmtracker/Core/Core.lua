@@ -112,8 +112,7 @@ end
 function ns.ApplyWindowHeightSetting()
     if ns.RefreshHUD then ns.RefreshHUD() end
     if ns.HistFrame and ns.HistFrame:IsShown() and ns.RebuildHistory then ns.RebuildHistory() end
-    if ns.FilterFrame and ns.FilterFrame:IsShown() and ns.RebuildFilterList then ns.RebuildFilterList() end
-    if ns.BlacklistFrame and ns.BlacklistFrame:IsShown() and ns.RebuildBlacklistList then ns.RebuildBlacklistList() end
+    if ns.RebuildFilterList then ns.RebuildFilterList() end
     if ns.GoalsFrame and ns.GoalsFrame:IsShown() and ns.RebuildGoalsList then ns.RebuildGoalsList() end
     if ns.LogFrame and ns.LogFrame:IsShown() and ns.RebuildLogList then ns.RebuildLogList() end
     if ns.RefitHelpWindow then ns.RefitHelpWindow() end

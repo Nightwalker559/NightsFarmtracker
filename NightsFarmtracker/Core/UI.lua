@@ -290,7 +290,7 @@ end
 
 -- Closing the main window closes every popout that docks off it, so the
 -- user doesn't end up with orphaned windows floating on screen.
-local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "BlacklistFrame", "GoalsFrame",
+local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "GoalsFrame",
                          "HistFrame", "DetailFrame", "VenomFrame" }
 
 MainFrame:HookScript("OnHide", function()
@@ -480,15 +480,14 @@ local function AddItemToList(itemID, itemName, toBlacklist)
     if toBlacklist then
         ns.AddBlacklist(itemID, name, icon, quality)
         ns.Print(ns.L["msg_added_blacklist"]:format(name))
-        ns.RebuildBlacklistList()
     elseif ns.IsForceVendor(itemID) then
         ns.Print(ns.L["msg_already_vendor"]:format(name))
         return
     else
         ns.AddForceVendor(itemID, name, icon, quality)
         ns.Print(ns.L["msg_added_vendor"]:format(name))
-        ns.RebuildFilterList()
     end
+    ns.RebuildFilterList()
     ns.RefreshHUD()  -- also drops a just-blacklisted item from the live count
 end
 
@@ -1043,9 +1042,7 @@ local function BuildHUD()
     UpdateFooterLine()
     UpdateSummary(grandTotal)
 
-    if ns.FilterFrame and ns.FilterFrame:IsShown() then
-        ns.RebuildFilterList()
-    end
+    if ns.RebuildFilterList then ns.RebuildFilterList() end
 end
 
 local refreshQueued = false
@@ -1210,11 +1207,7 @@ end)
 -- Left-click: Vendor-Only Filter · Right-click: Blacklist
 btnFilter:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 btnFilter:SetScript("OnClick", function(_, button)
-    if button == "RightButton" then
-        if NightsFarmtrackerDB.blacklistEnabled ~= false then ns.ToggleBlacklistWindow() end
-    else
-        if NightsFarmtrackerDB.vendorFilterEnabled ~= false then ns.ToggleFilterWindow() end
-    end
+    ns.ToggleFilterWindow(button == "RightButton" and "blacklist" or "vendor")
 end)
 SetBtnTooltip(btnFilter, "ANCHOR_RIGHT", function(tip)
     local db = NightsFarmtrackerDB
@@ -1260,4 +1253,5 @@ function ns.RefreshLeftButtons()
     else
         btnFilter:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
     end
+    if ns.RefreshFilterTabs then ns.RefreshFilterTabs() end
 end
