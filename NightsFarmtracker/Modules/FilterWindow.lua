@@ -87,7 +87,10 @@ local function SelectTab(tab)
     if active and active ~= tab and active.pane then active.pane.Hide() end
     active = tab
     NightsFarmtrackerDB.filterTab = tab.key
-    if not tab.pane then tab.pane = ns.CreateDropListPane(frame, tab.cfg, BODY_TOP) end
+    if not tab.pane then
+        tab.pane = ns.CreateDropListPane(frame, tab.cfg, BODY_TOP)
+        ns.RoundWindowLayout(frame)
+    end
     tab.pane.Show()
     PaintTabs()
     tab.pane.Rebuild()
@@ -106,6 +109,7 @@ local function EnsureFrame()
     end)
 
     for _, tab in ipairs(tabs) do tab.button = CreateTabButton(tab, SelectTab) end
+    ns.RoundWindowLayout(frame)   -- title and tab labels stay put while the list below changes height
 end
 
 -- Rebuilds the list of the shown tab (the others rebuild when opened)

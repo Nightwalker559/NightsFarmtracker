@@ -567,6 +567,16 @@ function ns.CreateWindowFrame(name, title, opts)
     return frame
 end
 
+-- Rounds the layout of a frame, its regions and its children (as they exist
+-- now) to whole pixels: Blizzard's own cure for text that moves by a pixel when
+-- the height of the frame it hangs from changes (a window whose list grows or
+-- shrinks). Call it after the parts that must stay put have been created.
+function ns.RoundWindowLayout(frame)
+    if PixelUtil and PixelUtil.SetRoundLayoutToNearestPixelRecursively then
+        PixelUtil.SetRoundLayoutToNearestPixelRecursively(frame, true)
+    end
+end
+
 ------------------------------------------------------------------------
 -- Small movable overlay (Venom Tracker, Fishing Lure Bar): styled, clamped,
 -- hidden at first. Dragging saves db[posKey] = { "TOP", x, y } (anchored to
