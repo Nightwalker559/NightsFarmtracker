@@ -8,7 +8,7 @@
 local _, ns = ...
 
 ns.RegisterFilterTab({
-    key = "blacklist", titleKey = "blacklist_title", enabledKey = "blacklistEnabled",
+    key = "blacklist", titleKey = "filter_tab_blacklist", enabledKey = "blacklistEnabled",
     itemsKey = "blacklist", categoriesKey = "blacklistCategories",
     categoriesTitleKey = "blacklist_categories_title", emptyKey = "blacklist_list_empty",
     clearPopup = "NFT_CONFIRM_CLEAR_ALL_BLACKLIST", clearConfirmKey = "blacklist_clear_all_confirm",

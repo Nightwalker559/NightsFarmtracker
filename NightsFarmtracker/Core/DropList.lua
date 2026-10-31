@@ -375,11 +375,12 @@ end
 -- window: the shared window; bodyTop: window Y where the scroll area starts.
 -- cfg:
 --   itemsKey                 account table: itemID -> { name, icon, quality, expansionID }
---   categoriesKey            account table of per-category switches
+--   categoriesKey (optional) account table of per-category switches; without it there are no
+--                            category checkboxes (the Delete List)
 --   categoriesTitleKey, emptyKey, clearConfirmKey, removeGroupKey   locale keys
 --   clearPopup, removeGroupPopup                  StaticPopup names
 --   categoriesCollapsedKey, groupsCollapsedKey    collapse state in the character DB
---   isCategoryEnabled, setCategory                category switch accessors
+--   isCategoryEnabled, setCategory                category switch accessors (with categoriesKey)
 --   add(itemID, name, icon, quality), remove(itemID), clear()
 --   expansions (optional)    { titleKey, hintKey, collapsedKey }: AH-by-expansion section
 -- Returns pane = { Rebuild(), Show(), Hide(), HandleDrop() }.
@@ -397,6 +398,7 @@ function ns.CreateDropListPane(window, cfg, bodyTop)
     local function RefreshAll()
         Rebuild()
         ns.RefreshHUD()
+        if ns.RefreshVendorSell then ns.RefreshVendorSell() end   -- the Sell List at a vendor follows the lists
     end
 
     local function RemoveItem(itemID)
@@ -430,13 +432,16 @@ function ns.CreateDropListPane(window, cfg, bodyTop)
     -- Category checkboxes, then the optional AH-by-expansion list. Returns the
     -- Y where the drop zone starts; a separator closes the last section.
     local function RebuildSections()
-        local names = ns.GetTrackedCategoryNames(NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB[cfg.categoriesKey])
-        local entries = {}
-        for i, name in ipairs(names) do entries[i] = { key = name, label = name } end
-        local y = ns.RebuildCheckboxSection(
-            listFrame, pane.catHeader, catRows, 0, 0, ns.L[cfg.categoriesTitleKey],
-            NightsFarmtrackerDB[cfg.categoriesCollapsedKey], entries,
-            cfg.isCategoryEnabled, cfg.setCategory, ns.RefreshHUD)
+        local y = 0
+        if cfg.categoriesKey then
+            local names = ns.GetTrackedCategoryNames(NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB[cfg.categoriesKey])
+            local entries = {}
+            for i, name in ipairs(names) do entries[i] = { key = name, label = name } end
+            y = ns.RebuildCheckboxSection(
+                listFrame, pane.catHeader, catRows, 0, 0, ns.L[cfg.categoriesTitleKey],
+                NightsFarmtrackerDB[cfg.categoriesCollapsedKey], entries,
+                cfg.isCategoryEnabled, cfg.setCategory, ns.RefreshHUD)
+        end
 
         if cfg.expansions then
             local exps = {}
@@ -449,6 +454,7 @@ function ns.CreateDropListPane(window, cfg, bodyTop)
                 ns.IsAHExpansionEnabled, ns.SetAHExpansionEnabled, ns.RefreshHUD)
         end
 
+        if not pane.sectionSep then return 0 end   -- no sections: the drop zone starts at the top
         pane.sectionSep:ClearAllPoints()
         pane.sectionSep:SetPoint("TOPLEFT", 0, -y)
         pane.sectionSep:SetPoint("TOPRIGHT", 0, -y)
@@ -488,12 +494,16 @@ function ns.CreateDropListPane(window, cfg, bodyTop)
     scrollFrame, listFrame = ns.CreateDropListScroll(window, HandleDrop)
     scrollFrame:SetPoint("TOPLEFT", pad, -bodyTop)
 
-    pane.catHeader = CollapsibleHeader(cfg.categoriesTitleKey, cfg.categoriesCollapsedKey)
-    pane.catHeader:SetPoint("TOPLEFT", 0, 0)
+    if cfg.categoriesKey then
+        pane.catHeader = CollapsibleHeader(cfg.categoriesTitleKey, cfg.categoriesCollapsedKey)
+        pane.catHeader:SetPoint("TOPLEFT", 0, 0)
+    end
     if cfg.expansions then
         pane.expHeader = CollapsibleHeader(cfg.expansions.titleKey, cfg.expansions.collapsedKey, cfg.expansions.hintKey)
     end
-    pane.sectionSep = ns.AddHLine(listFrame, "TOP", 0, 0)   -- separator lines: Rebuild positions them
+    if cfg.categoriesKey or cfg.expansions then
+        pane.sectionSep = ns.AddHLine(listFrame, "TOP", 0, 0)   -- separator lines: Rebuild positions them
+    end
 
     ns.CreateDropZoneRow(pane, listFrame, HandleDrop)
 

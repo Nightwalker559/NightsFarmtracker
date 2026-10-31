@@ -1219,8 +1219,10 @@ SetBtnTooltip(btnFilter, "ANCHOR_RIGHT", function(tip)
         tip:AddLine(ns.L["filter_right_hint"], 0.7, 0.7, 0.7)
     elseif blackShown then
         tip:SetText(ns.L["blacklist_title"])
-    else
+    elseif vendorShown then
         tip:SetText(ns.L["filter_title"])
+    else
+        tip:SetText(ns.L["filter_button"])
     end
 end)
 
@@ -1237,7 +1239,7 @@ function ns.RefreshLeftButtons()
     local db           = NightsFarmtrackerDB
     local historyShown = db.sessionHistoryEnabled ~= false
     local logShown     = db.logWindowEnabled      == true
-    local filterShown  = (db.vendorFilterEnabled ~= false) or (db.blacklistEnabled ~= false)
+    local filterShown  = (db.vendorFilterEnabled ~= false) or (db.blacklistEnabled ~= false) or (db.deleteListEnabled ~= false)
     local histLogShown = historyShown or logShown
 
     if histLogShown then btnHistory:Show(); btnHistory:EnableMouse(true)

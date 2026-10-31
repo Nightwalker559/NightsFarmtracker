@@ -37,6 +37,7 @@ Modules\Settings.lua
 Modules\FilterWindow.lua
 Modules\Filter.lua
 Modules\Blacklist.lua
+Modules\DeleteList.lua
 Modules\ItemGoals.lua
 Modules\VendorSell.lua
 Modules\VenomTracker.lua

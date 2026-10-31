@@ -5,6 +5,7 @@
 ### New
 
 - Sell List: a dropdown under "Keep Warband items" (several tracks can be ticked, the list stays open) sells Warband gear anyway by upgrade track (Explorer, Adventurer, Veteran, Champion, Hero, Myth), e.g. tick "Adventurer" and Warband gear of that track is offered at the vendor while all other Warband items stay in the bags. The tracks are matched by the name the game shows (client language or English); gear without a track stays. Greyed out while "Keep Warband items" or the Sell List is off
+- Delete List: items that can be neither sold nor auctioned (e.g. Warband-bound potions) go on a new third tab of the Filter window ("Delete", drop items there like on the other tabs; items only, no categories). At a vendor the Sell List shows them below the sale items with a "Delete" tag and gets a second button "Delete: <item> (n)" above the Sell button that deletes the next item with its whole stack for good. The game allows one deletion per click, so it is one click per item; nothing is deleted without a click on the button. Can be switched off in Settings, Filters ("Enable Delete List")
 
 ### Changed
 

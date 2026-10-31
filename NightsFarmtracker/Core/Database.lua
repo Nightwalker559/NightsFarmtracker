@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Database
 -- SavedVariables setup: profiles, per-character and account-wide defaults,
--- item-key migrations, and the Vendor-Only / Blacklist stores.
+-- item-key migrations, and the Vendor-Only / Blacklist / Delete List stores.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -77,7 +77,7 @@ end
 -- no other file needs to change.
 ns.PROFILE_KEYS = {
     goldRateMode=true, sessionLength=true, sessionHistoryEnabled=true, logWindowEnabled=true,
-    vendorFilterEnabled=true, blacklistEnabled=true, vendorSellEnabled=true, vendorSellProtect=true, vendorSellKeepWarband=true, vendorSellWarbandTracks=true, mergeDaily=true,
+    vendorFilterEnabled=true, blacklistEnabled=true, vendorSellEnabled=true, vendorSellProtect=true, vendorSellKeepWarband=true, vendorSellWarbandTracks=true, deleteListEnabled=true, mergeDaily=true,
     splitTradeGoods=true, splitGearByBinding=true, ahSource=true,
     gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
     tsmCustomSource=true, colorTheme=true, customAccent=true, headerGradient=true, themedButtons=true,
@@ -103,6 +103,7 @@ local function NewProfileDefaults()
         vendorSellProtect     = true,
         vendorSellKeepWarband = true,
         vendorSellWarbandTracks = {},
+        deleteListEnabled     = true,
         mergeDaily            = true,
         splitTradeGoods       = false,
         splitGearByBinding    = false,
@@ -337,7 +338,7 @@ function ns.InitItemDB()
 end
 
 -- Tables every account needs (all start empty).
-local ACCOUNT_TABLES = { "forceVendor", "forceVendorCategories", "ahExpansions", "blacklist", "blacklistCategories" }
+local ACCOUNT_TABLES = { "forceVendor", "forceVendorCategories", "ahExpansions", "blacklist", "blacklistCategories", "deleteList" }
 
 function ns.InitAccountDB()
     if not NightsFarmtrackerAccountDB then NightsFarmtrackerAccountDB = {} end
@@ -373,11 +374,12 @@ function ns.InitAccountDB()
 end
 
 ------------------------------------------------------------------------
--- Filter stores (account-wide, persistent). The Vendor-Only filter and the
--- Blacklist share one shape: itemID -> { name, icon, quality, expansionID }
--- plus a name-keyed set of categories (the exact string ns.CategoryName()
--- returns, so it follows the grouping the HUD shows, e.g. the trade-goods
--- split). `enabledKey` is the setting that switches the whole feature off.
+-- Filter stores (account-wide, persistent). The Vendor-Only filter, the
+-- Blacklist and the Delete List share one shape: itemID -> { name, icon,
+-- quality, expansionID } plus (not for the Delete List, catsKey = nil) a
+-- name-keyed set of categories (the exact string ns.CategoryName() returns,
+-- so it follows the grouping the HUD shows, e.g. the trade-goods split).
+-- `enabledKey` is the setting that switches the whole feature off.
 ------------------------------------------------------------------------
 local function CreateFilterStore(itemsKey, catsKey, enabledKey)
     local function active()
@@ -442,6 +444,14 @@ ns.ClearBlacklist               = blacklistStore.clear
 ns.IsBlacklistCategoryEnabled   = blacklistStore.categoryEnabled
 ns.SetBlacklistCategory         = blacklistStore.setCategory
 ns.IsBlacklistCategory          = blacklistStore.hasCategory
+
+-- Delete List: items that can be neither sold nor auctioned; the Sell List at
+-- a vendor offers them for deletion. Single items only, no categories.
+local deleteStore = CreateFilterStore("deleteList", nil, "deleteListEnabled")
+ns.IsOnDeleteList               = deleteStore.has
+ns.AddDeleteList                = deleteStore.add
+ns.RemoveDeleteList             = deleteStore.remove
+ns.ClearDeleteList              = deleteStore.clear
 
 ------------------------------------------------------------------------
 -- Item goals (profile scope): itemID -> { name, icon, quality, amount }, on

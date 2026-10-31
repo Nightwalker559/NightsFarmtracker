@@ -1674,9 +1674,10 @@ function ns.RebuildSettingsContent()
     addSection("sec_filters", function(y)
         y = sectionTitle(y, "sec_filters", TITLE_STEP_CTRL)
 
-        local function filterChanged() ns.RefreshLeftButtons(); ns.RefreshHUD() end
+        local function filterChanged() ns.RefreshLeftButtons(); ns.RefreshHUD(); ns.RefreshVendorSell() end
         y = flag(y, "vendor_filter_enabled", "vendorFilterEnabled", true, filterChanged)
         y = flag(y, "blacklist_enabled", "blacklistEnabled", true, filterChanged)
+        y = flag(y, "delete_list_enabled", "deleteListEnabled", true, filterChanged, { tip = "delete_list_tip" })
 
         return y
     end)

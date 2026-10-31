@@ -123,12 +123,12 @@ function ns.RefreshFilterTabs()
     if active and IsEnabled(active) then PaintTabs() else SelectTab(first) end
 end
 
--- Opens the window on a tab (by key; without one, the tab used last), switches
--- to it when the window is open on another tab, closes it when it is already
--- there. Without a key an open window closes.
+-- Opens the window on a tab (by key; without one, or when that tab is switched
+-- off, the tab used last), switches to it when the window is open on another
+-- tab, closes it when it is already there. Without a key an open window closes.
 function ns.ToggleFilterWindow(tabKey)
     local tab = byKey[tabKey or ""]
-    if tab and not IsEnabled(tab) then return end
+    if tab and not IsEnabled(tab) then tab, tabKey = nil, nil end
     if ns.DeferInCombat(function() ns.ToggleFilterWindow(tabKey) end) then return end
     if not tab then
         tab = byKey[NightsFarmtrackerDB.filterTab]

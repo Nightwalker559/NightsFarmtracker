@@ -8,7 +8,7 @@
 local _, ns = ...
 
 ns.RegisterFilterTab({
-    key = "vendor", titleKey = "filter_title", enabledKey = "vendorFilterEnabled",
+    key = "vendor", titleKey = "filter_tab_vendor", enabledKey = "vendorFilterEnabled",
     itemsKey = "forceVendor", categoriesKey = "forceVendorCategories",
     categoriesTitleKey = "filter_categories_title", emptyKey = "filter_list_empty",
     clearPopup = "NFT_CONFIRM_CLEAR_ALL_FILTER", clearConfirmKey = "filter_clear_all_confirm",

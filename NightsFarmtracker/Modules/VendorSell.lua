@@ -6,8 +6,10 @@
 -- as many as the merchant's buyback list holds, so a wrong click can still be
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
--- ticked there. The options live in a popup (ns.ToggleVendorSellConfig, Settings.lua)
--- that the gear icon of this window and the one in Settings open.
+-- ticked there. The options live in a window (ns.ToggleVendorSellConfig, Settings.lua)
+-- that the gear icon of this window and the one in Settings open. Below the sale
+-- list come the bag items of the Delete List, deleted by a second button: one
+-- item per click, the game allows no more per click.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -23,7 +25,7 @@ local VALUE_W   = 96         -- value column on the right of each row
 
 local FRAME_NAME = "NightsFarmtrackerVendorSellWnd"
 local frame, scrollFrame, listFrame
-local items, rows = {}, {}   -- bag items to sell (most gold first) and their active rows
+local items, trash, rows = {}, {}, {}   -- bag items to sell (most gold first), to delete, and their active rows
 local selling                -- ticker of the running sale
 
 -- Both options (Settings, Windows & Buttons) are on until switched off.
@@ -116,6 +118,7 @@ local function CollectItems()
             if info and info.hyperlink and not info.isLocked and not info.hasNoValue then
                 local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
                 if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot)
+                   and not ns.IsOnDeleteList(info.itemID)
                    and not (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot)
                             and not IsSellableTrack(info.hyperlink)) then
                     list[#list + 1] = {
@@ -129,6 +132,30 @@ local function CollectItems()
     end
     table.sort(list, function(a, b)
         if a.value ~= b.value then return a.value > b.value end
+        if a.bag ~= b.bag then return a.bag < b.bag end
+        return a.slot < b.slot
+    end)
+    return list
+end
+
+-- Bag items on the Delete List (not in an equipment set, not locked), by name.
+local function CollectTrash()
+    local list = {}
+    for bag = 0, ns.LAST_BAG do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local info = C_Container.GetContainerItemInfo(bag, slot)
+            if info and info.hyperlink and not info.isLocked and ns.IsOnDeleteList(info.itemID)
+               and not InEquipmentSet(bag, slot) then
+                list[#list + 1] = {
+                    bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink,
+                    name = C_Item.GetItemInfo(info.hyperlink) or ("Item " .. info.itemID),
+                    count = info.stackCount, quality = info.quality, icon = info.iconFileID,
+                }
+            end
+        end
+    end
+    table.sort(list, function(a, b)
+        if a.name ~= b.name then return a.name < b.name end
         if a.bag ~= b.bag then return a.bag < b.bag end
         return a.slot < b.slot
     end)
@@ -218,39 +245,73 @@ local function SellClick()
 end
 
 ------------------------------------------------------------------------
+-- Deleting: the next Delete List item per click. DeleteCursorItem needs a
+-- hardware event and takes one item per event, so there is no queue; the cursor
+-- is cleared again should the game refuse, so no item stays "in the hand".
+------------------------------------------------------------------------
+local function UpdateDeleteButton()
+    local btn = frame.deleteBtn
+    btn:SetShown(#trash > 0)
+    if #trash > 0 then
+        btn.lbl:SetText(string.format(ns.L["vendor_sell_delete_btn"], ns.TruncateName(trash[1].name), #trash))
+    end
+end
+
+local function DeleteClick()
+    local e = trash[1]
+    if not e or not MerchantFrame:IsShown() or CursorHasItem() then return end
+    local info = C_Container.GetContainerItemInfo(e.bag, e.slot)
+    if info and info.itemID == e.itemID and not info.isLocked then
+        C_Container.PickupContainerItem(e.bag, e.slot)
+        DeleteCursorItem()
+        if CursorHasItem() then ClearCursor() end
+    end
+end
+
+------------------------------------------------------------------------
 -- List rebuild
 ------------------------------------------------------------------------
+local function AddRow(yOff, e, valueText)
+    local r = rowPool.acquire(listFrame)
+    r:SetPoint("TOPLEFT", 0, -yOff)
+    r.itemLink = e.link
+    r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
+    local name = ns.TruncateName(e.name)
+    r.nameText:SetText(e.count > 1 and (name .. " |cffffd100x" .. e.count .. "|r") or name)
+    ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
+    r.valueText:SetText(valueText)
+    rows[#rows + 1] = r
+    return yOff + ns.ROW_H
+end
+
 local function Rebuild()
     rowPool.releaseAll(rows)
-    items = CollectItems()
+    items, trash = CollectItems(), CollectTrash()
 
     local yOff = 0
-    for _, e in ipairs(items) do
-        local r = rowPool.acquire(listFrame)
-        r:SetPoint("TOPLEFT", 0, -yOff)
-        r.itemLink = e.link
-        r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
-        local name = ns.TruncateName(e.name)
-        r.nameText:SetText(e.count > 1 and (name .. " |cffffd100x" .. e.count .. "|r") or name)
-        ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
-        r.valueText:SetText(ns.FormatGold(e.value))
-        rows[#rows + 1] = r
-        yOff = yOff + ns.ROW_H
-    end
+    for _, e in ipairs(items) do yOff = AddRow(yOff, e, ns.FormatGold(e.value)) end
+    local deleteTag = "|cffff5050" .. ns.L["vendor_sell_delete_tag"] .. "|r"
+    for _, e in ipairs(trash) do yOff = AddRow(yOff, e, deleteTag) end
 
+    -- The delete button sits above the sell button, so the footer grows with it
+    local ftrH = FTR_H + (#trash > 0 and BTN_H + 4 or 0)
+    frame.ftrLine:ClearAllPoints()
+    frame.ftrLine:SetPoint("BOTTOMLEFT", pad, ftrH - 2)
+    frame.ftrLine:SetPoint("BOTTOMRIGHT", -pad, ftrH - 2)
     ns.FitScrollWindow({
         window = frame, scroll = scrollFrame, list = listFrame,
-        hdrH = hdrH, ftrH = FTR_H, contentH = yOff, minH = MIN_VIS_H,
+        hdrH = hdrH, ftrH = ftrH, contentH = yOff, minH = MIN_VIS_H,
     })
-    frame.emptyLabel:SetShown(#items == 0)
+    frame.emptyLabel:SetShown(#items == 0 and #trash == 0)
     UpdateSellButton()
+    UpdateDeleteButton()
     ns.DockFrame(frame, MerchantFrame, "right")
 end
 
 ------------------------------------------------------------------------
 -- Window
 ------------------------------------------------------------------------
-local function CreateSellButton(parent)
+local function CreateFooterButton(parent, onClick)
     local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
     btn:SetHeight(BTN_H)
     ns.StyleBackdropBox(btn, {0.05, 0.08, 0.09, 1})
@@ -261,7 +322,7 @@ local function CreateSellButton(parent)
         if self:IsEnabled() then self:SetBackdropBorderColor(unpack(ns.COL_ACCENT)) end
     end)
     btn:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(unpack(ns.COL_BORDER)) end)
-    btn:SetScript("OnClick", SellClick)
+    btn:SetScript("OnClick", onClick)
     return btn
 end
 
@@ -273,7 +334,7 @@ local function EnsureFrame()
     ns.VendorSellFrame = frame
 
     ns.AddHLine(frame, "TOP", pad, -(hdrH - 1))
-    ns.AddHLine(frame, "BOTTOM", pad, FTR_H - 2)
+    frame.ftrLine = ns.AddHLine(frame, "BOTTOM", pad, FTR_H - 2)   -- Rebuild moves it above the delete button
 
     scrollFrame, listFrame = ns.CreateScrollList(frame, ns.CONTENT_W, ns.ROW_H)
     scrollFrame:SetPoint("TOPLEFT", pad, -hdrH)
@@ -289,9 +350,20 @@ local function EnsureFrame()
     cfgBtn:SetPoint("RIGHT", frame.closeBtn, "LEFT", -6, 0)
     cfgBtn:SetScript("OnClick", function() ns.ToggleVendorSellConfig(frame) end)
 
-    frame.sellBtn = CreateSellButton(frame)
+    frame.sellBtn = CreateFooterButton(frame, SellClick)
     frame.sellBtn:SetPoint("BOTTOMLEFT", pad, 8)
     frame.sellBtn:SetPoint("BOTTOMRIGHT", -pad, 8)
+
+    frame.deleteBtn = CreateFooterButton(frame, DeleteClick)
+    frame.deleteBtn:SetPoint("BOTTOMLEFT", pad, 8 + BTN_H + 4)
+    frame.deleteBtn:SetPoint("BOTTOMRIGHT", -pad, 8 + BTN_H + 4)
+    frame.deleteBtn.lbl:SetTextColor(1, 0.4, 0.4)
+    frame.deleteBtn:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
+        GameTooltip:AddLine(ns.L["vendor_sell_delete_tip"], 0.5, 0.5, 0.5, true)
+        GameTooltip:Show()
+    end)
+    frame.deleteBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Registered only while the window is open
     frame:SetScript("OnEvent", Rebuild)
@@ -303,7 +375,7 @@ local function OnMerchantShow()
     if NightsFarmtrackerDB.vendorSellEnabled == false then return end
     EnsureFrame()
     Rebuild()
-    if #items > 0 then frame:Show() end
+    if #items > 0 or #trash > 0 then frame:Show() end
 end
 
 local function OnMerchantHide()
