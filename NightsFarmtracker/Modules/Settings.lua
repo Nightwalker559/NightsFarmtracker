@@ -1169,11 +1169,19 @@ function ns.ToggleVendorSellConfig(anchor)
     end
 
     BuildSellConfig()
+
+    -- Below the anchor, or above it when there is no room below; flush with its
+    -- left edge, or its right edge when it would run off the screen.
+    local scale = anchor:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    local room = (anchor:GetBottom() or 0) * scale
+    local above = room - 4 < sellCfgPop:GetHeight()
+        and UIParent:GetHeight() - (anchor:GetTop() or 0) * scale > room
+    local side = (anchor:GetLeft() or 0) * scale + S_W > UIParent:GetWidth() and "RIGHT" or "LEFT"
     sellCfgPop:ClearAllPoints()
-    if (anchor:GetLeft() or 0) + S_W > UIParent:GetWidth() then
-        sellCfgPop:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -4)
+    if above then
+        sellCfgPop:SetPoint("BOTTOM" .. side, anchor, "TOP" .. side, 0, 4)
     else
-        sellCfgPop:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
+        sellCfgPop:SetPoint("TOP" .. side, anchor, "BOTTOM" .. side, 0, -4)
     end
     sellCfgPop:Show()
 end
