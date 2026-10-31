@@ -65,7 +65,8 @@ end
 local function CreateTabButton(tab, onClick)
     local btn = CreateFrame("Button", nil, frame)
     btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    btn.text:SetPoint("CENTER")
+    btn.text:SetAllPoints()   -- as wide as the tab, centered: the label cannot drift with its own width
+    btn.text:SetJustifyH("CENTER")
     btn.text:SetFontHeight(ns.FONT_NORMAL)
     btn.text:SetText(ns.L[tab.cfg.titleKey])
     btn.underline = btn:CreateTexture(nil, "ARTWORK")
