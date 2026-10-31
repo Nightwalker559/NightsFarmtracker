@@ -191,9 +191,10 @@ local goalsBtn, goalsCheck
 local exportBtn
 local maxHeightEB
 local profileDropdown
+local warbandTrackDropdown
 local profileButtons
 local deleteProfileRow
-local themeMenuList, profileMenuList, deleteMenuList
+local themeMenuList, profileMenuList, deleteMenuList, trackMenuList
 
 -- Single-instance widgets are built on first use, then only moved and shown.
 local function PlaceWidget(widget, make, y)
@@ -283,6 +284,7 @@ local function CloseMenus()
     if themeMenuList then themeMenuList:Hide() end
     if profileMenuList then profileMenuList:Hide() end
     if deleteMenuList then deleteMenuList:Hide() end
+    if trackMenuList then trackMenuList:Hide() end
 end
 
 local function MakeDropdown(parent, yOff)
@@ -829,6 +831,90 @@ local function MakeProfileDropdown(parent)
 
     function frame:Refresh()
         self.lbl:SetText(ns.GetActiveProfileName())
+    end
+
+    return frame
+end
+
+------------------------------------------------------------------------
+-- Sell List: upgrade tracks of Warband gear that is sold anyway. A dropdown
+-- whose rows are check boxes; the list stays open while several are ticked.
+-- Greyed out while Warband items are not kept or the Sell List is off.
+------------------------------------------------------------------------
+local TRACK_ROW_H = 20
+
+local function MakeWarbandTrackDropdown(parent)
+    local frame = MakeDropdownBox(parent, S_W - S_PAD*2 - 40 - (CTRL_SIZE + 8))
+    frame.lbl:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
+    frame.lbl:SetJustifyH("LEFT")
+    frame.lbl:SetWordWrap(false)
+
+    local list = MakePopupList()
+    trackMenuList = list
+
+    local function Ticked(key)
+        local tracks = NightsFarmtrackerDB.vendorSellWarbandTracks
+        return tracks ~= nil and tracks[key] == true
+    end
+
+    list.rows = {}
+    for i, t in ipairs(ns.WARBAND_SELL_TRACKS) do
+        local row = CreateFrame("Button", nil, list)
+        row:SetHeight(TRACK_ROW_H)
+        row:SetPoint("TOPLEFT", 2, -2 - (i-1)*TRACK_ROW_H)
+        row:SetPoint("RIGHT", -2, 0)
+        local box, mark = ns.CreateMarkBox(row, 12)
+        box:SetPoint("LEFT", 6, 0)
+        row.mark = mark
+        row.txt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        row.txt:SetPoint("LEFT", box, "RIGHT", 6, 0)
+        row.txt:SetText(ns.L[t.locKey])
+        row:SetScript("OnEnter", function() row.txt:SetTextColor(1, 1, 1) end)
+        row:SetScript("OnLeave", function() MenuTextColor(row) end)
+        row:SetScript("OnClick", function()
+            local db = NightsFarmtrackerDB
+            db.vendorSellWarbandTracks = db.vendorSellWarbandTracks or {}
+            db.vendorSellWarbandTracks[t.key] = (not Ticked(t.key)) or nil
+            row.isActive = Ticked(t.key)
+            row.mark:SetShown(row.isActive)
+            MenuTextColor(row)
+            frame:Refresh()
+            ns.RefreshVendorSell()
+        end)
+        list.rows[i] = row
+    end
+    list:SetHeight(2 + TRACK_ROW_H * #ns.WARBAND_SELL_TRACKS + 2)
+
+    frame:SetScript("OnMouseUp", function()
+        ToggleMenu(list, frame, function()
+            for i, t in ipairs(ns.WARBAND_SELL_TRACKS) do
+                local row = list.rows[i]
+                row.isActive = Ticked(t.key)
+                row.mark:SetShown(row.isActive)
+                MenuTextColor(row)
+            end
+        end)
+    end)
+    frame:SetScript("OnEnter", function(self)
+        if not self:IsMouseEnabled() then return end
+        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
+        GameTooltip:AddLine(ns.L["vendor_sell_track_tip"], 0.5, 0.5, 0.5, true)
+        GameTooltip:Show()
+    end)
+    frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Label = the ticked tracks; greyed out and inert while off
+    function frame:Refresh()
+        local db = NightsFarmtrackerDB
+        local names = {}
+        for _, t in ipairs(ns.WARBAND_SELL_TRACKS) do
+            if Ticked(t.key) then names[#names + 1] = ns.L[t.locKey] end
+        end
+        local off = db.vendorSellEnabled == false or db.vendorSellKeepWarband == false
+        self.lbl:SetText(#names > 0 and table.concat(names, ", ") or ns.L["vendor_sell_tracks_none"])
+        self.lbl:SetTextColor(off and 0.4 or 0.85, off and 0.4 or 0.85, off and 0.4 or 0.85)
+        self:EnableMouse(not off)
+        if off then list:Hide() end
     end
 
     return frame
@@ -1399,18 +1485,15 @@ function ns.RebuildSettingsContent()
         end, { indent = indent, disabled = off, tip = "vendor_sell_warband_tip" })
 
         -- Upgrade tracks of Warband gear that is sold anyway
-        local trackIndent, trackOff = indent * 2, off or db.vendorSellKeepWarband == false
-        hintLabel(S_PAD + indent, y, ns.L["vendor_sell_tracks"], trackOff and 0.3 or 0.5)
+        hintLabel(S_PAD + indent, y, ns.L["vendor_sell_tracks"],
+            (off or db.vendorSellKeepWarband == false) and 0.3 or 0.5)
         y = y - 18
-        for _, t in ipairs(ns.WARBAND_SELL_TRACKS) do
-            y = checkbox(y, t.locKey,
-                function() return (db.vendorSellWarbandTracks or {})[t.key] == true end,
-                function(v)
-                    db.vendorSellWarbandTracks = db.vendorSellWarbandTracks or {}
-                    db.vendorSellWarbandTracks[t.key] = v or nil
-                    ns.RefreshVendorSell()
-                end, { indent = trackIndent, disabled = trackOff, tip = "vendor_sell_track_tip" })
-        end
+        warbandTrackDropdown = PlaceWidget(warbandTrackDropdown, MakeWarbandTrackDropdown, y)
+        warbandTrackDropdown:ClearAllPoints()
+        warbandTrackDropdown:SetPoint("TOPLEFT", S_PAD + indent, y)
+        warbandTrackDropdown:Refresh()
+        track(warbandTrackDropdown, "other")
+        y = y - 32
         y = flag(y, "vendor_sell_protect", "vendorSellProtect", true, ns.RefreshVendorSell,
             { indent = indent, disabled = off, tip = "vendor_sell_protect_tip", arg = ns.VENDOR_SELL_PROTECT_MAX })
 
