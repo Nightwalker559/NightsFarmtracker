@@ -9,6 +9,7 @@
 ### Changed
 
 - Sell List options (Keep Warband items, upgrade tracks, protection) moved out of the Settings page into their own window behind a gear icon next to "Show the sell list at vendors" and in the Sell List window (docked next to Settings, or below/above it when the screen has no room; at the vendor next to the Sell List window); they follow the active profile (the upgrade tracks are a profile setting and are copied with it)
+- Marked as compatible with game patch 12.1.7
 - All windows keep the same distance (2 px) when docked next to or below each other; before it was 1, 2 or 4 px depending on the window
 
 ## 1.8.3
