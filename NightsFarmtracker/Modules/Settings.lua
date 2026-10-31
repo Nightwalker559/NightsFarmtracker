@@ -37,7 +37,6 @@ local S_HDR_H      = ns.WINDOW_HDR_H
 local S_FTR_H       = 26   -- footer strip height (Reset to Default button)
 local S_SCROLL_STEP = 22
 local TOP_PAD       = 8    -- small top padding within the scroll area
-local settingsMarks = {}   -- name -> y of a spot ns.OpenSettingsAt can scroll to
 
 -- Checkboxes and radio dots are CTRL_SIZE squares with CTRL_GAP between the
 -- rows of a group. CHECK_RUN_TAIL is the extra space after the last checkbox of
@@ -191,10 +190,11 @@ local goalsBtn, goalsCheck
 local exportBtn
 local maxHeightEB
 local profileDropdown
-local warbandTrackDropdown
+local sellConfigBtn
 local profileButtons
 local deleteProfileRow
 local themeMenuList, profileMenuList, deleteMenuList, trackMenuList
+local sellCfgPop   -- Sell List config popup (see ns.ToggleVendorSellConfig)
 
 -- Single-instance widgets are built on first use, then only moved and shown.
 local function PlaceWidget(widget, make, y)
@@ -285,6 +285,7 @@ local function CloseMenus()
     if profileMenuList then profileMenuList:Hide() end
     if deleteMenuList then deleteMenuList:Hide() end
     if trackMenuList then trackMenuList:Hide() end
+    if sellCfgPop then sellCfgPop:Hide() end
 end
 
 local function MakeDropdown(parent, yOff)
@@ -850,6 +851,7 @@ local function MakeWarbandTrackDropdown(parent)
     frame.lbl:SetWordWrap(false)
 
     local list = MakePopupList()
+    list:SetFrameLevel(50)   -- above the config popup that hosts this dropdown
     trackMenuList = list
 
     local function Ticked(key)
@@ -1097,6 +1099,97 @@ local function ConfigureCheckbox(row, label, yOff, getValue, setValue, opts)
 end
 
 ------------------------------------------------------------------------
+-- Sell List config popup: the gear icon next to "Show the sell list at
+-- vendors" (Settings) and the one in the Sell List window open it. Warband
+-- items, upgrade tracks and the sale protection, the same widgets as the
+-- settings page; rebuilt on open and after every change, so it always shows
+-- the active profile. New Sell List options belong here.
+------------------------------------------------------------------------
+local sellCfgRows = {}
+
+local function BuildSellConfig()
+    local pop = sellCfgPop
+    checkboxPool.releaseAll(sellCfgRows)
+    local db = NightsFarmtrackerDB
+    local off = db.vendorSellEnabled == false
+
+    -- Checkbox on db[key] (on unless switched off), then the next row's y
+    local function option(y, label, key, tip)
+        local row = checkboxPool.acquire(pop)
+        sellCfgRows[#sellCfgRows + 1] = row
+        ConfigureCheckbox(row, label, y,
+            function() return db[key] ~= false end,
+            function(v)
+                db[key] = v
+                ns.RefreshVendorSell()
+                RunNextFrame(BuildSellConfig)   -- the pooled row still refreshes itself after this returns
+            end, { disabled = off, tip = tip })
+        return y - math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())) - CTRL_GAP
+    end
+
+    local y = -32
+    y = option(y, ns.L["vendor_sell_warband"], "vendorSellKeepWarband", ns.L["vendor_sell_warband_tip"])
+
+    local indent = CTRL_SIZE + 8
+    local gray = (off or db.vendorSellKeepWarband == false) and 0.3 or 0.5
+    pop.hint:ClearAllPoints()
+    pop.hint:SetPoint("TOPLEFT", S_PAD + indent, y)
+    pop.hint:SetTextColor(gray, gray, gray)
+    y = y - 18
+    pop.trackDropdown:ClearAllPoints()
+    pop.trackDropdown:SetPoint("TOPLEFT", S_PAD + indent, y)
+    pop.trackDropdown:Refresh()
+    y = y - 32
+
+    y = option(y, string.format(ns.L["vendor_sell_protect"], ns.VENDOR_SELL_PROTECT_MAX), "vendorSellProtect",
+        string.format(ns.L["vendor_sell_protect_tip"], ns.VENDOR_SELL_PROTECT_MAX))
+    pop:SetHeight(-y + 4)
+end
+
+function ns.ToggleVendorSellConfig(anchor)
+    if sellCfgPop and sellCfgPop:IsShown() then sellCfgPop:Hide(); return end
+
+    if not sellCfgPop then
+        local pop = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+        pop:SetFrameStrata("TOOLTIP")
+        pop:EnableMouse(true)
+        pop:SetWidth(S_W)
+        ns.ApplyFrameStyle(pop)
+        sellCfgPop = pop
+
+        local title = pop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        title:SetPoint("TOPLEFT", 10, -8)
+        title:SetTextColor(unpack(ns.COL_ACCENT))
+        title:SetText(ns.L["vendor_sell_config"])
+
+        pop.hint = pop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        pop.hint:SetText(ns.L["vendor_sell_tracks"])
+        pop.trackDropdown = MakeWarbandTrackDropdown(pop)
+        pop:HookScript("OnHide", function() trackMenuList:Hide() end)
+    end
+
+    BuildSellConfig()
+    sellCfgPop:ClearAllPoints()
+    if (anchor:GetLeft() or 0) + S_W > UIParent:GetWidth() then
+        sellCfgPop:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -4)
+    else
+        sellCfgPop:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
+    end
+    sellCfgPop:Show()
+end
+
+-- The merchant window closing takes the popup with it
+function ns.CloseVendorSellConfig()
+    if sellCfgPop then sellCfgPop:Hide() end
+end
+
+local function MakeSellConfigButton(parent)
+    local btn = ns.CreateConfigButton(parent, ns.L["vendor_sell_config"])
+    btn:SetScript("OnClick", function(self) ns.ToggleVendorSellConfig(self) end)
+    return btn
+end
+
+------------------------------------------------------------------------
 -- Section title / hint text — pooled FontStrings. Text color is set once
 -- at creation (ns.COL_ACCENT/gray) since a theme change always requires
 -- a UI reload (see ApplyColorTheme), so it never goes stale while pooled.
@@ -1254,7 +1347,7 @@ function ns.RebuildSettingsContent()
         local tip = opts.tip and string.format(ns.L[opts.tip], opts.arg)
         local row = ConfigureCheckbox(track(checkboxPool.acquire(SListFrame), "checkbox"), label, y, get, set,
             { indent = opts.indent, disabled = opts.disabled, tip = tip })
-        return y - math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())) - CTRL_GAP
+        return y - math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())) - CTRL_GAP, row
     end
 
     -- Checkbox bound to db[key]. With defaultOn an unset value counts as
@@ -1468,34 +1561,19 @@ function ns.RebuildSettingsContent()
             function() return db.instanceLockoutEnabled == true end,
             function(v) ns.SetInstanceLockoutEnabled(v) end)
 
-        -- Sell list at vendors: its two options only count while it is on
-        -- (the same two sit in the sell window itself)
+        -- Sell list at vendors; its options sit behind the gear icon (popup)
         y = y - CHECK_RUN_TAIL
-        settingsMarks.sellList = y
         hintLabel(S_PAD, y, ns.L["vendor_sell_group"], 0.6)
         y = y - 18
-        y = flag(y, "vendor_sell_enabled", "vendorSellEnabled", true, function(v)
+        local rowY, row = y
+        y, row = flag(y, "vendor_sell_enabled", "vendorSellEnabled", true, function(v)
             if not v then ns.OnVendorSellDisabled() end
             RunNextFrame(ns.RebuildSettingsContent)   -- the pooled row still refreshes itself after this returns
         end)
-        local indent, off = CTRL_SIZE + 8, db.vendorSellEnabled == false
-        y = flag(y, "vendor_sell_warband", "vendorSellKeepWarband", true, function()
-            ns.RefreshVendorSell()
-            RunNextFrame(ns.RebuildSettingsContent)   -- the track boxes below follow this one
-        end, { indent = indent, disabled = off, tip = "vendor_sell_warband_tip" })
-
-        -- Upgrade tracks of Warband gear that is sold anyway
-        hintLabel(S_PAD + indent, y, ns.L["vendor_sell_tracks"],
-            (off or db.vendorSellKeepWarband == false) and 0.3 or 0.5)
-        y = y - 18
-        warbandTrackDropdown = PlaceWidget(warbandTrackDropdown, MakeWarbandTrackDropdown, y)
-        warbandTrackDropdown:ClearAllPoints()
-        warbandTrackDropdown:SetPoint("TOPLEFT", S_PAD + indent, y)
-        warbandTrackDropdown:Refresh()
-        track(warbandTrackDropdown, "other")
-        y = y - 32
-        y = flag(y, "vendor_sell_protect", "vendorSellProtect", true, ns.RefreshVendorSell,
-            { indent = indent, disabled = off, tip = "vendor_sell_protect_tip", arg = ns.VENDOR_SELL_PROTECT_MAX })
+        sellConfigBtn = PlaceWidget(sellConfigBtn, MakeSellConfigButton, rowY)
+        sellConfigBtn:ClearAllPoints()
+        sellConfigBtn:SetPoint("LEFT", row.label, "LEFT", row.label:GetStringWidth() + 8, 0)
+        track(sellConfigBtn, "other")
 
         return y
     end)
@@ -1753,14 +1831,4 @@ function ns.ToggleSettings()
         SF:Show()
         ns.RefreshWindowChain("left")
     end
-end
-
--- Opens Settings (builds it when closed) scrolled to a marked spot, e.g.
--- "sellList" for the sell list options.
-function ns.OpenSettingsAt(markKey)
-    if not (SF and SF:IsShown()) then ns.ToggleSettings() end
-    local y = settingsMarks[markKey]
-    if not (y and SF and SF:IsShown()) then return end
-    local maxS = math.max(0, SListFrame:GetHeight() - SScrollFrame:GetHeight())
-    SScrollFrame:SetVerticalScroll(math.max(0, math.min(-y - TOP_PAD, maxS)))
 end

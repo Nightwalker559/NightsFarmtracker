@@ -4,7 +4,11 @@
 
 ### New
 
-- Sell List: Settings, Windows & Buttons has a new dropdown under "Keep Warband items" (several tracks can be ticked, the list stays open) to sell Warband gear anyway by upgrade track (Explorer, Adventurer, Veteran, Champion, Hero, Myth), e.g. tick "Adventurer" and Warband gear of that track is offered at the vendor while all other Warband items stay in the bags. The tracks are matched by the name the game shows (client language or English); gear without a track stays. Greyed out while "Keep Warband items" or the Sell List is off
+- Sell List: a dropdown under "Keep Warband items" (several tracks can be ticked, the list stays open) sells Warband gear anyway by upgrade track (Explorer, Adventurer, Veteran, Champion, Hero, Myth), e.g. tick "Adventurer" and Warband gear of that track is offered at the vendor while all other Warband items stay in the bags. The tracks are matched by the name the game shows (client language or English); gear without a track stays. Greyed out while "Keep Warband items" or the Sell List is off
+
+### Changed
+
+- Sell List options (Keep Warband items, upgrade tracks, protection) moved out of the Settings page into one popup behind a gear icon next to "Show the sell list at vendors" and in the Sell List window; they follow the active profile (the upgrade tracks are a profile setting and are copied with it)
 
 ## 1.8.3
 

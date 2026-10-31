@@ -6,8 +6,8 @@
 -- as many as the merchant's buyback list holds, so a wrong click can still be
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
--- ticked there. The options live in Settings (Windows & Buttons); the window
--- only has a gear icon that jumps there.
+-- ticked there. The options live in a popup (ns.ToggleVendorSellConfig, Settings.lua)
+-- that the gear icon of this window and the one in Settings open.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -284,10 +284,10 @@ local function EnsureFrame()
     frame.emptyLabel:SetTextColor(0.55, 0.55, 0.55)
     frame.emptyLabel:SetText(ns.L["vendor_sell_empty"])
 
-    -- Gear icon left of the close button: opens Settings at the sell list options
+    -- Gear icon left of the close button: opens the sell list options popup
     local cfgBtn = ns.CreateConfigButton(frame, ns.L["vendor_sell_config"])
     cfgBtn:SetPoint("RIGHT", frame.closeBtn, "LEFT", -6, 0)
-    cfgBtn:SetScript("OnClick", function() ns.OpenSettingsAt("sellList") end)
+    cfgBtn:SetScript("OnClick", function(self) ns.ToggleVendorSellConfig(self) end)
 
     frame.sellBtn = CreateSellButton(frame)
     frame.sellBtn:SetPoint("BOTTOMLEFT", pad, 8)
@@ -308,6 +308,7 @@ end
 
 local function OnMerchantHide()
     StopSelling()
+    ns.CloseVendorSellConfig()
     if frame then frame:Hide() end
 end
 
