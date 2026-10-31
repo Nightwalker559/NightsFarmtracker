@@ -1573,6 +1573,7 @@ function ns.RebuildSettingsContent()
         sellConfigBtn = PlaceWidget(sellConfigBtn, MakeSellConfigButton, rowY)
         sellConfigBtn:ClearAllPoints()
         sellConfigBtn:SetPoint("LEFT", row.label, "LEFT", row.label:GetStringWidth() + 8, 0)
+        sellConfigBtn:SetFrameLevel(row:GetFrameLevel() + 5)   -- pooled rows keep their level, the checkbox row must not catch the click
         track(sellConfigBtn, "other")
 
         return y
