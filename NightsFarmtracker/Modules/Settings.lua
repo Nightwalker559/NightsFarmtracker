@@ -1576,7 +1576,7 @@ function ns.RebuildSettingsContent()
         sellConfigBtn:SetFrameLevel(row:GetFrameLevel() + 5)   -- pooled rows keep their level, the checkbox row must not catch the click
         track(sellConfigBtn, "other")
 
-        return y
+        return y - CHECK_RUN_TAIL   -- the gear icon is the last tracked widget, so the section loop adds no tail
     end)
 
     -- ----------------------------------------------------------------
