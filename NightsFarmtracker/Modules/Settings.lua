@@ -1393,8 +1393,24 @@ function ns.RebuildSettingsContent()
             RunNextFrame(ns.RebuildSettingsContent)   -- the pooled row still refreshes itself after this returns
         end)
         local indent, off = CTRL_SIZE + 8, db.vendorSellEnabled == false
-        y = flag(y, "vendor_sell_warband", "vendorSellKeepWarband", true, ns.RefreshVendorSell,
-            { indent = indent, disabled = off, tip = "vendor_sell_warband_tip" })
+        y = flag(y, "vendor_sell_warband", "vendorSellKeepWarband", true, function()
+            ns.RefreshVendorSell()
+            RunNextFrame(ns.RebuildSettingsContent)   -- the track boxes below follow this one
+        end, { indent = indent, disabled = off, tip = "vendor_sell_warband_tip" })
+
+        -- Upgrade tracks of Warband gear that is sold anyway
+        local trackIndent, trackOff = indent * 2, off or db.vendorSellKeepWarband == false
+        hintLabel(S_PAD + indent, y, ns.L["vendor_sell_tracks"], trackOff and 0.3 or 0.5)
+        y = y - 18
+        for _, t in ipairs(ns.WARBAND_SELL_TRACKS) do
+            y = checkbox(y, t.locKey,
+                function() return (db.vendorSellWarbandTracks or {})[t.key] == true end,
+                function(v)
+                    db.vendorSellWarbandTracks = db.vendorSellWarbandTracks or {}
+                    db.vendorSellWarbandTracks[t.key] = v or nil
+                    ns.RefreshVendorSell()
+                end, { indent = trackIndent, disabled = trackOff, tip = "vendor_sell_track_tip" })
+        end
         y = flag(y, "vendor_sell_protect", "vendorSellProtect", true, ns.RefreshVendorSell,
             { indent = indent, disabled = off, tip = "vendor_sell_protect_tip", arg = ns.VENDOR_SELL_PROTECT_MAX })
 

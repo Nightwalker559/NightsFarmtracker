@@ -5,8 +5,9 @@
 -- them. With the protection on, one click sells at most PROTECT_MAX items,
 -- as many as the merchant's buyback list holds, so a wrong click can still be
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
--- unless that option is switched off. Both options live in Settings (Windows &
--- Buttons); the window only has a gear icon that jumps there.
+-- unless that option is switched off or their upgrade track (Adventurer, ...) is
+-- ticked there. The options live in Settings (Windows & Buttons); the window
+-- only has a gear icon that jumps there.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -70,6 +71,39 @@ local function IsWarband(data, bag, slot)
     return loc ~= nil and loc:IsValid() and C_Item.IsBoundToAccountUntilEquip(loc) == true
 end
 
+-- Upgrade tracks of Warband gear that may be sold although Warband items are
+-- kept (db.vendorSellWarbandTracks[key] = true). Matched by the track name the
+-- game shows, in the client language or in English.
+ns.WARBAND_SELL_TRACKS = {
+    { key = "explorer",   locKey = "track_explorer",   en = "Explorer"   },
+    { key = "adventurer", locKey = "track_adventurer", en = "Adventurer" },
+    { key = "veteran",    locKey = "track_veteran",    en = "Veteran"    },
+    { key = "champion",   locKey = "track_champion",   en = "Champion"   },
+    { key = "hero",       locKey = "track_hero",       en = "Hero"       },
+    { key = "myth",       locKey = "track_myth",       en = "Myth"       },
+}
+
+local trackByName
+local function BuildTrackNames()
+    trackByName = {}
+    for _, t in ipairs(ns.WARBAND_SELL_TRACKS) do
+        trackByName[t.en:lower()] = t.key
+        trackByName[ns.L[t.locKey]:lower()] = t.key
+    end
+end
+
+-- Warband gear whose upgrade track is ticked in Settings. Gear without a
+-- track, or with a name we do not know, stays in the bags.
+local function IsSellableTrack(link)
+    local tracks = NightsFarmtrackerDB.vendorSellWarbandTracks
+    if not (tracks and next(tracks) and C_Item.GetItemUpgradeInfo) then return false end
+    local info = C_Item.GetItemUpgradeInfo(link)
+    if not (info and info.trackString) then return false end
+    if not trackByName then BuildTrackNames() end
+    local key = trackByName[info.trackString:lower()]
+    return key ~= nil and tracks[key] == true
+end
+
 local function InEquipmentSet(bag, slot)
     return C_Container.GetContainerItemEquipmentSetInfo(bag, slot) == true
 end
@@ -82,7 +116,8 @@ local function CollectItems()
             if info and info.hyperlink and not info.isLocked and not info.hasNoValue then
                 local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
                 if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot)
-                   and not (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot)) then
+                   and not (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot)
+                            and not IsSellableTrack(info.hyperlink)) then
                     list[#list + 1] = {
                         bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink, name = data.name,
                         count = info.stackCount, value = sellPrice * info.stackCount,

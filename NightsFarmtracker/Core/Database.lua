@@ -77,7 +77,7 @@ end
 -- no other file needs to change.
 ns.PROFILE_KEYS = {
     goldRateMode=true, sessionLength=true, sessionHistoryEnabled=true, logWindowEnabled=true,
-    vendorFilterEnabled=true, blacklistEnabled=true, vendorSellEnabled=true, vendorSellProtect=true, vendorSellKeepWarband=true, mergeDaily=true,
+    vendorFilterEnabled=true, blacklistEnabled=true, vendorSellEnabled=true, vendorSellProtect=true, vendorSellKeepWarband=true, vendorSellWarbandTracks=true, mergeDaily=true,
     splitTradeGoods=true, splitGearByBinding=true, ahSource=true,
     gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
     tsmCustomSource=true, colorTheme=true, customAccent=true, headerGradient=true, themedButtons=true,
@@ -102,6 +102,7 @@ local function NewProfileDefaults()
         vendorSellEnabled     = true,
         vendorSellProtect     = true,
         vendorSellKeepWarband = true,
+        vendorSellWarbandTracks = {},
         mergeDaily            = true,
         splitTradeGoods       = false,
         splitGearByBinding    = false,
@@ -181,8 +182,8 @@ function ns.CopyProfile(name, sourceName)
     local src = profiles[sourceName] or ActiveProfileTable()
     local copy = {}
     for k, v in pairs(src) do copy[k] = v end
-    -- gearThresholdOff and pos are tables - copy them so the two profiles don't share them
-    for _, key in ipairs({ "gearThresholdOff", "pos" }) do
+    -- these are tables - copy them so the two profiles don't share them
+    for _, key in ipairs({ "gearThresholdOff", "vendorSellWarbandTracks", "pos" }) do
         if type(src[key]) == "table" then
             copy[key] = {}
             for k, v in pairs(src[key]) do copy[key][k] = v end
