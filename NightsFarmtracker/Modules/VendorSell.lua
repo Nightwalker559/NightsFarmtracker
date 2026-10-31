@@ -287,7 +287,7 @@ local function EnsureFrame()
     -- Gear icon left of the close button: opens the sell list options popup
     local cfgBtn = ns.CreateConfigButton(frame, ns.L["vendor_sell_config"])
     cfgBtn:SetPoint("RIGHT", frame.closeBtn, "LEFT", -6, 0)
-    cfgBtn:SetScript("OnClick", function(self) ns.ToggleVendorSellConfig(self) end)
+    cfgBtn:SetScript("OnClick", function(self) ns.ToggleVendorSellConfig(self, frame) end)
 
     frame.sellBtn = CreateSellButton(frame)
     frame.sellBtn:SetPoint("BOTTOMLEFT", pad, 8)

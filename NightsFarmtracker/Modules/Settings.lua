@@ -1100,7 +1100,8 @@ end
 
 ------------------------------------------------------------------------
 -- Sell List config popup: the gear icon next to "Show the sell list at
--- vendors" (Settings) and the one in the Sell List window open it. Warband
+-- vendors" (Settings) and the one in the Sell List window open it (anchor =
+-- the icon, owner = the window it sits in). Warband
 -- items, upgrade tracks and the sale protection, the same widgets as the
 -- settings page; rebuilt on open and after every change, so it always shows
 -- the active profile. New Sell List options belong here.
@@ -1146,7 +1147,7 @@ local function BuildSellConfig()
     pop:SetHeight(-y + 4)
 end
 
-function ns.ToggleVendorSellConfig(anchor)
+function ns.ToggleVendorSellConfig(anchor, owner)
     if sellCfgPop and sellCfgPop:IsShown() then sellCfgPop:Hide(); return end
 
     if not sellCfgPop then
@@ -1170,19 +1171,16 @@ function ns.ToggleVendorSellConfig(anchor)
 
     BuildSellConfig()
 
-    -- Below the anchor, or above it when there is no room below; flush with its
-    -- left edge, or its right edge when it would run off the screen.
-    local scale = anchor:GetEffectiveScale() / UIParent:GetEffectiveScale()
-    local room = (anchor:GetBottom() or 0) * scale
-    local above = room - 4 < sellCfgPop:GetHeight()
-        and UIParent:GetHeight() - (anchor:GetTop() or 0) * scale > room
-    local side = (anchor:GetLeft() or 0) * scale + S_W > UIParent:GetWidth() and "RIGHT" or "LEFT"
+    -- Beside the window that holds the gear icon, so it covers none of it: on
+    -- the right, or on the left when the screen has no room there. Top edge level
+    -- with the icon, moved up as far as needed to stay on the screen.
+    local scale = owner:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    local left, right = (owner:GetLeft() or 0) * scale, (owner:GetRight() or 0) * scale
+    local x = right + 4
+    if x + S_W > UIParent:GetWidth() then x = math.max(0, left - 4 - S_W) end
+    local top = math.max((anchor:GetTop() or 0) * scale + 4, sellCfgPop:GetHeight())
     sellCfgPop:ClearAllPoints()
-    if above then
-        sellCfgPop:SetPoint("BOTTOM" .. side, anchor, "TOP" .. side, 0, 4)
-    else
-        sellCfgPop:SetPoint("TOP" .. side, anchor, "BOTTOM" .. side, 0, -4)
-    end
+    sellCfgPop:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, math.min(top, UIParent:GetHeight()))
     sellCfgPop:Show()
 end
 
@@ -1193,7 +1191,7 @@ end
 
 local function MakeSellConfigButton(parent)
     local btn = ns.CreateConfigButton(parent, ns.L["vendor_sell_config"])
-    btn:SetScript("OnClick", function(self) ns.ToggleVendorSellConfig(self) end)
+    btn:SetScript("OnClick", function(self) ns.ToggleVendorSellConfig(self, SF) end)
     return btn
 end
 
