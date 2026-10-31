@@ -1099,12 +1099,13 @@ local function ConfigureCheckbox(row, label, yOff, getValue, setValue, opts)
 end
 
 ------------------------------------------------------------------------
--- Sell List config popup: the gear icon next to "Show the sell list at
--- vendors" (Settings) and the one in the Sell List window open it (anchor =
--- the icon, owner = the window it sits in). Warband
+-- Sell List config window: the gear icon next to "Show the sell list at
+-- vendors" (Settings) and the one in the Sell List window open it. Warband
 -- items, upgrade tracks and the sale protection, the same widgets as the
 -- settings page; rebuilt on open and after every change, so it always shows
--- the active profile. New Sell List options belong here.
+-- the active profile. New Sell List options belong here. Opened from Settings
+-- it joins the left docking chain behind Settings, opened from the Sell List
+-- window it docks to that window.
 ------------------------------------------------------------------------
 local sellCfgRows = {}
 
@@ -1128,7 +1129,7 @@ local function BuildSellConfig()
         return y - math.max(CTRL_SIZE, math.ceil(row.label:GetStringHeight())) - CTRL_GAP
     end
 
-    local y = -32
+    local y = -(S_HDR_H + 6)
     y = option(y, ns.L["vendor_sell_warband"], "vendorSellKeepWarband", ns.L["vendor_sell_warband_tip"])
 
     local indent = CTRL_SIZE + 8
@@ -1147,21 +1148,14 @@ local function BuildSellConfig()
     pop:SetHeight(-y + 4)
 end
 
-function ns.ToggleVendorSellConfig(anchor, owner)
+function ns.ToggleVendorSellConfig(owner)
     if sellCfgPop and sellCfgPop:IsShown() then sellCfgPop:Hide(); return end
 
     if not sellCfgPop then
-        local pop = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-        pop:SetFrameStrata("TOOLTIP")
-        pop:EnableMouse(true)
-        pop:SetWidth(S_W)
-        ns.ApplyFrameStyle(pop)
+        local pop = ns.CreateWindowFrame("NightsFarmtrackerSellConfigWnd", ns.L["vendor_sell_config"],
+            { width = S_W, pad = S_PAD, titleColor = ns.COL_ACCENT, dockChain = "left", noEsc = true })
         sellCfgPop = pop
-
-        local title = pop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        title:SetPoint("TOPLEFT", 10, -8)
-        title:SetTextColor(unpack(ns.COL_ACCENT))
-        title:SetText(ns.L["vendor_sell_config"])
+        ns.AddHLine(pop, "TOP", S_PAD, -(S_HDR_H - 1))
 
         pop.hint = pop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         pop.hint:SetText(ns.L["vendor_sell_tracks"])
@@ -1170,18 +1164,12 @@ function ns.ToggleVendorSellConfig(anchor, owner)
     end
 
     BuildSellConfig()
-
-    -- Beside the window that holds the gear icon, so it covers none of it: on
-    -- the right, or on the left when the screen has no room there. Top edge level
-    -- with the icon, moved up as far as needed to stay on the screen.
-    local scale = owner:GetEffectiveScale() / UIParent:GetEffectiveScale()
-    local left, right = (owner:GetLeft() or 0) * scale, (owner:GetRight() or 0) * scale
-    local x = right + 4
-    if x + S_W > UIParent:GetWidth() then x = math.max(0, left - 4 - S_W) end
-    local top = math.max((anchor:GetTop() or 0) * scale + 4, sellCfgPop:GetHeight())
-    sellCfgPop:ClearAllPoints()
-    sellCfgPop:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, math.min(top, UIParent:GetHeight()))
+    -- Only a window opened from Settings belongs to the chain (it re-docks
+    -- there whenever another window opens or closes)
+    local fromSettings = owner == SF
+    ns.SellConfigFrame = fromSettings and sellCfgPop or nil
     sellCfgPop:Show()
+    if fromSettings then ns.RefreshWindowChain("left") else ns.DockFrame(sellCfgPop, owner, "right") end
 end
 
 -- The merchant window closing takes the popup with it
@@ -1191,7 +1179,7 @@ end
 
 local function MakeSellConfigButton(parent)
     local btn = ns.CreateConfigButton(parent, ns.L["vendor_sell_config"])
-    btn:SetScript("OnClick", function(self) ns.ToggleVendorSellConfig(self, SF) end)
+    btn:SetScript("OnClick", function() ns.ToggleVendorSellConfig(SF) end)
     return btn
 end
 

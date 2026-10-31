@@ -96,9 +96,9 @@ local function Reanchor()
     if not LockoutFrame then return end
     LockoutFrame:ClearAllPoints()
     if ns.GoldFrame and ns.GoldFrame:IsShown() then
-        LockoutFrame:SetPoint("TOPLEFT", ns.GoldFrame, "BOTTOMLEFT", 0, -2)
+        LockoutFrame:SetPoint("TOPLEFT", ns.GoldFrame, "BOTTOMLEFT", 0, -ns.WINDOW_GAP)
     else
-        LockoutFrame:SetPoint("TOPLEFT", ns.MainFrame, "BOTTOMLEFT", 0, -2)
+        LockoutFrame:SetPoint("TOPLEFT", ns.MainFrame, "BOTTOMLEFT", 0, -ns.WINDOW_GAP)
     end
 end
 

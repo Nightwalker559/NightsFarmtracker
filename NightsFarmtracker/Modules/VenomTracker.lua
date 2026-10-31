@@ -33,7 +33,7 @@ local function ApplyVenomPosition()
         VenomFrame:SetPoint("BOTTOMLEFT", ns.BaitFrame, "TOPLEFT", 0, 1)
     else
         -- Default: docked above the main frame.
-        VenomFrame:SetPoint("BOTTOMLEFT", ns.MainFrame, "TOPLEFT", 0, 1)
+        VenomFrame:SetPoint("BOTTOMLEFT", ns.MainFrame, "TOPLEFT", 0, ns.WINDOW_GAP)
     end
 end
 

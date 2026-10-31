@@ -199,7 +199,7 @@ ScrollFrame:Hide()
 ------------------------------------------------------------------------
 local GoldFrame = CreateFrame("Frame","NightsFarmtrackerGoldFrame",UIParent,"BackdropTemplate")
 GoldFrame:SetWidth(FRAME_W)
-GoldFrame:SetPoint("TOPLEFT", MainFrame, "BOTTOMLEFT", 0, -2)
+GoldFrame:SetPoint("TOPLEFT", MainFrame, "BOTTOMLEFT", 0, -ns.WINDOW_GAP)
 GoldFrame:SetFrameStrata("MEDIUM")
 GoldFrame:SetClampedToScreen(true)
 ns.ApplyFrameStyle(GoldFrame)
@@ -266,11 +266,11 @@ function ns.KeepStackOnScreen()
     if not bottom or not MainFrame:IsShown() then return end
     if InCombatLockdown() and ns.BaitDependsOnMainFrame and ns.BaitDependsOnMainFrame() then return end
     local below = 0
-    if GoldFrame:IsShown() then below = below + GoldFrame:GetHeight() + 2 end
+    if GoldFrame:IsShown() then below = below + GoldFrame:GetHeight() + ns.WINDOW_GAP end
     local lockout = ns.LockoutFrame
-    if lockout and lockout:IsShown() then below = below + lockout:GetHeight() + 2 end
+    if lockout and lockout:IsShown() then below = below + lockout:GetHeight() + ns.WINDOW_GAP end
     local log = ns.LogFrame   -- docked below the stack while the main window is collapsed
-    if log and log:IsShown() and NightsFarmtrackerDB.expanded == false then below = below + ns.STACK_GAP + log:GetHeight() end
+    if log and log:IsShown() and NightsFarmtrackerDB.expanded == false then below = below + ns.WINDOW_GAP + log:GetHeight() end
     local missing = below - bottom
     if missing <= 0 then return end
     local x, y = ns.AnchorToTop(MainFrame)

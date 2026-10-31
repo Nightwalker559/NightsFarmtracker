@@ -25,12 +25,13 @@ local function DockStacked(frame, anchor, edge)
     local screenTop    = UIParent:GetTop()
     local anchorBottom = anchor:GetBottom()
     local anchorTop    = anchor:GetTop()
-    local noRoomBelow  = anchorBottom and UIParent:GetBottom() and (anchorBottom - 1 - height) < UIParent:GetBottom()
-    local roomAbove    = anchorTop and screenTop and (anchorTop + 1 + height) <= screenTop
+    local gap          = ns.WINDOW_GAP
+    local noRoomBelow  = anchorBottom and UIParent:GetBottom() and (anchorBottom - gap - height) < UIParent:GetBottom()
+    local roomAbove    = anchorTop and screenTop and (anchorTop + gap + height) <= screenTop
     if noRoomBelow and roomAbove then
-        frame:SetPoint("BOTTOM" .. edge, anchor, "TOP" .. edge, 0, 1)
+        frame:SetPoint("BOTTOM" .. edge, anchor, "TOP" .. edge, 0, gap)
     else
-        frame:SetPoint("TOP" .. edge, anchor, "BOTTOM" .. edge, 0, -1)
+        frame:SetPoint("TOP" .. edge, anchor, "BOTTOM" .. edge, 0, -gap)
     end
 end
 
@@ -46,17 +47,17 @@ function ns.DockFrame(frame, anchor, side)
     local screenRight = UIParent:GetRight()
     if side == "left" then
         local anchorLeft = anchor:GetLeft()
-        if anchorLeft and screenLeft and (anchorLeft - 1 - width) < screenLeft then
+        if anchorLeft and screenLeft and (anchorLeft - ns.WINDOW_GAP - width) < screenLeft then
             DockStacked(frame, anchor, "RIGHT")
         else
-            frame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -1, 0)
+            frame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -ns.WINDOW_GAP, 0)
         end
     else
         local anchorRight = anchor:GetRight()
-        if anchorRight and screenRight and (anchorRight + 1 + width) > screenRight then
+        if anchorRight and screenRight and (anchorRight + ns.WINDOW_GAP + width) > screenRight then
             DockStacked(frame, anchor, "LEFT")
         else
-            frame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 1, 0)
+            frame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", ns.WINDOW_GAP, 0)
         end
     end
 end
@@ -74,7 +75,7 @@ end
 ------------------------------------------------------------------------
 ns.WINDOW_CHAINS = {
     right = { "LogFrame", "FilterFrame", "BlacklistFrame", "GoalsFrame" },
-    left  = { "HistFrame", "SettingsFrame", "ExportPickFrame", "ExportFrame", "DebugFrame" },
+    left  = { "HistFrame", "SettingsFrame", "SellConfigFrame", "ExportPickFrame", "ExportFrame", "DebugFrame" },
 }
 
 function ns.RefreshWindowChain(side)
