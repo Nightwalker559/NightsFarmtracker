@@ -7,6 +7,7 @@
 - Session detail window: when the game renders the saved link of a gear row with the wrong item level (base level 133 instead of 253), the tooltip is shown with the saved item level and its stats instead, like the Auction House does
 - Number fields (Item Goals amounts, number boxes in Settings) are right-aligned
 - Item Goals window: the hint of the empty list is no longer cut off
+- Settings: the color theme list scrolls with the mouse wheel and is only as tall as the space below the dropdown, so the last themes are no longer cut off at the screen bottom
 - Filter window (all tabs) and Item Goals: item names use the whole row width instead of being cut after 20 characters
 - Settings: an open dropdown list (theme, profile, ...) closes when the page scrolls or you jump to another section in the sidebar, instead of floating away from its dropdown
 

@@ -67,6 +67,13 @@ local function MakeThemeDropdown(parent, yOff)
 
     local list = MakePopupList()
 
+    -- The rows sit in a scroll area: with 17 themes the list is taller than
+    -- the space below the dropdown on many screens.
+    local listW = S_W - S_PAD*2 - 40 - 4
+    local scroll, content, onWheel = ns.CreateScrollList(list, listW, THEME_ROW_H)
+    scroll:SetPoint("TOPLEFT", 2, -2); scroll:SetPoint("BOTTOMRIGHT", -2, 2)
+    content:SetSize(listW, THEME_ROW_H * #ns.COLOR_THEME_ORDER)
+
     -- Hover preview: floats beside the list next to the hovered entry
     local popup = MakeThemePreview(UIParent)
     popup:SetFrameStrata("TOOLTIP")
@@ -82,10 +89,11 @@ local function MakeThemeDropdown(parent, yOff)
     list.rows = {}
     for i, key in ipairs(ns.COLOR_THEME_ORDER) do
         local theme = ns.COLOR_THEMES[key]
-        local row = CreateFrame("Button", nil, list)
-        row:SetHeight(THEME_ROW_H)
-        row:SetPoint("TOPLEFT", 2, -2 - (i-1)*THEME_ROW_H)
-        row:SetPoint("RIGHT", -2, 0)
+        local row = CreateFrame("Button", nil, content)
+        row:SetSize(listW, THEME_ROW_H)
+        row:SetPoint("TOPLEFT", 0, -(i-1)*THEME_ROW_H)
+        row:EnableMouseWheel(true)   -- the wheel scrolls the list also over a row
+        row:SetScript("OnMouseWheel", onWheel)
         -- Color chips (frame border, header, accent) as a quick glance
         row.chips = {}
         for ci = 1, 3 do
@@ -131,12 +139,15 @@ local function MakeThemeDropdown(parent, yOff)
         end)
         list.rows[i] = row
     end
-    list:SetHeight(2 + THEME_ROW_H * #ns.COLOR_THEME_ORDER + 2)
-
     frame:EnableMouse(true)
     frame:SetScript("OnMouseUp", function()
         ToggleMenu(list, frame, function()
             for _, r in ipairs(list.rows) do r:PaintChips() end  -- custom color may have changed
+            -- as many rows as fit between the dropdown and the screen bottom (at least 5)
+            local bottom = (tonumber(frame:GetBottom()) or 0) * frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+            local fit = math.floor((bottom - 16 - 4) / THEME_ROW_H)
+            list:SetHeight(4 + THEME_ROW_H * math.max(5, math.min(#ns.COLOR_THEME_ORDER, fit)))
+            scroll:SetVerticalScroll(0)
         end)
     end)
 
