@@ -12,7 +12,7 @@
 - Sell List options (Keep Warband items, upgrade tracks, protection) moved out of the Settings page into their own window behind a gear icon next to "Show the sell list at vendors" and in the Sell List window (docked next to Settings, or below/above it when the screen has no room; at the vendor next to the Sell List window); they follow the active profile (the upgrade tracks are a profile setting and are copied with it)
 - Filter window: the Vendor-Only Filter and the Blacklist are one window with a tab each instead of two windows. Left-click on the Filter button opens the Vendor-Only tab, right-click the Blacklist tab, a click on a tab switches; items dropped on the window go into the shown tab, and a tab whose feature is switched off in Settings is not shown. The last used tab is remembered (`/nft filter` opens it). The window is built so another list can be added as a further tab
 - Marked as compatible with game patch 12.1.7
-- Windows that grow and shrink with their list (Filter, Sell List, Loot Log, ...) get a height of whole screen pixels, so the title and tab labels of the Filter window no longer move by a pixel when the tab changes
+- The Filter window has the same height in every tab (the maximum window height, the list scrolls inside), so its title and tab labels stay where they are when the tab changes
 - All windows keep the same distance (2 px) when docked next to or below each other; before it was 1, 2 or 4 px depending on the window
 
 ## 1.8.3

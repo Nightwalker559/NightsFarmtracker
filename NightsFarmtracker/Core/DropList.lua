@@ -274,7 +274,8 @@ local groupHeaderPool = ns.NewPool(CreateItemGroupHeader)
 -- grows with its content up to ns.GetMaxWindowH(), then scrolls.
 --
 -- cfg: window, listFrame, scrollFrame, emptyLabel; itemPool, rows (the
--- window's item row pool, see ns.NewPool, and its active rows); headers (active
+-- window's item row pool, see ns.NewPool, and its active rows); fixedVisH
+-- (optional: the list area never gets smaller than this); headers (active
 -- group headers); padX; bodyTop (window Y where the scroll area starts);
 -- itemsTop (Y inside listFrame where the rows start); ftrH; minVisH (room for
 -- the "list empty" label); items (itemID -> { name, icon, quality,
@@ -357,7 +358,7 @@ function ns.RebuildDropItemList(cfg)
 
     ns.FitScrollWindow({
         window = cfg.window, scroll = cfg.scrollFrame, list = cfg.listFrame,
-        hdrH = cfg.bodyTop, ftrH = cfg.ftrH,
+        hdrH = cfg.bodyTop, ftrH = cfg.ftrH, minH = cfg.fixedVisH,
         contentH = yOff + (count == 0 and cfg.minVisH or 0),
     })
 
@@ -470,6 +471,7 @@ function ns.CreateDropListPane(window, cfg, bodyTop)
             window = window, listFrame = listFrame, scrollFrame = scrollFrame, emptyLabel = pane.emptyLabel,
             itemPool = itemPool, rows = itemRows, padX = pad, bodyTop = bodyTop, itemsTop = itemsTop,
             ftrH = FTR_H, minVisH = MIN_VIS_H, items = Items(),
+            fixedVisH = ns.GetMaxWindowH() - bodyTop - FTR_H,   -- same window height in every tab
             headers = headers,
             collapsed = ns.GetCollapsedTable(cfg.groupsCollapsedKey),
             rebuild = Rebuild,

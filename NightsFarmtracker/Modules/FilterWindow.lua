@@ -9,7 +9,9 @@
 --
 -- ns.RegisterFilterTab(cfg): cfg.key (tab id), cfg.titleKey (tab label),
 -- cfg.enabledKey (setting that switches the tab off), and the pane fields
--- described at ns.CreateDropListPane.
+-- described at ns.CreateDropListPane. The window has the same height in every
+-- tab (the maximum window height, the list scrolls inside): a window whose height
+-- changes with the tab moves its title and tab labels by a pixel against the border.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -87,10 +89,7 @@ local function SelectTab(tab)
     if active and active ~= tab and active.pane then active.pane.Hide() end
     active = tab
     NightsFarmtrackerDB.filterTab = tab.key
-    if not tab.pane then
-        tab.pane = ns.CreateDropListPane(frame, tab.cfg, BODY_TOP)
-        ns.RoundWindowLayout(frame)
-    end
+    if not tab.pane then tab.pane = ns.CreateDropListPane(frame, tab.cfg, BODY_TOP) end
     tab.pane.Show()
     PaintTabs()
     tab.pane.Rebuild()
@@ -109,7 +108,6 @@ local function EnsureFrame()
     end)
 
     for _, tab in ipairs(tabs) do tab.button = CreateTabButton(tab, SelectTab) end
-    ns.RoundWindowLayout(frame)   -- title and tab labels stay put while the list below changes height
 end
 
 -- Rebuilds the list of the shown tab (the others rebuild when opened)

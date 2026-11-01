@@ -414,24 +414,13 @@ function ns.VisibleListHeight(contentH, hdrH, ftrH, maxTotal)
     return math.min(math.max(1, contentH), maxVis)
 end
 
--- A size in UI units rounded to whole screen pixels for `frame`. The game
--- places a frame by its bottom edge; with a fractional height the top edge,
--- and every border and text hanging from it, lands on a different pixel
--- whenever the height changes (title and tabs of the Filter window moved by a pixel).
-function ns.SnapToPixel(frame, value)
-    if PixelUtil and PixelUtil.GetNearestPixelSize then
-        return PixelUtil.GetNearestPixelSize(value, frame:GetEffectiveScale())
-    end
-    return value
-end
-
 function ns.FitScrollWindow(cfg)
     local contentH = math.max(1, cfg.contentH)
     local visH = ns.VisibleListHeight(contentH, cfg.hdrH, cfg.ftrH, cfg.maxTotal)
     if cfg.minH then visH = math.max(cfg.minH, visH) end
     if cfg.list then cfg.list:SetHeight(contentH) end
     if not cfg.anchored then cfg.scroll:SetHeight(visH) end
-    cfg.window:SetHeight(ns.SnapToPixel(cfg.window, cfg.hdrH + visH + cfg.ftrH))
+    cfg.window:SetHeight(cfg.hdrH + visH + cfg.ftrH)
     cfg.scroll:SetVerticalScroll(math.min(cfg.scroll:GetVerticalScroll(), math.max(0, contentH - visH)))
     return visH
 end
@@ -576,16 +565,6 @@ function ns.CreateWindowFrame(name, title, opts)
     frame.closeBtn = xBtn
 
     return frame
-end
-
--- Rounds the layout of a frame, its regions and its children (as they exist
--- now) to whole pixels: Blizzard's own cure for text that moves by a pixel when
--- the height of the frame it hangs from changes (a window whose list grows or
--- shrinks). Call it after the parts that must stay put have been created.
-function ns.RoundWindowLayout(frame)
-    if PixelUtil and PixelUtil.SetRoundLayoutToNearestPixelRecursively then
-        PixelUtil.SetRoundLayoutToNearestPixelRecursively(frame, true)
-    end
 end
 
 ------------------------------------------------------------------------
