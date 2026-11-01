@@ -309,16 +309,18 @@ end)
 -- which one is active ("goal" | "session" | "off"), the other keeps its value.
 -- The goal of one item (pieces) or nil: its own amount from db.itemGoals (only
 -- while db.itemGoalsEnabled, so the list can stay without being emptied), else
--- the general db.itemGoal that covers every other item (0 = none), except
--- items in the Vendor-Only Filter: they only get a goal of their own. See
--- ApplyValueBars. Goals run the normal count-up timer.
+-- the general db.itemGoal that covers every other item (0 = none), Vendor-Only
+-- items included: their bar shows the progress too. The second result tells
+-- whether the goal is the item's own. What triggers the goal is decided in
+-- GoalReachedIn. See ApplyValueBars. Goals run the normal count-up timer.
 function ns.GetItemGoal(itemID)
     local db = NightsFarmtrackerDB
     if db.limitMode ~= "goal" or not itemID then return nil end
     local entry = db.itemGoalsEnabled ~= false and db.itemGoals and db.itemGoals[itemID]
     local amount = entry and tonumber(entry.amount) or 0
-    if amount <= 0 and not ns.IsForceVendor(itemID) then amount = tonumber(db.itemGoal) or 0 end
-    return amount > 0 and amount or nil
+    local own = amount > 0
+    if not own then amount = tonumber(db.itemGoal) or 0 end
+    return amount > 0 and amount or nil, own
 end
 
 -- Optional fixed session length (db.sessionLength minutes): the timer then
@@ -744,13 +746,15 @@ function ns.GoalReached() return goalReached end
 
 -- True if any item reached its goal with its whole amount (all rolls and tiers
 -- together). BuildHUD pauses the session on it, also with the bars switched off.
+-- Items valued at vendor price only (Vendor-Only Filter, BoP) count towards
+-- their bar but only trigger a goal of their own, not the general one.
 local function GoalReachedIn(cats)
     for _, cat in pairs(cats) do
         for _, it in ipairs(cat.items) do
             local d = it.data
             if not d.isJunkMerged then
-                local goal = ns.GetItemGoal(it.itemID)
-                if goal and (d.amount or 0) >= goal then return true end
+                local goal, own = ns.GetItemGoal(it.itemID)
+                if goal and (own or not ns.IsVendorOnly(d)) and (d.amount or 0) >= goal then return true end
             end
         end
     end
