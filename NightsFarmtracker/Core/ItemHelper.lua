@@ -200,8 +200,8 @@ function ns.ItemValue(data, vendor, ah)
     if ns.IsVendorOnly(data) then return vendor or ns.VendorTotal(data) end
     -- Per-variant vendor-vs-AH threshold decision only applies to scaling
     -- gear (see GearVariantItemValue) - reagent quality tiers also use
-    -- data.variants (see GetVariants in PriceHelper.lua) but keep the
-    -- combined item-level decision below, matching pre-unification behavior.
+    -- data.variants (see GetVariants in PriceHelper.lua) but are valued as one
+    -- item below.
     if data.variants and ns.IsGear(data) then return ns.GearVariantItemValue(data) end
     return ns.PickValue(data, vendor or ns.VendorTotal(data), ah or ns.AHTotal(data))
 end
@@ -260,9 +260,9 @@ end
 ------------------------------------------------------------------------
 -- Category discovery — every distinct category currently present among
 -- tracked items (same grouping the HUD uses). "Junk" is always pinned in
--- the list even with nothing tracked yet, since both the Vendor-Only
--- Filter and Blacklist windows show it as an always-available toggle.
--- Shared by both windows' category checkbox sections.
+-- the list even with nothing tracked yet, since both the Vendor-Only and
+-- the Blacklist tab show it as an always-available toggle. Shared by the
+-- category checkbox sections of both tabs.
 ------------------------------------------------------------------------
 -- Every category name ns.CategoryName can produce in the current client
 -- language. Saved filter keys from another language (e.g. "Junk" next to

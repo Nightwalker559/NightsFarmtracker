@@ -220,7 +220,7 @@ local function MoveSurroundings()
         if seen[obj] or IsIgnored(obj) then return end
         seen[obj] = true
         local ok, err = pcall(Redirect, obj, reparent)
-        if not ok and ns.Log then ns.Log("Hud: redirect failed", err) end
+        if not ok then ns.Log("Hud: redirect failed", err) end
     end
 
     -- 1) everything that is a child or texture of the Minimap itself

@@ -127,6 +127,6 @@ ns.FONT_NORMAL = 12  -- default row/item text
 ns.FONT_HEADER = 14  -- emphasized headers/titles
 
 -- Header height for title-only secondary windows (History, Detail, Filter,
--- Blacklist, Log, Settings). MainFrame keeps its own taller header (it has
+-- Log, Settings). MainFrame keeps its own taller header (it has
 -- to fit the icon toolbar) and isn't affected by this constant.
 ns.WINDOW_HDR_H = 34

@@ -13,7 +13,6 @@ local ROW_H       = ns.ROW_H
 local LOG_FTR_H   = 10
 local MIN_VIS_H   = 30
 local MAX_ENTRIES = 100  -- oldest entries drop off
-local DOCK_GAP    = ns.WINDOW_GAP
 
 -- Row layout (the window is as wide as its widest row, see RebuildLogList)
 local TIME_W         = 38
@@ -104,9 +103,9 @@ local function RebuildLogList()
     local maxTotal
     if collapsed then
         frameW = LOG_W
-        local used = ns.COLLAPSED_H + DOCK_GAP
-        if ns.GoldFrame:IsShown() then used = used + ns.GoldFrame:GetHeight() + DOCK_GAP end
-        if ns.LockoutFrame and ns.LockoutFrame:IsShown() then used = used + ns.LockoutFrame:GetHeight() + DOCK_GAP end
+        local used = ns.COLLAPSED_H + ns.WINDOW_GAP
+        if ns.GoldFrame:IsShown() then used = used + ns.GoldFrame:GetHeight() + ns.WINDOW_GAP end
+        if ns.LockoutFrame and ns.LockoutFrame:IsShown() then used = used + ns.LockoutFrame:GetHeight() + ns.WINDOW_GAP end
         maxTotal = ns.GetMaxWindowH() - used
     end
     local contentW = frameW - 2 * LOG_PAD
@@ -174,7 +173,7 @@ local function EnsureLogFrame()
     if LogFrame then return end
 
     LogFrame = ns.CreateWindowFrame("NightsFarmtrackerLogWnd", ns.L["log_title"], {width = LOG_W, dockChain = "right"})
-    LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", DOCK_GAP, 0)
+    LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", ns.WINDOW_GAP, 0)
     ns.LogFrame = LogFrame  -- exposed so other windows (e.g. Filter) can anchor next to it
     LogFrame.closeBtn:HookScript("OnClick", function()
         NightsFarmtrackerDB.logWindowShown = false
@@ -197,8 +196,8 @@ end
 -- Anchoring — below MainFrame when collapsed, as wide as it (or below the Gold
 -- Overview window / Instance Lockout frame if those are also open there, to
 -- avoid overlapping them), otherwise part of the right-side window chain (see
--- ns.RefreshWindowChain in Widgets.lua), which also re-flows the Filter,
--- Blacklist and Item Goals windows if they are open.
+-- ns.RefreshWindowChain in Widgets.lua), which also re-flows the Filter and
+-- Item Goals windows if they are open.
 ------------------------------------------------------------------------
 local function ReanchorLogFrame()
     if NightsFarmtrackerDB.expanded == false then
@@ -206,7 +205,7 @@ local function ReanchorLogFrame()
         local below = ns.MainFrame
         if ns.LockoutFrame and ns.LockoutFrame:IsShown() then below = ns.LockoutFrame
         elseif ns.GoldFrame and ns.GoldFrame:IsShown() then below = ns.GoldFrame end
-        LogFrame:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -DOCK_GAP)
+        LogFrame:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -ns.WINDOW_GAP)
     end
     ns.RefreshWindowChain("right")
 end

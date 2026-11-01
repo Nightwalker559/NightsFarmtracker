@@ -404,30 +404,25 @@ function ns.MigrateGearVariantsFromBags(items)
     end
     if not next(targets) then return end
 
-    for bag = 0, ns.LAST_BAG do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            local ci = C_Container.GetContainerItemInfo(bag, slot)
-            if ci and targets[ci.itemID] then
-                local d    = targets[ci.itemID]
-                local link = C_Container.GetContainerItemLink(bag, slot)
-                if link then
-                    local _, _, iQuality, iLevel, _, _, _, _, _, _, sp = C_Item.GetItemInfo(link)
-                    local vKey = ns.GearVariantKey(link)
-                    d.variants  = d.variants or {}
-                    local gv    = d.variants[vKey]
-                    if not gv then
-                        gv = { amount = 0 }
-                        d.variants[vKey] = gv
-                    end
-                    gv.amount    = gv.amount + (ci.stackCount or 1)
-                    gv.quality   = iQuality
-                    gv.itemLevel = iLevel
-                    gv.itemLink  = link
-                    if sp and sp > 0 then gv.sellPrice = sp end
-                end
+    ns.ForEachBagItem(function(bag, slot, ci)
+        local d = targets[ci.itemID]
+        local link = d and C_Container.GetContainerItemLink(bag, slot)
+        if link then
+            local _, _, iQuality, iLevel, _, _, _, _, _, _, sp = C_Item.GetItemInfo(link)
+            local vKey = ns.GearVariantKey(link)
+            d.variants  = d.variants or {}
+            local gv    = d.variants[vKey]
+            if not gv then
+                gv = { amount = 0 }
+                d.variants[vKey] = gv
             end
+            gv.amount    = gv.amount + (ci.stackCount or 1)
+            gv.quality   = iQuality
+            gv.itemLevel = iLevel
+            gv.itemLink  = link
+            if sp and sp > 0 then gv.sellPrice = sp end
         end
-    end
+    end)
 
     for _, d in pairs(targets) do
         local found = 0

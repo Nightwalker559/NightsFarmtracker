@@ -644,12 +644,10 @@ end
 ------------------------------------------------------------------------
 local function EnsureHistFrame()
     if HListFrame then return end
-    HistFrame = ns.CreateWindowFrame("NightsFarmtrackerHistoryWnd", ns.L["session_history"], {width = H_W})
+    HistFrame = ns.CreateWindowFrame("NightsFarmtrackerHistoryWnd", ns.L["session_history"], {width = H_W, dockChain = "left"})
     ns.HistFrame = HistFrame  -- exposed so Settings can dock next to it in the left-side chain
-    HistFrame:SetScript("OnHide",function(self)
-        ns.HideTooltipOf(self)  -- explicit: don't rely on the shell's hook surviving SetScript
+    HistFrame:HookScript("OnHide", function()
         if DetailFrame then DetailFrame:Hide() end
-        ns.RefreshWindowChain("left")
     end)
 
     ns.AddHLine(HistFrame, "TOP", PAD, -(H_HDR_H-1))
@@ -714,8 +712,8 @@ function ns.ToggleHistory()
         HistFrame:Hide()
         if DetailFrame then DetailFrame:Hide() end
     else
-        -- Settings docks off the same anchor point as History, so close
-        -- it first to avoid overlap.
+        -- Settings and the Detail window both dock left of History, so close
+        -- Settings first to avoid overlap.
         if ns.SettingsFrame and ns.SettingsFrame:IsShown() then ns.SettingsFrame:Hide() end
         ns.RebuildHistory()
         HistFrame:Show()

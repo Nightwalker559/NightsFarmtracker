@@ -523,7 +523,7 @@ end
 -- behavior via frame:SetScript("OnHide", ...) or
 -- frame.closeBtn:HookScript("OnClick", ...). opts (all optional): width, pad
 -- (default ns.PAD), titleColor (default ns.COL_GOLD), titleY (default -10),
--- dockChain ("right": the window sits in that docking chain, see
+-- dockChain ("right" or "left": the window sits in that docking chain, see
 -- ns.WINDOW_CHAINS, and the others close ranks when it hides), noEsc (Esc does
 -- not close it: it is closed by whatever owns it).
 ------------------------------------------------------------------------
@@ -671,9 +671,9 @@ end
 function ns.CreateCopyTextWindow(name, title, noEsc)
     local W, HDR_H, FTR_H = 460, ns.WINDOW_HDR_H, 12
 
-    local frame = ns.CreateWindowFrame(name, title, {width = W, pad = ns.PAD, titleColor = ns.COL_ACCENT, noEsc = noEsc})
+    local frame = ns.CreateWindowFrame(name, title,
+        {width = W, pad = ns.PAD, titleColor = ns.COL_ACCENT, dockChain = "left", noEsc = noEsc})
     frame:SetHeight(360)
-    frame:SetScript("OnHide", function() ns.RefreshWindowChain("left") end)
 
     ns.AddHLine(frame, "TOP", ns.PAD, -(HDR_H - 1))
 

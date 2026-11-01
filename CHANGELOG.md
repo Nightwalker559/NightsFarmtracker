@@ -13,7 +13,9 @@
 - Filter window: the Vendor-Only Filter and the Blacklist are one window with a tab each instead of two windows. Left-click on the Filter button opens the Vendor-Only tab, right-click the Blacklist tab, a click on a tab switches; items dropped on the window go into the shown tab, and a tab whose feature is switched off in Settings is not shown. The last used tab is remembered (`/nft filter` opens it). The window is built so another list can be added as a further tab
 - Marked as compatible with game patch 12.1.7
 - The Filter window has the same height in every tab (the maximum window height, the list scrolls inside), so its title and tab labels stay where they are when the tab changes
-- All windows keep the same distance (2 px) when docked next to or below each other; before it was 1, 2 or 4 px depending on the window
+- All windows keep the same distance (2 px) when docked next to or below each other; before it was 1, 2 or 4 px depending on the window (the Venom Tracker above the Lure Bar included)
+- The tooltip of the Filter button reads "Filter" and only shows the left-/right-click hints while the Vendor-Only Filter and the Blacklist are both on (it named a single list before, which was wrong once the Delete List is on); the info window, `/nft filter` and the Reset all text mention the Delete List
+- Internal: the four bag scans (price update, gear variant repair, Sell List) share one helper, Session History, Settings and the copy text windows join their docking chain through the window option instead of their own hide scripts, and unused text keys and a stale CHANGELOG copy in the addon folder are gone
 
 ## 1.8.3
 
@@ -35,7 +37,7 @@
 ### Changed
 
 - Session length and Item goals each have a checkbox now (Settings, Session Limit); only one of the two can be active at a time, and the other keeps its values instead of having to be cleared. Existing settings are carried over
-- Settings reorganized: Session length and Item goals moved out of Display into a new Session Limit section; the window height, lock, minimap and addon-menu buttons, Loot Log and Instance Lockout options moved into a new Windows & Buttons section. Display keeps the gold rate, gold format, price source and value bar
+- Settings reorganized: Session length and Item goals moved out of Display into a new Session Limit section; the window height, lock, minimap and addon-menu buttons, Loot Log and Instance Lockout options moved into a new Windows & Buttons section. Display keeps the gold rate, gold format, price source and value bar
 - 4 px (was 10) between a window's border and its content on the sides, in the main window and the list windows; the lists are 12 px wider
 - The value bar starts where the item name starts (4 px right of the icon, was 1 px)
 - Internal cleanup: shared helpers for scroll lists, number boxes, checkbox boxes and the drop zone, and several small fixes (recent-loot memory, Venom Tracker slot lookup, session storage)

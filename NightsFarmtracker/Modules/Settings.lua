@@ -16,7 +16,7 @@ end)
 -- Wipes both SavedVariables tables and reloads - InitDB()/InitAccountDB()
 -- (called again on the reload) then rebuild everything from scratch, same
 -- as a fresh install. Deletes settings, session history, Vendor-Only
--- filter, Blacklist, AH-by-expansion selection - everything.
+-- filter, Blacklist, Delete List, AH-by-expansion selection - everything.
 function ns.ResetAddonToDefault()
     NightsFarmtrackerDB = nil
     NightsFarmtrackerAccountDB = nil
@@ -194,7 +194,7 @@ local sellConfigBtn
 local profileButtons
 local deleteProfileRow
 local themeMenuList, profileMenuList, deleteMenuList, trackMenuList
-local sellCfgPop   -- Sell List config popup (see ns.ToggleVendorSellConfig)
+local sellCfgPop   -- Sell List options window (see ns.ToggleVendorSellConfig)
 
 -- Single-instance widgets are built on first use, then only moved and shown.
 local function PlaceWidget(widget, make, y)
@@ -851,7 +851,7 @@ local function MakeWarbandTrackDropdown(parent)
     frame.lbl:SetWordWrap(false)
 
     local list = MakePopupList()
-    list:SetFrameLevel(50)   -- above the config popup that hosts this dropdown
+    list:SetFrameLevel(50)   -- above the options window that hosts this dropdown
     trackMenuList = list
 
     local function Ticked(key)
@@ -1172,7 +1172,7 @@ function ns.ToggleVendorSellConfig(owner)
     if fromSettings then ns.RefreshWindowChain("left") else ns.DockFrame(sellCfgPop, owner, "right") end
 end
 
--- The merchant window closing takes the popup with it
+-- The merchant window closing takes the options window with it
 function ns.CloseVendorSellConfig()
     if sellCfgPop then sellCfgPop:Hide() end
 end
@@ -1555,7 +1555,7 @@ function ns.RebuildSettingsContent()
             function() return db.instanceLockoutEnabled == true end,
             function(v) ns.SetInstanceLockoutEnabled(v) end)
 
-        -- Sell list at vendors; its options sit behind the gear icon (popup)
+        -- Sell list at vendors; its options sit behind the gear icon (own window)
         y = y - CHECK_RUN_TAIL
         hintLabel(S_PAD, y, ns.L["vendor_sell_group"], 0.6)
         y = y - 18
@@ -1775,17 +1775,14 @@ local function EnsureSettingsFrame()
     if SF then return end
 
     SF = ns.CreateWindowFrame("NightsFarmtrackerSettingsWnd", ns.L["settings_title"],
-        {width = S_W + S_SIDEBAR_W, pad = S_PAD, titleColor = ns.COL_ACCENT})
+        {width = S_W + S_SIDEBAR_W, pad = S_PAD, titleColor = ns.COL_ACCENT, dockChain = "left"})
     SF:SetHeight(280)
     ns.SettingsFrame = SF  -- exposed so Session History can dock next to it in the left-side chain
-    -- Closes the floating theme dropdown list whenever Settings hides for
-    -- ANY reason (X button, ESC via UISpecialFrames, /reload, etc.) - the
-    -- list is a separate TOOLTIP-strata frame parented to UIParent, so it
-    -- doesn't auto-close with SF on its own.
-    SF:SetScript("OnHide", function()
-        CloseMenus()
-        ns.RefreshWindowChain("left")
-    end)
+    -- Closes the floating dropdown lists and the Sell List options whenever
+    -- Settings hides for ANY reason (X button, ESC via UISpecialFrames, /reload,
+    -- etc.) - the lists are separate TOOLTIP-strata frames parented to UIParent,
+    -- so they don't auto-close with SF on their own.
+    SF:HookScript("OnHide", CloseMenus)
 
     ns.AddHLine(SF, "TOP", S_PAD, -(S_HDR_H-1))
 

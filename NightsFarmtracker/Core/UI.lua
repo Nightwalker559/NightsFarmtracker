@@ -72,7 +72,7 @@ ns.MainFrame = MainFrame
 
 ------------------------------------------------------------------------
 -- Button bar — always visible
--- Left:  [▶] [↺] [history/log] [filter/blacklist]
+-- Left:  [▶] [↺] [history/log] [filter]
 -- Right: [⚙] [?] [▼/▲] [✕]
 ------------------------------------------------------------------------
 local BtnBar = CreateFrame("Frame", nil, MainFrame)
@@ -472,7 +472,7 @@ end
 ------------------------------------------------------------------------
 -- Ctrl+Left-click: item -> Vendor-Only Filter, Ctrl+Right-click -> Blacklist.
 -- Name/icon/quality come from the session data (db.count) so the entry
--- looks right in the Filter/Blacklist windows without an item-info lookup.
+-- looks right in the Filter window without an item-info lookup.
 ------------------------------------------------------------------------
 local function AddItemToList(itemID, itemName, toBlacklist)
     local d = NightsFarmtrackerDB.count[itemID]
@@ -1211,18 +1211,10 @@ btnFilter:SetScript("OnClick", function(_, button)
 end)
 SetBtnTooltip(btnFilter, "ANCHOR_RIGHT", function(tip)
     local db = NightsFarmtrackerDB
-    local vendorShown = db.vendorFilterEnabled ~= false
-    local blackShown  = db.blacklistEnabled ~= false
-    if vendorShown and blackShown then
-        tip:SetText(ns.L["filter_button"])
+    tip:SetText(ns.L["filter_button"])
+    if db.vendorFilterEnabled ~= false and db.blacklistEnabled ~= false then
         tip:AddLine(ns.L["filter_left_hint"], 0.7, 0.7, 0.7)
         tip:AddLine(ns.L["filter_right_hint"], 0.7, 0.7, 0.7)
-    elseif blackShown then
-        tip:SetText(ns.L["blacklist_title"])
-    elseif vendorShown then
-        tip:SetText(ns.L["filter_title"])
-    else
-        tip:SetText(ns.L["filter_button"])
     end
 end)
 
@@ -1232,9 +1224,9 @@ SetBtnTooltip(btnSettings, "ANCHOR_RIGHT", function(tip) tip:SetText(ns.L["setti
 btnHelp:SetScript("OnClick", function() ns.ToggleHelpWindow() end)
 SetBtnTooltip(btnHelp, "ANCHOR_BOTTOMRIGHT", function(tip) ns.FillHelpTooltip(tip) end)
 
--- Re-evaluates and re-lays-out the History/Log/Filter/Blacklist buttons.
+-- Re-evaluates and re-lays-out the History/Log and Filter buttons.
 -- Called whenever a setting affecting their visibility changes (session
--- history, loot log, vendor filter, or blacklist toggled on/off).
+-- history, loot log, or one of the filter lists toggled on/off).
 function ns.RefreshLeftButtons()
     local db           = NightsFarmtrackerDB
     local historyShown = db.sessionHistoryEnabled ~= false

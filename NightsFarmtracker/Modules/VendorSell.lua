@@ -112,24 +112,21 @@ end
 
 local function CollectItems()
     local list = {}
-    for bag = 0, ns.LAST_BAG do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            local info = C_Container.GetContainerItemInfo(bag, slot)
-            if info and info.hyperlink and not info.isLocked and not info.hasNoValue then
-                local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
-                if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot)
-                   and not ns.IsOnDeleteList(info.itemID)
-                   and not (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot)
-                            and not IsSellableTrack(info.hyperlink)) then
-                    list[#list + 1] = {
-                        bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink, name = data.name,
-                        count = info.stackCount, value = sellPrice * info.stackCount,
-                        quality = info.quality, icon = info.iconFileID,
-                    }
-                end
+    ns.ForEachBagItem(function(bag, slot, info)
+        if info.hyperlink and not info.isLocked and not info.hasNoValue then
+            local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
+            if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot)
+               and not ns.IsOnDeleteList(info.itemID)
+               and not (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot)
+                        and not IsSellableTrack(info.hyperlink)) then
+                list[#list + 1] = {
+                    bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink, name = data.name,
+                    count = info.stackCount, value = sellPrice * info.stackCount,
+                    quality = info.quality, icon = info.iconFileID,
+                }
             end
         end
-    end
+    end)
     table.sort(list, function(a, b)
         if a.value ~= b.value then return a.value > b.value end
         if a.bag ~= b.bag then return a.bag < b.bag end
@@ -141,19 +138,16 @@ end
 -- Bag items on the Delete List (not in an equipment set, not locked), by name.
 local function CollectTrash()
     local list = {}
-    for bag = 0, ns.LAST_BAG do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            local info = C_Container.GetContainerItemInfo(bag, slot)
-            if info and info.hyperlink and not info.isLocked and ns.IsOnDeleteList(info.itemID)
-               and not InEquipmentSet(bag, slot) then
-                list[#list + 1] = {
-                    bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink,
-                    name = C_Item.GetItemInfo(info.hyperlink) or ("Item " .. info.itemID),
-                    count = info.stackCount, quality = info.quality, icon = info.iconFileID,
-                }
-            end
+    ns.ForEachBagItem(function(bag, slot, info)
+        if info.hyperlink and not info.isLocked and ns.IsOnDeleteList(info.itemID)
+           and not InEquipmentSet(bag, slot) then
+            list[#list + 1] = {
+                bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink,
+                name = C_Item.GetItemInfo(info.hyperlink) or ("Item " .. info.itemID),
+                count = info.stackCount, quality = info.quality, icon = info.iconFileID,
+            }
         end
-    end
+    end)
     table.sort(list, function(a, b)
         if a.name ~= b.name then return a.name < b.name end
         if a.bag ~= b.bag then return a.bag < b.bag end
@@ -345,7 +339,7 @@ local function EnsureFrame()
     frame.emptyLabel:SetTextColor(0.55, 0.55, 0.55)
     frame.emptyLabel:SetText(ns.L["vendor_sell_empty"])
 
-    -- Gear icon left of the close button: opens the sell list options popup
+    -- Gear icon left of the close button: opens the sell list options window
     local cfgBtn = ns.CreateConfigButton(frame, ns.L["vendor_sell_config"])
     cfgBtn:SetPoint("RIGHT", frame.closeBtn, "LEFT", -6, 0)
     cfgBtn:SetScript("OnClick", function() ns.ToggleVendorSellConfig(frame) end)

@@ -30,7 +30,7 @@ local function ApplyVenomPosition()
     elseif ns.BaitFrame and ns.BaitFrame:IsShown() then
         -- Dock above the Fishing Lure Bar when it's visible, so the two
         -- fishing-related frames don't overlap.
-        VenomFrame:SetPoint("BOTTOMLEFT", ns.BaitFrame, "TOPLEFT", 0, 1)
+        VenomFrame:SetPoint("BOTTOMLEFT", ns.BaitFrame, "TOPLEFT", 0, ns.WINDOW_GAP)
     else
         -- Default: docked above the main frame.
         VenomFrame:SetPoint("BOTTOMLEFT", ns.MainFrame, "TOPLEFT", 0, ns.WINDOW_GAP)

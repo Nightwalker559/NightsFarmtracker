@@ -260,7 +260,7 @@ function ns.PaintCatBg(tex)
     end
 end
 
--- Shared backdrop used throughout Settings/Blacklist/Filter for small
+-- Shared backdrop used throughout Settings and the list windows for small
 -- boxed widgets (checkboxes, radio dots, dropdowns, edit boxes, buttons).
 -- Its 1px square border matches the window frames (see ApplyFrameStyle).
 -- bgColor defaults to {0.06,0.09,0.10,1} (the checkbox/radio shade); pass

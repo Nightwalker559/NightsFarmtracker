@@ -359,19 +359,16 @@ function ns.UpdatePricesFromBags()
     end
 
     if next(byID) then
-        for bag = 0, ns.LAST_BAG do
-            for slot = 1, C_Container.GetContainerNumSlots(bag) do
-                local ci = C_Container.GetContainerItemInfo(bag, slot)
-                local data = ci and byID[ci.itemID]
-                local bagLink = data and C_Container.GetContainerItemLink(bag, slot)
-                -- no link yet: keep the item in byID for another slot or retry
-                if bagLink then
-                    ApplyBagItemInfo(data, bag, slot, bagLink)
-                    updated = true
-                    byID[ci.itemID] = nil
-                end
+        ns.ForEachBagItem(function(bag, slot, ci)
+            local data = byID[ci.itemID]
+            local bagLink = data and C_Container.GetContainerItemLink(bag, slot)
+            -- no link yet: keep the item in byID for another slot or retry
+            if bagLink then
+                ApplyBagItemInfo(data, bag, slot, bagLink)
+                updated = true
+                byID[ci.itemID] = nil
             end
-        end
+        end)
     end
 
     local stillMissing = next(byID) ~= nil

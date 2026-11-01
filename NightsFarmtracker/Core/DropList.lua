@@ -1,18 +1,18 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Drop list windows
--- Building blocks and the pane factory shared by the Vendor-Only Filter
--- and the Blacklist: collapsible checkbox sections, a drop zone for items
--- dragged from the bags, and an item list grouped by expansion.
+-- Building blocks and the pane factory shared by the tabs of the Filter
+-- window (Vendor-Only, Blacklist, Delete List) and Item Goals: collapsible
+-- checkbox sections, a drop zone for items dragged from the bags, and an item
+-- list grouped by expansion.
 ------------------------------------------------------------------------
 local _, ns = ...
 
 ------------------------------------------------------------------------
 -- Shared collapsible section header (category/expansion-style headers).
 -- One recipe for the frame + header band (ns.AddHeaderBand) + accent-colored
--- label used by the Filter and Blacklist windows (and matching History's month
--- header), so all of them share one height/font setup instead of each file
--- rebuilding slightly different versions that can drift out of sync (that
--- mismatch is what caused the header text to render off-center in 1.4.x).
+-- label used by the Filter window (and matching History's month header), so
+-- all of them share one height/font setup instead of slightly different
+-- versions that can drift out of sync and render the header text off-center.
 -- Caller still positions it (SetPoint) and wires OnMouseUp/OnEnter/OnLeave
 -- for its own collapse/tooltip behavior.
 ------------------------------------------------------------------------
@@ -73,8 +73,8 @@ end
 ------------------------------------------------------------------------
 -- Shared "drop-list" item row — icon + name, item
 -- tooltip on hover, Shift+Right-click removes it via the given callback.
--- Used by the Vendor-Only Filter and Blacklist item lists (identical row
--- shape; only the removal/rebuild behavior differs between the two).
+-- Used by the Filter window's item lists and Item Goals (same row shape; only
+-- the removal/rebuild behavior differs).
 ------------------------------------------------------------------------
 function ns.CreateDropListItemRow(parent, onShiftRemove)
     local r = CreateFrame("Frame", nil, parent)
@@ -109,8 +109,8 @@ end
 
 ------------------------------------------------------------------------
 -- Shared permanent drop-target zone (dashed accent border, centered hint
--- label) used by the Vendor-Only Filter and Blacklist windows to accept
--- item drags from bags. onDrop is called for both the real drag-hold-
+-- label) used by the Filter window and Item Goals to accept item drags from
+-- bags. onDrop is called for both the real drag-hold-
 -- release gesture (OnReceiveDrag) and a left-click while holding an item
 -- (OnMouseUp), matching ns.HandleItemDrop's two-script pattern.
 ------------------------------------------------------------------------
@@ -139,8 +139,8 @@ function ns.CreateDropZone(parent, height, onDrop)
 end
 
 ------------------------------------------------------------------------
--- Scroll frame + list frame pair for the Vendor-Only Filter / Blacklist
--- item lists: mouse-wheel scrolling in row steps, item drops accepted on
+-- Scroll frame + list frame pair for the item lists of the Filter window and
+-- Item Goals: mouse-wheel scrolling in row steps, item drops accepted on
 -- the list area too. Caller sizes/positions the scroll frame (see
 -- ns.RebuildDropItemList). Returns scrollFrame, listFrame.
 ------------------------------------------------------------------------
@@ -154,7 +154,7 @@ end
 
 ------------------------------------------------------------------------
 -- Drop zone plus the separator line below it, at the top of a drop-list
--- window's list (Filter and Blacklist panes, Item Goals). CreateDropZoneRow
+-- window's list (Filter window panes, Item Goals). CreateDropZoneRow
 -- builds them once (owner.DropZone, owner.dzSep, owner = the pane or the
 -- window); PlaceDropZoneRow puts them at `top` (Y inside listFrame) and
 -- returns the Y where the item rows start.
@@ -369,9 +369,10 @@ end
 
 ------------------------------------------------------------------------
 -- Pane factory: the content of one tab of the Filter window. The Vendor-Only
--- Filter and the Blacklist are the same pane with different data behind it;
--- Modules/Filter.lua and Modules/Blacklist.lua only describe that data
--- (ns.RegisterFilterTab) and Modules/FilterWindow.lua hosts the panes.
+-- Filter, the Blacklist and the Delete List are the same pane with different
+-- data behind it; Modules/Filter.lua, Blacklist.lua and DeleteList.lua only
+-- describe that data (ns.RegisterFilterTab) and Modules/FilterWindow.lua hosts
+-- the panes.
 --
 -- window: the shared window; bodyTop: window Y where the scroll area starts.
 -- cfg:
