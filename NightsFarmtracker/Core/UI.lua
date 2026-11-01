@@ -700,16 +700,19 @@ end
 
 -- Rows of an item with a goal (db.itemGoals / db.itemGoal) show their count relative to the
 -- goal instead and turn green once it is reached. The merged junk row is a sum
--- of many items, so it has no goal. Every other row keeps the value bar, scaled
--- among the rows without a goal. Whether a goal is reached is decided from the
+-- of many items, so it has no goal. Without any goal on the list every row keeps
+-- the value bar, scaled among them; while some rows show goal progress, the
+-- others get no bar (a value bar would mix a second scale into the list, and
+-- be full length whenever it is the only one). Whether a goal is reached is decided from the
 -- items, not the rows (GoalReachedIn), so collapsed categories count too.
 local function ApplyValueBars()
     barsShown = NightsFarmtrackerDB.showValueBar ~= false
 
-    local maxValue, maxMerged = 0, 0
+    local maxValue, maxMerged, anyGoal = 0, 0, false
     for _, row in pairs(itemRows) do
         local goal = not row.isJunkMerged and row.barCount and ns.GetItemGoal(row.itemID)
         if goal then
+            anyGoal = true
             local c = row.barCount
             row.barGoal = goal
             if c >= goal then
@@ -726,7 +729,7 @@ local function ApplyValueBars()
             end
         end
     end
-    if not barsShown then return end
+    if not barsShown or anyGoal then return end
 
     if maxValue == 0 then maxValue = maxMerged end
     for _, row in pairs(itemRows) do
