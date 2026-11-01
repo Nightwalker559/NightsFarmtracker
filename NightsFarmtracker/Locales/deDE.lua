@@ -53,6 +53,7 @@ L["reset_addon_confirm"] = "Das gesamte Addon auf Standard zurücksetzen? Dabei 
 L["clear_all_history_confirm"] = "Gesamten gespeicherten Session-Verlauf löschen? Kann nicht rückgängig gemacht werden."
 L["no_sessions"]       = "Keine Sessions gespeichert"
 L["no_sessions_month"] = "Keine Sessions in diesem Monat"
+L["no_history_months"] = "Noch keine vergangenen Monate"
 L["history_window_title"] = "Sessions & History"
 L["tab_sessions"]      = "Sessions"
 L["tab_history"]       = "History"

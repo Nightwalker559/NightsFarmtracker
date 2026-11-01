@@ -59,6 +59,7 @@ L["reset_addon_confirm"] = "Reset the entire addon to default? This deletes ALL 
 L["clear_all_history_confirm"] = "Delete all saved session history? This cannot be undone."
 L["no_sessions"]       = "No sessions saved yet"
 L["no_sessions_month"] = "No sessions this month"
+L["no_history_months"] = "No past months yet"
 L["history_window_title"] = "Sessions & History"
 L["tab_sessions"]      = "Sessions"
 L["tab_history"]       = "History"

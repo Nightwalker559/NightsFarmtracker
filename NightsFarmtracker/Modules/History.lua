@@ -1,8 +1,8 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - History
 -- Sessions & History window and the Detail window for one session or month.
--- Two tabs: Sessions = the running month, day by day; History = every month,
--- collapsible down to its days and sessions. The data model is in
+-- Two tabs: Sessions = the running month, day by day; History = the past
+-- months, collapsible down to their days and sessions. The data model is in
 -- Core/Sessions.lua.
 ------------------------------------------------------------------------
 local _, ns = ...
@@ -581,18 +581,25 @@ function ns.RebuildHistory()
 
     local yOffset=0
     local flow=ns.NewHeaderFlow()
-    local nShown=nTotal
+    local currentMonth=months[currentMonthKey]
+    local nCurrent=currentMonth and currentMonth.sessionCount or 0
+    local nShown
     if activeTab=="sessions" then
-        -- the running month, day by day (no month rows: older months are in the History tab)
-        local month=months[currentMonthKey]
-        nShown=month and month.sessionCount or 0
+        -- the running month, day by day (no month rows); it is not part of the History tab
+        local month=currentMonth
+        nShown=nCurrent
         if month then
             for _,dStr in ipairs(month.dayList) do
                 yOffset=AddDayRows(days[dStr], dStr, month, flow, yOffset)
             end
         end
     else
+        nShown=nTotal-nCurrent
+        local pastOrder={}
         for _,mKey in ipairs(monthOrder) do
+            if not months[mKey].isCurrent then pastOrder[#pastOrder+1]=mKey end
+        end
+        for _,mKey in ipairs(pastOrder) do
             local month=months[mKey]
             -- default: every month collapsed — user choice wins
             local collapsed=accDB.collapsedMonths[mKey]
@@ -651,15 +658,14 @@ function ns.RebuildHistory()
     })
     histFlow, histOverflows = flow, visH < yOffset
     UpdateHistFooterLine()
-    if nTotal==0 or (activeTab=="sessions" and nShown==0) then
-        HistFrame.emptyLabel:SetText(ns.L[nTotal==0 and "no_sessions" or "no_sessions_month"])
+    if nShown==0 then
+        HistFrame.emptyLabel:SetText(ns.L[nTotal==0 and "no_sessions" or activeTab=="sessions" and "no_sessions_month" or "no_history_months"])
         HistFrame.emptyLabel:Show()
     else
         HistFrame.emptyLabel:Hide()
     end
     HistFrame.countLabel:SetText(nShown==0 and "" or string.format(ns.L[nShown==1 and "sessions_summary" or "sessions_summary_pl"], nShown))
-    -- "Clear all" wipes every month, so it belongs to the History tab
-    if HistFrame.clrBtn then HistFrame.clrBtn:SetShown(activeTab=="history" and nTotal>0) end
+    if HistFrame.clrBtn then HistFrame.clrBtn:SetShown(nTotal>0) end
 end
 
 ------------------------------------------------------------------------
