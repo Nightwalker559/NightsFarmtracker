@@ -568,6 +568,72 @@ function ns.CreateWindowFrame(name, title, opts)
 end
 
 ------------------------------------------------------------------------
+-- Tab strip right under a window's title (Filter, History): equal-width tabs
+-- with centered labels, the active one gold with an underline. The caller
+-- draws the separator lines and owns the panes; onClick(key) runs when a tab
+-- is clicked.
+--   strip.Add(key, label)     creates the tab's button, in order
+--   strip.Layout(isShown)     shows the tabs for which isShown(key) is true (all
+--                             without it) and shares the width between them
+--   strip.SetActive(key)      paints the active tab
+------------------------------------------------------------------------
+ns.TAB_H = 22
+
+function ns.CreateTabStrip(window, onClick)
+    local strip, buttons, order, active = {}, {}, {}, nil
+
+    local function Paint()
+        for _, key in ipairs(order) do
+            local btn, on = buttons[key], key == active
+            -- Gold like a checked option in Settings: the accent red is darker and made the active label look smaller
+            if on then btn.text:SetTextColor(1, 0.82, 0) else btn.text:SetTextColor(0.6, 0.6, 0.6) end
+            btn.underline:SetShown(on)
+        end
+    end
+
+    function strip.Add(key, label)
+        local btn = CreateFrame("Button", nil, window)
+        btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        btn.text:SetAllPoints()   -- as wide as the tab, centered: the label cannot drift with its own width
+        btn.text:SetJustifyH("CENTER")
+        btn.text:SetFontHeight(ns.FONT_NORMAL)
+        btn.text:SetText(label)
+        btn.underline = btn:CreateTexture(nil, "ARTWORK")
+        btn.underline:SetHeight(2)
+        btn.underline:SetPoint("BOTTOMLEFT", 0, 0)
+        btn.underline:SetPoint("BOTTOMRIGHT", 0, 0)
+        btn.underline:SetColorTexture(unpack(ns.COL_ACCENT))
+        btn:SetScript("OnEnter", function(self) if key ~= active then self.text:SetTextColor(1, 1, 1) end end)
+        btn:SetScript("OnLeave", Paint)
+        btn:SetScript("OnClick", function() onClick(key) end)
+        buttons[key] = btn
+        order[#order + 1] = key
+    end
+
+    function strip.Layout(isShown)
+        local shown = {}
+        for _, key in ipairs(order) do
+            if not isShown or isShown(key) then shown[#shown + 1] = key else buttons[key]:Hide() end
+        end
+        local w = ns.CONTENT_W / math.max(#shown, 1)
+        for i, key in ipairs(shown) do
+            local btn = buttons[key]
+            btn:ClearAllPoints()
+            btn:SetPoint("TOPLEFT", window, "TOPLEFT", ns.PAD + (i - 1) * w, -ns.WINDOW_HDR_H)
+            btn:SetSize(w, ns.TAB_H)
+            btn:Show()
+        end
+    end
+
+    function strip.SetActive(key)
+        active = key
+        Paint()
+    end
+
+    return strip
+end
+
+------------------------------------------------------------------------
 -- Small movable overlay (Venom Tracker, Fishing Lure Bar): styled, clamped,
 -- hidden at first. Dragging saves db[posKey] = { "TOP", x, y } (anchored to
 -- the screen top, see ns.AnchorToTop); the X button calls onClose. The caller

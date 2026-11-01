@@ -10,7 +10,9 @@
 
 ### Changed
 
+- Session History is now the "Sessions & History" window with two tabs: Sessions shows the running month day by day, History lists every month (collapsed; click for its days and sessions, Shift+Click for the month summary). The window has the same height in both tabs, the last tab is remembered, "Clear all" sits in the History tab
 - The category list of the Gear AH Threshold (gear icon next to the threshold field) is a window in the docking chain behind Settings and the Sell List options instead of floating over Settings
+- Internal: the tab strip of the Filter window is a shared widget (`ns.CreateTabStrip`), now also used by Sessions & History
 - Internal: the Settings code is split into the folder `Modules\Settings` (shared widgets, one file per topic, the window itself); no change in behavior
 
 ## 1.8.4

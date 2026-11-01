@@ -1,7 +1,9 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - History
--- Session History window (months, days, sessions) and the Detail window for
--- one session or month. The data model is in Core/Sessions.lua.
+-- Sessions & History window and the Detail window for one session or month.
+-- Two tabs: Sessions = the running month, day by day; History = every month,
+-- collapsible down to its days and sessions. The data model is in
+-- Core/Sessions.lua.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -12,6 +14,7 @@ local H_W      = ns.FRAME_W
 local PAD      = ns.PAD
 local H_HDR_H  = ns.WINDOW_HDR_H
 local H_FTR_H  = 28
+local BODY_TOP  = H_HDR_H + ns.TAB_H   -- window Y where the list starts, below the tab strip
 local DAY_H    = ns.CAT_ROW_H
 local MONTH_H  = ns.CAT_ROW_H
 local SESS_H   = 38
@@ -32,12 +35,15 @@ local DET_ROW_H  = ns.ROW_H
 local HistFrame, HScrollFrame, HListFrame
 
 -- Footer line state of the list (see ns.SetFooterLine); also refreshed on scroll.
-local histFlow, histScrolls
+local histFlow, histOverflows
 local function UpdateHistFooterLine()
     if not (histFlow and HistFrame and HistFrame.footerSep) then return end
-    ns.SetFooterLine(HistFrame.footerSep, histFlow, histScrolls,
-        histScrolls and ns.ScrolledToEnd(HScrollFrame, HListFrame))
+    -- the window has a fixed height, so the line also closes a list that ends early
+    ns.SetFooterLine(HistFrame.footerSep, histFlow, true,
+        histOverflows and ns.ScrolledToEnd(HScrollFrame, HListFrame))
 end
+local activeTab = "sessions"   -- "sessions" | "history"
+local tabStrip
 local DetailFrame, DScrollFrame, DListFrame
 
 ------------------------------------------------------------------------
@@ -446,6 +452,62 @@ local function AveragePerDay(gold, days)
     return math.floor(gold / days)
 end
 
+-- Day header (with the Merge button) and session rows of one day; returns the
+-- new y offset. Shared by the Sessions tab and the expanded months of the
+-- History tab.
+local function AddDayRows(day, dStr, month, flow, yOffset)
+    -- A past month with exactly one day/session (e.g. after
+    -- compaction) doesn't need its own date subheader — the
+    -- month header already says everything there is to say.
+    local skipDayRow = (not month.isCurrent) and #month.dayList==1 and #day.sessions==1
+    if not skipDayRow then
+        local drow=dayPool.acquire(HListFrame); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
+        flow.header(drow)
+        drow.dateText:SetText(dStr)
+        drow.goldText:SetText("")
+        if #day.sessions > 1 then
+            drow.mergeBtn:Show()
+            drow.mergeBtn:SetScript("OnClick", function()
+                StaticPopup_Show("NFT_CONFIRM_MERGE_DAY",
+                    string.format(ns.L["merge_day_confirm"], #day.sessions, dStr), nil, day.dayKey)
+            end)
+        else
+            drow.mergeBtn:Hide()
+        end
+        activeDayRows[#activeDayRows+1]=drow; yOffset=yOffset+DAY_H
+    end
+    for si,entry in ipairs(day.sessions) do
+        local session=entry.session
+        local row=sessPool.acquire(HListFrame); row:SetWidth(ns.CONTENT_W); row:SetPoint("TOPLEFT",0,-yOffset)
+        row.sep:SetShown(si < #day.sessions)   -- only between sessions; a header line follows the last one
+        row.session=session
+        local combinedGold = (session.totalGold or 0) + (session.lootedGold or 0)
+        row.dateText:SetText(ns.FormatTime(session.duration))
+        row.goldText:SetText(combinedGold>0 and ns.FormatGold(combinedGold) or "")
+        local sess=session
+        row:SetScript("OnMouseUp",function(self,btn)
+            if btn=="LeftButton" and not self.delBtn:IsMouseOver() then
+                if DetailFrame and DetailFrame:IsShown() and currentDetailSession == sess then
+                    if not ns.DeferInCombat(function() DetailFrame:Hide() end) then DetailFrame:Hide() end
+                else
+                    ShowDetail(sess)
+                end
+            end
+        end)
+        row.delBtn:SetScript("OnClick",function()
+            local dayList = NightsFarmtrackerAccountDB.sessions[entry.dayKey]
+            if dayList then
+                table.remove(dayList, entry.sessIdx)
+                if #dayList == 0 then NightsFarmtrackerAccountDB.sessions[entry.dayKey] = nil end
+            end
+            ns.RebuildHistory()
+        end)
+        activeSessRows[#activeSessRows+1]=row; yOffset=yOffset+SESS_H
+        flow.rows()
+    end
+    return yOffset
+end
+
 function ns.RebuildHistory()
     if not HListFrame then return end
     sessPool.releaseAll(activeSessRows)
@@ -519,124 +581,85 @@ function ns.RebuildHistory()
 
     local yOffset=0
     local flow=ns.NewHeaderFlow()
-    for _,mKey in ipairs(monthOrder) do
-        local month=months[mKey]
-        -- default: current month expanded, past months collapsed — user choice wins
-        local collapsed=accDB.collapsedMonths[mKey]
-        if collapsed==nil then collapsed=not month.isCurrent end
-        local mrow=monthPool.acquire(HListFrame); mrow:SetSize(ns.CONTENT_W, MONTH_H); mrow:SetPoint("TOPLEFT",0,-yOffset)
-        flow.header(mrow)
-        ns.SetHeaderArrow(mrow, collapsed)
-        mrow.nameText:SetText(month.label)
-        local monthCombined = (month.totalGold or 0) + (month.lootedGold or 0)
-        mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
-        mrow:SetScript("OnEnter",function(self)
-            self.nameText:SetTextColor(1,1,1)
-            GameTooltip:SetOwner(self,"ANCHOR_TOP")
-            GameTooltip:AddLine(ns.L["month_summary_tooltip"])
-            if monthCombined>0 then
-                GameTooltip:AddLine(" ")
-                GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(month.totalGold or 0), 0.75,0.75,0.75, 1,1,1)
-                GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(month.lootedGold or 0), 0.75,0.75,0.75, 1,1,1)
-                GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(monthCombined), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
-                local avg = AveragePerDay(monthCombined, MonthDays(mKey, month.isCurrent))
-                if avg then
-                    GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
-                end
-            end
-            GameTooltip:Show()
-        end)
-        mrow:SetScript("OnMouseUp",function(self)
-            if self.delBtn:IsMouseOver() then return end
-            if IsShiftKeyDown() then
-                if #month.sessionsList > 0 then
-                    ShowDetail(BuildMonthAggregate(mKey, month))
-                end
-            else
-                accDB.collapsedMonths[mKey]=not collapsed
-                ns.RebuildHistory()
-            end
-        end)
-        mrow.delBtn:SetScript("OnClick",function()
-            StaticPopup_Show("NFT_CONFIRM_DELETE_MONTH",
-                string.format(ns.L["delete_month_confirm"], month.sessionCount, month.label), nil, mKey)
-        end)
-        activeMonthRows[#activeMonthRows+1]=mrow; yOffset=yOffset+MONTH_H
-        if not collapsed then
-            -- flush: month row already draws its own bottom line, first day row starts right after it
+    local nShown=nTotal
+    if activeTab=="sessions" then
+        -- the running month, day by day (no month rows: older months are in the History tab)
+        local month=months[currentMonthKey]
+        nShown=month and month.sessionCount or 0
+        if month then
             for _,dStr in ipairs(month.dayList) do
-                local day=days[dStr]
-                -- A past month with exactly one day/session (e.g. after
-                -- compaction) doesn't need its own date subheader — the
-                -- month header already says everything there is to say.
-                local skipDayRow = (not month.isCurrent) and #month.dayList==1 and #day.sessions==1
-                if not skipDayRow then
-                    local drow=dayPool.acquire(HListFrame); drow:SetSize(ns.CONTENT_W, DAY_H); drow:SetPoint("TOPLEFT",0,-yOffset)
-                    flow.header(drow)
-                    drow.dateText:SetText(dStr)
-                    drow.goldText:SetText("")
-                    if #day.sessions > 1 then
-                        drow.mergeBtn:Show()
-                        drow.mergeBtn:SetScript("OnClick", function()
-                            StaticPopup_Show("NFT_CONFIRM_MERGE_DAY",
-                                string.format(ns.L["merge_day_confirm"], #day.sessions, dStr), nil, day.dayKey)
-                        end)
-                    else
-                        drow.mergeBtn:Hide()
+                yOffset=AddDayRows(days[dStr], dStr, month, flow, yOffset)
+            end
+        end
+    else
+        for _,mKey in ipairs(monthOrder) do
+            local month=months[mKey]
+            -- default: every month collapsed — user choice wins
+            local collapsed=accDB.collapsedMonths[mKey]
+            if collapsed==nil then collapsed=true end
+            local mrow=monthPool.acquire(HListFrame); mrow:SetSize(ns.CONTENT_W, MONTH_H); mrow:SetPoint("TOPLEFT",0,-yOffset)
+            flow.header(mrow)
+            ns.SetHeaderArrow(mrow, collapsed)
+            mrow.nameText:SetText(month.label)
+            local monthCombined = (month.totalGold or 0) + (month.lootedGold or 0)
+            mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
+            mrow:SetScript("OnEnter",function(self)
+                self.nameText:SetTextColor(1,1,1)
+                GameTooltip:SetOwner(self,"ANCHOR_TOP")
+                GameTooltip:AddLine(ns.L["month_summary_tooltip"])
+                if monthCombined>0 then
+                    GameTooltip:AddLine(" ")
+                    GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(month.totalGold or 0), 0.75,0.75,0.75, 1,1,1)
+                    GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(month.lootedGold or 0), 0.75,0.75,0.75, 1,1,1)
+                    GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(monthCombined), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+                    local avg = AveragePerDay(monthCombined, MonthDays(mKey, month.isCurrent))
+                    if avg then
+                        GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
                     end
-                    activeDayRows[#activeDayRows+1]=drow; yOffset=yOffset+DAY_H
                 end
-                for si,entry in ipairs(day.sessions) do
-                    local session=entry.session
-                    local row=sessPool.acquire(HListFrame); row:SetWidth(ns.CONTENT_W); row:SetPoint("TOPLEFT",0,-yOffset)
-                    row.sep:SetShown(si < #day.sessions)   -- only between sessions; a header line follows the last one
-                    row.session=session
-                    local combinedGold = (session.totalGold or 0) + (session.lootedGold or 0)
-                    row.dateText:SetText(ns.FormatTime(session.duration))
-                    row.goldText:SetText(combinedGold>0 and ns.FormatGold(combinedGold) or "")
-                    local sess=session
-                    row:SetScript("OnMouseUp",function(self,btn)
-                        if btn=="LeftButton" and not self.delBtn:IsMouseOver() then
-                            if DetailFrame and DetailFrame:IsShown() and currentDetailSession == sess then
-                                if not ns.DeferInCombat(function() DetailFrame:Hide() end) then DetailFrame:Hide() end
-                            else
-                                ShowDetail(sess)
-                            end
-                        end
-                    end)
-                    row.delBtn:SetScript("OnClick",function()
-                        local dayList = NightsFarmtrackerAccountDB.sessions[entry.dayKey]
-                        if dayList then
-                            table.remove(dayList, entry.sessIdx)
-                            if #dayList == 0 then NightsFarmtrackerAccountDB.sessions[entry.dayKey] = nil end
-                        end
-                        ns.RebuildHistory()
-                    end)
-                    activeSessRows[#activeSessRows+1]=row; yOffset=yOffset+SESS_H
-                    flow.rows()
+                GameTooltip:Show()
+            end)
+            mrow:SetScript("OnMouseUp",function(self)
+                if self.delBtn:IsMouseOver() then return end
+                if IsShiftKeyDown() then
+                    if #month.sessionsList > 0 then
+                        ShowDetail(BuildMonthAggregate(mKey, month))
+                    end
+                else
+                    accDB.collapsedMonths[mKey]=not collapsed
+                    ns.RebuildHistory()
+                end
+            end)
+            mrow.delBtn:SetScript("OnClick",function()
+                StaticPopup_Show("NFT_CONFIRM_DELETE_MONTH",
+                    string.format(ns.L["delete_month_confirm"], month.sessionCount, month.label), nil, mKey)
+            end)
+            activeMonthRows[#activeMonthRows+1]=mrow; yOffset=yOffset+MONTH_H
+            if not collapsed then
+                -- flush: month row already draws its own bottom line, first day row starts right after it
+                for _,dStr in ipairs(month.dayList) do
+                    yOffset=AddDayRows(days[dStr], dStr, month, flow, yOffset)
                 end
             end
         end
     end
+    -- the same window height in both tabs (the list scrolls inside)
     local visH = ns.FitScrollWindow({
         window=HistFrame, scroll=HScrollFrame, list=HListFrame, anchored=true,
-        hdrH=H_HDR_H, ftrH=H_FTR_H, contentH=yOffset,
-        minH=yOffset==0 and 44 or nil,   -- empty: room for the "no sessions" label
+        hdrH=BODY_TOP, ftrH=H_FTR_H, contentH=yOffset,
+        minH=ns.GetMaxWindowH() - BODY_TOP - H_FTR_H,
     })
-    histFlow, histScrolls = flow, yOffset == 0 or visH < yOffset
+    histFlow, histOverflows = flow, visH < yOffset
     UpdateHistFooterLine()
-    -- nTotal already counted above while grouping by day
-    if nTotal==0 then
-        HistFrame.countLabel:SetText("")
-        HistFrame.emptyLabel:SetText(ns.L["no_sessions"])
+    if nTotal==0 or (activeTab=="sessions" and nShown==0) then
+        HistFrame.emptyLabel:SetText(ns.L[nTotal==0 and "no_sessions" or "no_sessions_month"])
         HistFrame.emptyLabel:Show()
-        if HistFrame.clrBtn then HistFrame.clrBtn:Hide() end
     else
         HistFrame.emptyLabel:Hide()
-        if HistFrame.clrBtn then HistFrame.clrBtn:Show() end
-        local key = (nTotal == 1) and ns.L["sessions_summary"] or ns.L["sessions_summary_pl"]
-        HistFrame.countLabel:SetText(string.format(key, nTotal))
     end
+    HistFrame.countLabel:SetText(nShown==0 and "" or string.format(ns.L[nShown==1 and "sessions_summary" or "sessions_summary_pl"], nShown))
+    -- "Clear all" wipes every month, so it belongs to the History tab
+    if HistFrame.clrBtn then HistFrame.clrBtn:SetShown(activeTab=="history" and nTotal>0) end
 end
 
 ------------------------------------------------------------------------
@@ -644,13 +667,19 @@ end
 ------------------------------------------------------------------------
 local function EnsureHistFrame()
     if HListFrame then return end
-    HistFrame = ns.CreateWindowFrame("NightsFarmtrackerHistoryWnd", ns.L["session_history"], {width = H_W, dockChain = "left"})
+    HistFrame = ns.CreateWindowFrame("NightsFarmtrackerHistoryWnd", ns.L["history_window_title"], {width = H_W, dockChain = "left"})
     ns.HistFrame = HistFrame  -- exposed so Settings can dock next to it in the left-side chain
     HistFrame:HookScript("OnHide", function()
         if DetailFrame then DetailFrame:Hide() end
     end)
 
     ns.AddHLine(HistFrame, "TOP", PAD, -(H_HDR_H-1))
+    ns.AddHLine(HistFrame, "TOP", PAD, -(BODY_TOP-1))
+
+    tabStrip = ns.CreateTabStrip(HistFrame, function(key) ns.SelectHistoryTab(key) end)
+    tabStrip.Add("sessions", ns.L["tab_sessions"])
+    tabStrip.Add("history", ns.L["tab_history"])
+    tabStrip.Layout()
 
     -- Hover on the title: gold of all saved months added up. The right edge
     -- stops short of the close button so the hitbox doesn't swallow its click.
@@ -679,7 +708,7 @@ local function EnsureHistFrame()
     titleHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     HScrollFrame, HListFrame = ns.CreateScrollList(HistFrame, ns.CONTENT_W, SESS_H)
-    HScrollFrame:SetPoint("TOPLEFT",PAD,-H_HDR_H); HScrollFrame:SetPoint("BOTTOMRIGHT",-PAD,H_FTR_H)
+    HScrollFrame:SetPoint("TOPLEFT",PAD,-BODY_TOP); HScrollFrame:SetPoint("BOTTOMRIGHT",-PAD,H_FTR_H)
     HScrollFrame:SetScript("OnVerticalScroll", UpdateHistFooterLine)
 
     HistFrame.footerSep = ns.AddHLine(HistFrame, "BOTTOM", PAD, H_FTR_H-2)
@@ -688,7 +717,7 @@ local function EnsureHistFrame()
     HistFrame.countLabel:SetPoint("BOTTOMLEFT",PAD,8); HistFrame.countLabel:SetTextColor(0.40,0.40,0.40)
 
     HistFrame.emptyLabel = HistFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    HistFrame.emptyLabel:SetPoint("TOP",HistFrame,"TOP",0,-(H_HDR_H+22))
+    HistFrame.emptyLabel:SetPoint("TOP",HistFrame,"TOP",0,-(BODY_TOP+22))
     HistFrame.emptyLabel:SetJustifyH("CENTER")
     HistFrame.emptyLabel:SetTextColor(0.55,0.55,0.55)
     HistFrame.emptyLabel:Hide()
@@ -705,6 +734,14 @@ end
 ------------------------------------------------------------------------
 -- Public API
 ------------------------------------------------------------------------
+function ns.SelectHistoryTab(key)
+    activeTab = key == "history" and "history" or "sessions"
+    NightsFarmtrackerDB.historyTab = activeTab
+    tabStrip.SetActive(activeTab)
+    HScrollFrame:SetVerticalScroll(0)
+    ns.RebuildHistory()
+end
+
 function ns.ToggleHistory()
     if ns.DeferInCombat(ns.ToggleHistory) then return end
     EnsureHistFrame()
@@ -715,6 +752,8 @@ function ns.ToggleHistory()
         -- Settings and the Detail window both dock left of History, so close
         -- Settings first to avoid overlap.
         if ns.SettingsFrame and ns.SettingsFrame:IsShown() then ns.SettingsFrame:Hide() end
+        activeTab = NightsFarmtrackerDB.historyTab == "history" and "history" or "sessions"
+        tabStrip.SetActive(activeTab)
         ns.RebuildHistory()
         HistFrame:Show()
         ns.RefreshWindowChain("left")

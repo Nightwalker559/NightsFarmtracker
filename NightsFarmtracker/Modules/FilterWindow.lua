@@ -16,11 +16,10 @@
 local _, ns = ...
 
 local pad, hdrH = ns.PAD, ns.WINDOW_HDR_H
-local TAB_H     = 22
-local BODY_TOP  = hdrH + TAB_H   -- window Y where a pane starts
+local BODY_TOP  = hdrH + ns.TAB_H   -- window Y where a pane starts
 
 local tabs, byKey = {}, {}       -- registered tabs in order, and by key
-local frame, active              -- the window (built on first open) and the shown tab
+local frame, strip, active       -- the window (built on first open), its tab strip and the shown tab
 
 function ns.RegisterFilterTab(cfg)
     local tab = { key = cfg.key, cfg = cfg }
@@ -38,49 +37,9 @@ local function FirstEnabled()
     end
 end
 
-------------------------------------------------------------------------
--- Tab strip
-------------------------------------------------------------------------
-local function PaintTabs()
-    for _, tab in ipairs(tabs) do
-        local on = tab == active
-        -- Gold like a checked option in Settings: the accent red is darker and made the active label look smaller
-        if on then tab.button.text:SetTextColor(1, 0.82, 0) else tab.button.text:SetTextColor(0.6, 0.6, 0.6) end
-        tab.button.underline:SetShown(on)
-    end
-end
-
 -- Enabled tabs share the width of the strip equally
 local function LayoutTabs()
-    local shown = {}
-    for _, tab in ipairs(tabs) do
-        if IsEnabled(tab) then shown[#shown + 1] = tab else tab.button:Hide() end
-    end
-    local w = ns.CONTENT_W / math.max(#shown, 1)
-    for i, tab in ipairs(shown) do
-        tab.button:ClearAllPoints()
-        tab.button:SetPoint("TOPLEFT", frame, "TOPLEFT", pad + (i - 1) * w, -hdrH)
-        tab.button:SetSize(w, TAB_H)
-        tab.button:Show()
-    end
-end
-
-local function CreateTabButton(tab, onClick)
-    local btn = CreateFrame("Button", nil, frame)
-    btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    btn.text:SetAllPoints()   -- as wide as the tab, centered: the label cannot drift with its own width
-    btn.text:SetJustifyH("CENTER")
-    btn.text:SetFontHeight(ns.FONT_NORMAL)
-    btn.text:SetText(ns.L[tab.cfg.titleKey])
-    btn.underline = btn:CreateTexture(nil, "ARTWORK")
-    btn.underline:SetHeight(2)
-    btn.underline:SetPoint("BOTTOMLEFT", 0, 0)
-    btn.underline:SetPoint("BOTTOMRIGHT", 0, 0)
-    btn.underline:SetColorTexture(unpack(ns.COL_ACCENT))
-    btn:SetScript("OnEnter", function(self) if tab ~= active then self.text:SetTextColor(1, 1, 1) end end)
-    btn:SetScript("OnLeave", function() PaintTabs() end)
-    btn:SetScript("OnClick", function() onClick(tab) end)
-    return btn
+    strip.Layout(function(key) return IsEnabled(byKey[key]) end)
 end
 
 ------------------------------------------------------------------------
@@ -92,7 +51,7 @@ local function SelectTab(tab)
     NightsFarmtrackerDB.filterTab = tab.key
     if not tab.pane then tab.pane = ns.CreateDropListPane(frame, tab.cfg, BODY_TOP) end
     tab.pane.Show()
-    PaintTabs()
+    strip.SetActive(tab.key)
     tab.pane.Rebuild()
 end
 
@@ -108,7 +67,8 @@ local function EnsureFrame()
         if active and active.pane then active.pane.HandleDrop() end
     end)
 
-    for _, tab in ipairs(tabs) do tab.button = CreateTabButton(tab, SelectTab) end
+    strip = ns.CreateTabStrip(frame, function(key) SelectTab(byKey[key]) end)
+    for _, tab in ipairs(tabs) do strip.Add(tab.key, ns.L[tab.cfg.titleKey]) end
 end
 
 -- Rebuilds the list of the shown tab (the others rebuild when opened)
@@ -124,7 +84,7 @@ function ns.RefreshFilterTabs()
     if not frame:IsShown() then return end
     local first = FirstEnabled()
     if not first then frame:Hide(); return end
-    if active and IsEnabled(active) then PaintTabs() else SelectTab(first) end
+    if not (active and IsEnabled(active)) then SelectTab(first) end
 end
 
 -- Opens the window on a tab (by key; without one, or when that tab is switched
