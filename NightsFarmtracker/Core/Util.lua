@@ -64,7 +64,25 @@ local function EnsureAuctionatorLines(link)
     A.Tooltip.ShowTipWithPricing(GameTooltip, link, 1)
 end
 
-function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID)
+-- A saved gear link can render with the item's base item level in a tooltip
+-- (133 for a drop the game itself reports as 253), so the shown level line is
+-- set to the one stored with the drop. The stats below it stay as the game
+-- computes them.
+local function ShowStoredItemLevel(itemLevel)
+    if type(ITEM_LEVEL) ~= "string" then return end
+    local pattern = ns.FormatToPattern(ITEM_LEVEL)
+    for i = 2, math.min(GameTooltip:NumLines(), 5) do
+        local fs = _G["GameTooltipTextLeft" .. i]
+        local text = fs and fs:GetText()
+        if text and text:match("^" .. pattern .. "$") then
+            fs:SetText((text:gsub("%d+", itemLevel, 1)))
+            return
+        end
+    end
+end
+
+-- itemLevel (optional): the stored item level of a gear drop, see ShowStoredItemLevel.
+function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID, itemLevel)
     GameTooltip:SetOwner(owner, anchor or "ANCHOR_RIGHT")
     local linkID, classID
     if hyperlink then
@@ -74,6 +92,7 @@ function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID)
     if hyperlink and (not linkID or TooltipNeedsLink(linkID, classID)) then
         GameTooltip:SetHyperlink(hyperlink)
         EnsureAuctionatorLines(hyperlink)
+        if itemLevel then ShowStoredItemLevel(itemLevel) end
     else
         GameTooltip:SetItemByID(linkID or itemID)
     end

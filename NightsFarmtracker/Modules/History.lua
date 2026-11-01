@@ -179,7 +179,7 @@ local detRowPool = ns.NewPool(function(parent)
         -- structurally occupied - prefer LEFT here (see ns.SmartAnchor).
         local anchor = ns.SmartAnchor(self, "LEFT")
         if self.itemLink then
-            ns.ShowItemTooltipNoCompare(self, anchor, self.itemLink)
+            ns.ShowItemTooltipNoCompare(self, anchor, self.itemLink, nil, self.itemLevel)
         elseif self.itemID then
             -- Old session saved before the itemLink fix - for equipment,
             -- SetItemByID would show the generic base item (wrong item
@@ -226,7 +226,7 @@ local detRowPool = ns.NewPool(function(parent)
     r.goldHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return r
 end, function(r)
-    r.itemID=nil; r.itemLink=nil; r.classID=nil; r.itemName=nil; r.iconBorder:Hide()
+    r.itemID=nil; r.itemLink=nil; r.itemLevel=nil; r.classID=nil; r.itemName=nil; r.iconBorder:Hide()
     r.breakdown=nil; r.goldHit:Hide()
     r.icon:ClearAllPoints(); r.icon:SetPoint("LEFT", ns.ICON_X, 0)
     r.goldText:SetTextColor(unpack(ns.COL_GOLD))
@@ -331,6 +331,7 @@ local function FillDetailRow(ir, entry)
         ns.ApplyQualityColor(ir.nameText, ir.iconBorder, gv.quality, {1,1,1})
         ir.itemID = d.itemID
         ir.itemLink = gv.itemLink
+        ir.itemLevel = gv.itemLevel
         ns.SetItemRowName(ir.nameText, ns.DisplayName(entry.name, gv.itemLink or d.itemID))
         ir.rankBadge:SetText("")
         ir.countText:SetText(tostring(gv.amount))
