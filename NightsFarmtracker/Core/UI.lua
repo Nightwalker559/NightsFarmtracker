@@ -699,12 +699,11 @@ local function DrawBar(row, frac, r, g, b)
 end
 
 -- Rows of an item with a goal (db.itemGoals / db.itemGoal) show their count relative to the
--- goal instead, and turn green once it is reached; goalReached then tells
--- BuildHUD to pause the session (also with the bars switched off). The merged
--- junk row is a sum of many items, so it has no goal. Every other row keeps
--- the value bar, scaled among the rows without a goal.
+-- goal instead and turn green once it is reached. The merged junk row is a sum
+-- of many items, so it has no goal. Every other row keeps the value bar, scaled
+-- among the rows without a goal. Whether a goal is reached is decided from the
+-- items, not the rows (GoalReachedIn), so collapsed categories count too.
 local function ApplyValueBars()
-    goalReached = false
     barsShown = NightsFarmtrackerDB.showValueBar ~= false
 
     local maxValue, maxMerged = 0, 0
@@ -714,7 +713,6 @@ local function ApplyValueBars()
             local c = row.barCount
             row.barGoal = goal
             if c >= goal then
-                goalReached = true
                 DrawBar(row, 1, unpack(GOAL_COL))
             else
                 DrawBar(row, c / goal, unpack(ns.COL_ACCENT))
@@ -740,6 +738,21 @@ local function ApplyValueBars()
 end
 
 function ns.GoalReached() return goalReached end
+
+-- True if any item reached its goal with its whole amount (all rolls and tiers
+-- together). BuildHUD pauses the session on it, also with the bars switched off.
+local function GoalReachedIn(cats)
+    for _, cat in pairs(cats) do
+        for _, it in ipairs(cat.items) do
+            local d = it.data
+            if not d.isJunkMerged then
+                local goal = ns.GetItemGoal(it.itemID)
+                if goal and (d.amount or 0) >= goal then return true end
+            end
+        end
+    end
+    return false
+end
 
 ------------------------------------------------------------------------
 -- RefreshHUD
@@ -1021,6 +1034,7 @@ local function BuildHUD()
     end
 
     local wasReached = goalReached
+    goalReached = GoalReachedIn(cats)
     ApplyValueBars()
     if goalReached and not db.paused then
         db.paused = true
