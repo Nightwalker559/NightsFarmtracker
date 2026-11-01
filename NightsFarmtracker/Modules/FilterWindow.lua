@@ -44,7 +44,8 @@ end
 local function PaintTabs()
     for _, tab in ipairs(tabs) do
         local on = tab == active
-        tab.button.text:SetTextColor(unpack(on and ns.COL_ACCENT or {0.6, 0.6, 0.6}))
+        -- Gold like a checked option in Settings: the accent red is darker and made the active label look smaller
+        if on then tab.button.text:SetTextColor(1, 0.82, 0) else tab.button.text:SetTextColor(0.6, 0.6, 0.6) end
         tab.button.underline:SetShown(on)
     end
 end
