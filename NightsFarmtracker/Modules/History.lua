@@ -127,6 +127,8 @@ local monthPool = ns.NewPool(function(parent)
     r.nameText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.nameText:SetPoint("LEFT",ns.HEADER_TEXT_X,0); r.nameText:SetFontHeight(ns.FONT_NORMAL)
     r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
+    r.infoText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    r.infoText:SetPoint("LEFT",r.nameText,"RIGHT",10,0); r.infoText:SetFontHeight(ns.FONT_SMALL); r.infoText:SetTextColor(0.45,0.45,0.45)
     r.delBtn = ns.CreateCloseButton(r, 18, 0.5, ns.L["delete_month"]); r.delBtn:SetPoint("RIGHT",-2,0)
     r.goldText = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.goldText:SetPoint("RIGHT",r.delBtn,"LEFT",-6,0); r.goldText:SetJustifyH("RIGHT"); r.goldText:SetFontHeight(ns.FONT_NORMAL)
@@ -407,7 +409,7 @@ end
 -- on demand without touching saved data.
 local function BuildMonthAggregate(mKey, month)
     local agg = {
-        timestamp = ns.EndOfMonthTimestamp(mKey), isMonthCompact = true,
+        timestamp = ns.EndOfMonthTimestamp(mKey), isMonthCompact = true, monthKey = mKey,
         duration = 0, totalGold = 0, totalVendor = 0, totalAH = 0,
         lootedGold = 0, items = {}, qAtlas = {},
     }
@@ -428,7 +430,7 @@ local function ShowDetail(session)
     else
         dateStr = date("%d.%m.%Y", session.timestamp)
     end
-    DetailFrame.dateText:SetText(dateStr)
+    DetailFrame.dateText:SetText(dateStr.." • "..ns.FormatTime(session.duration))
     RebuildDetailContent(session)
     ns.DockFrame(DetailFrame, HistFrame, "left")
     DetailFrame:Show()
@@ -554,12 +556,15 @@ function ns.RebuildHistory()
     for _,dStr in ipairs(dayOrder) do
         local day=days[dStr]; local mKey=day.monthKey
         if not months[mKey] then
-            months[mKey]={label=day.monthLabel,totalGold=0,sessionCount=0,dayList={},sessionsList={},isCurrent=(mKey==currentMonthKey)}
+            months[mKey]={label=day.monthLabel,totalGold=0,sessionCount=0,duration=0,dayList={},sessionsList={},isCurrent=(mKey==currentMonthKey)}
             monthOrder[#monthOrder+1]=mKey
         end
         months[mKey].totalGold=months[mKey].totalGold+day.totalGold
         months[mKey].lootedGold=(months[mKey].lootedGold or 0)+(day.lootedGold or 0)
         months[mKey].sessionCount=months[mKey].sessionCount+#day.sessions
+        for _,entry in ipairs(day.sessions) do
+            months[mKey].duration=months[mKey].duration+(entry.session.duration or 0)
+        end
         table.insert(months[mKey].dayList,dStr)
         for _,entry in ipairs(day.sessions) do
             months[mKey].sessionsList[#months[mKey].sessionsList+1]=entry.session
@@ -583,6 +588,7 @@ function ns.RebuildHistory()
     local flow=ns.NewHeaderFlow()
     local currentMonth=months[currentMonthKey]
     local nCurrent=currentMonth and currentMonth.sessionCount or 0
+    local flat=NightsFarmtrackerDB.sessionHistoryMode=="compact"   -- Compact: past months are plain rows, a click opens the month
     local nShown
     if activeTab=="sessions" then
         -- the running month, day by day (no month rows); it is not part of the History tab
@@ -603,19 +609,25 @@ function ns.RebuildHistory()
             local month=months[mKey]
             -- default: every month collapsed — user choice wins
             local collapsed=accDB.collapsedMonths[mKey]
-            if collapsed==nil then collapsed=true end
+            if collapsed==nil or flat then collapsed=true end
             local mrow=monthPool.acquire(HListFrame); mrow:SetSize(ns.CONTENT_W, MONTH_H); mrow:SetPoint("TOPLEFT",0,-yOffset)
             flow.header(mrow)
             ns.SetHeaderArrow(mrow, collapsed)
+            mrow.headerArrow:SetShown(not flat)
+            mrow.nameText:ClearAllPoints()
+            mrow.nameText:SetPoint("LEFT",flat and 4 or ns.HEADER_TEXT_X,0)
             mrow.nameText:SetText(month.label)
+            mrow.infoText:SetText(month.duration>0 and ns.FormatTime(month.duration) or "")
             local monthCombined = (month.totalGold or 0) + (month.lootedGold or 0)
             mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
             mrow:SetScript("OnEnter",function(self)
                 self.nameText:SetTextColor(1,1,1)
                 GameTooltip:SetOwner(self,"ANCHOR_TOP")
-                GameTooltip:AddLine(ns.L["month_summary_tooltip"])
-                if monthCombined>0 then
+                if not flat then
+                    GameTooltip:AddLine(ns.L["month_summary_tooltip"])
                     GameTooltip:AddLine(" ")
+                end
+                if monthCombined>0 then
                     GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(month.totalGold or 0), 0.75,0.75,0.75, 1,1,1)
                     GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(month.lootedGold or 0), 0.75,0.75,0.75, 1,1,1)
                     GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(monthCombined), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
@@ -624,12 +636,14 @@ function ns.RebuildHistory()
                         GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
                     end
                 end
-                GameTooltip:Show()
+                if not flat or monthCombined>0 then GameTooltip:Show() end
             end)
             mrow:SetScript("OnMouseUp",function(self)
                 if self.delBtn:IsMouseOver() then return end
-                if IsShiftKeyDown() then
-                    if #month.sessionsList > 0 then
+                if flat or IsShiftKeyDown() then
+                    if DetailFrame and DetailFrame:IsShown() and currentDetailSession and currentDetailSession.monthKey == mKey then
+                        if not ns.DeferInCombat(function() DetailFrame:Hide() end) then DetailFrame:Hide() end
+                    elseif #month.sessionsList > 0 then
                         ShowDetail(BuildMonthAggregate(mKey, month))
                     end
                 else

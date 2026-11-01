@@ -268,7 +268,7 @@ K.AddSection("session_history", function(y, ui)
     local rows
     y, rows = radioGroup(y,
         { {"session_history_mode_full", "full"}, {"session_history_mode_compact", "compact"} },
-        getHistMode(), function(v) db.sessionHistoryMode = v end)
+        getHistMode(), function(v) db.sessionHistoryMode = v; ns.RebuildHistory() end)
     -- "compact" folds past months irreversibly: ask first instead of
     -- switching on click.
     rows[2]:SetScript("OnMouseUp", function()
