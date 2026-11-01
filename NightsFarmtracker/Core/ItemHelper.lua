@@ -167,10 +167,10 @@ end
 -- be nil): the higher of the two, but vendor where the Gear AH Threshold
 -- says so - Equipment only uses its AH price once that price reaches the
 -- configured gold threshold; below it (or with no AH price at all) vendor
--- price is used. Shared by the live value, the frozen session value and the
+-- price is used, and nothing when there is none. Shared by the live value, the frozen session value and the
 -- per-variant sums so a row always agrees with its category header.
 function ns.PickValue(data, vendor, ah, count)
-    if ns.IsGearThresholdVendorOnly(data, ah, count) then return vendor or ah end
+    if ns.IsGearThresholdVendorOnly(data, ah, count) then return vendor end
     if ah and vendor then return math.max(ah, vendor) end
     return ah or vendor
 end

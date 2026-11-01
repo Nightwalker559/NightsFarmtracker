@@ -22,6 +22,8 @@
 - Fishing Lure Bar: right-clicking a lure in combat no longer shifts the saved list against the shown bar
 - Settings: a number box that applies its value while the page rebuilds no longer garbles the page; the session length is applied when the box loses focus (typing "60" no longer ends a longer session at "6"); the Default profile cannot be renamed
 - Item goals: a goal is reached by the whole amount of the item (all rolls and tiers together) and also counts while its category is collapsed; before, collapsing a category could keep a goal from pausing the session or lift the pause again
+- Gear below the Gear AH Threshold that has no vendor price counts nothing, like its (empty) row; before, the category total counted its AH value
+- Merged sessions (same day, compact months): a reagent whose tier breakdown does not add up after the merge (one session had tiers, the other not) stays one plain entry with the summed values instead of being priced with live AH values
 - Minimap HUD: the restored zoom level is within the valid range
 - Item tooltips: an error while the item tooltip is built no longer disables the Auctionator line refresh; the tooltip of drop list rows follows the screen side
 - Repairs: a failing repair is reported as an error instead of being lost silently; failing deferred combat calls no longer drop the rest of the queue

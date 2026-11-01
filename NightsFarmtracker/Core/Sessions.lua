@@ -142,8 +142,8 @@ local function MergeSessionInto(target, src, keepTimestamp)
                         -- ei already holds amount/value from an earlier source without a breakdown:
                         -- seed a placeholder bucket for that part first, so the variant sum keeps
                         -- matching ei.amount (a mismatch would be read as corruption and wiped).
-                        -- Reagent tiers get no placeholder; an inconsistent tier breakdown is left
-                        -- to RepairCorruptedTierBreakdowns.
+                        -- Reagent tiers get no placeholder; a tier breakdown that does not
+                        -- add up is dropped below.
                         ei.variants = { [NoVariantKey(ei.quality)] = {
                             amount = priorAmount, sellPrice = ei.sellPrice, ahTotal = priorAhTotal,
                             quality = ei.quality,
@@ -189,6 +189,14 @@ local function MergeSessionInto(target, src, keepTimestamp)
                     egv.quality   = egv.quality or d.quality
                 end
             end
+        end
+        -- A reagent tier breakdown that does not add up to the amount (one side
+        -- had none, or an inconsistent one) is dropped: the entry stays a plain
+        -- item with the summed frozen values. Rendering would otherwise price
+        -- it with live AH values.
+        local merged = target.items[itemID]
+        if merged.variants and not ns.IsGear(merged) and VariantsSum(merged.variants) ~= (merged.amount or 0) then
+            merged.variants = nil
         end
     end
 end
