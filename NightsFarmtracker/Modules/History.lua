@@ -300,15 +300,10 @@ local function EnsureDetailFrame()
     DScrollFrame:SetPoint("TOPLEFT",PAD,-DET_HDR_H); DScrollFrame:SetWidth(DET_CONT_W)
 end
 
--- Row gold text. Plain rows and rows with a frozen AH/vendor split show
--- entry.gold (the exact value the list was sorted by - BuildSessionCategories
--- takes the LARGER of AH and vendor); older variant/tier rows show their AH
--- total, else their vendor total.
+-- Row gold text: entry.gold, the exact value the list was sorted by
+-- (BuildSessionCategories takes the LARGER of AH and vendor).
 local function SetDetailGold(ir, entry)
     local value = entry.gold
-    if (entry.isRank or entry.isGearVariant) and not entry.breakdown then
-        value = (entry.tAH and entry.tAH > 0) and entry.tAH or entry.tV
-    end
     ir.goldText:SetText(value and value > 0 and ns.FormatGold(value) or "")
 end
 
@@ -316,7 +311,7 @@ end
 local function FillDetailRow(ir, entry)
     local d = entry.d
     ir.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
-    ns.ApplyQualityColor(ir.nameText, ir.iconBorder, d.quality, {1,1,1})
+    ns.ApplyQualityColor(ir.nameText, ir.iconBorder, d.quality)
     ir.goldText:SetTextColor(unpack(ns.COL_GOLD))  -- always gold, like the main window
     ir.classID = d.classID
     ir.itemName = entry.name
@@ -328,7 +323,7 @@ local function FillDetailRow(ir, entry)
         ir.countText:SetText(tostring(entry.tc))
     elseif entry.isGearVariant then
         local gv = entry.gv
-        ns.ApplyQualityColor(ir.nameText, ir.iconBorder, gv.quality, {1,1,1})
+        ns.ApplyQualityColor(ir.nameText, ir.iconBorder, gv.quality)
         ir.itemID = d.itemID
         ir.itemLink = gv.itemLink
         ir.itemLevel = gv.itemLevel
@@ -362,7 +357,7 @@ local function RebuildDetailContent(session)
     for _, catName in ipairs(catOrder) do
         for _, entry in ipairs(cats[catName].items) do
             kinds = kinds + 1
-            qty = qty + (tonumber(entry.isRank and entry.tc or entry.isGearVariant and entry.gv.amount or entry.d.amount) or 0)
+            qty = qty + ns.EntryAmount(entry)
         end
     end
     detailStats = { kinds = kinds, qty = qty }
@@ -491,7 +486,7 @@ local function AddDayRows(day, dStr, month, flow, yOffset)
         row:SetScript("OnMouseUp",function(self,btn)
             if btn=="LeftButton" and not self.delBtn:IsMouseOver() then
                 if DetailFrame and DetailFrame:IsShown() and currentDetailSession == sess then
-                    if not ns.DeferInCombat(function() DetailFrame:Hide() end) then DetailFrame:Hide() end
+                    ns.HideOutOfCombat(DetailFrame)
                 else
                     ShowDetail(sess)
                 end
@@ -545,7 +540,7 @@ function ns.RebuildHistory()
                 }
                 dayOrder[#dayOrder+1]=dStr
             end
-            days[dStr].totalGold=days[dStr].totalGold+session.totalGold
+            days[dStr].totalGold=days[dStr].totalGold+(session.totalGold or 0)
             days[dStr].lootedGold=(days[dStr].lootedGold or 0)+(session.lootedGold or 0)
             days[dStr].sessions[#days[dStr].sessions+1]={session=session,dayKey=dayKey,sessIdx=sessIdx}
         end
@@ -643,7 +638,7 @@ function ns.RebuildHistory()
                 if self.delBtn:IsMouseOver() then return end
                 if flat or IsShiftKeyDown() then
                     if DetailFrame and DetailFrame:IsShown() and currentDetailSession and currentDetailSession.monthKey == mKey then
-                        if not ns.DeferInCombat(function() DetailFrame:Hide() end) then DetailFrame:Hide() end
+                        ns.HideOutOfCombat(DetailFrame)
                     elseif #month.sessionsList > 0 then
                         ShowDetail(BuildMonthAggregate(mKey, month))
                     end

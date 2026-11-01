@@ -146,9 +146,11 @@ function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID, itemLevel
     ownLink = nil
     if hyperlink and (not linkID or TooltipNeedsLink(linkID, classID)) then
         inOwnCall = true
-        ShowGearTooltip(hyperlink, linkID, itemLevel)
+        local ok, err = pcall(ShowGearTooltip, hyperlink, linkID, itemLevel)
+        inOwnCall = false   -- must not stay set, it would silence the refresh post-call for good
+        if not ok then geterrorhandler()(err) end
         EnsureAuctionatorLines(hyperlink)
-        inOwnCall, ownLink = false, hyperlink
+        ownLink = hyperlink
         RunNextFrame(function() if ownLink == hyperlink then AddAuctionatorLinesDirect(hyperlink) end end)
     else
         GameTooltip:SetItemByID(linkID or itemID)
@@ -237,7 +239,7 @@ end
 
 local function FormatGoldClassic(copper)
     if copper >= 10000 then
-        -- Gold + silver (rounded to the nearest silver coin). Post-process
+        -- Gold + silver (copper cut off). Post-process
         -- Blizzard's own icon string to add the separator to the leading
         -- gold digits only — silver/copper stay 2-digit, never need one.
         local str = C_CurrencyInfo.GetCoinTextureString(math.floor(copper / 100) * 100)

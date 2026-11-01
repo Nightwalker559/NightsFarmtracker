@@ -201,9 +201,11 @@ function ns.CopyProfile(name, sourceName)
     return true
 end
 
+-- "Default" is the fallback of every character and is recreated when missing,
+-- so it cannot be renamed.
 function ns.RenameProfile(oldName, newName)
     local profiles = EnsureProfileStore()
-    if not profiles[oldName] or not newName or newName == "" or profiles[newName] then return false end
+    if oldName == ns.DEFAULT_PROFILE or not profiles[oldName] or not newName or newName == "" or profiles[newName] then return false end
     profiles[newName] = profiles[oldName]
     profiles[oldName] = nil
     if ns.GetActiveProfileName() == oldName then

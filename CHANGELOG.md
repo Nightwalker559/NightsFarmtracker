@@ -11,6 +11,19 @@
 - Gear AH Threshold: the threshold is checked per item, not against the whole stack. Two rings worth 799g each no longer count as AH-priced at a 1000g threshold (the stack of 2 reached it)
 - Sessions & History: gear below the Gear AH Threshold (per item) is saved at its vendor price, so History shows the values the list showed while farming instead of the plain AH values. Sessions saved earlier are corrected once on the next login with the threshold of the active profile
 - Item tooltips of gear in the item list and History: the Auctionator lines (vendor and auction price) are added from Auctionator's own helpers when its own call leaves them out (seen with gear shown through its item key)
+- AH source "No AH": gear totals and History no longer include live AH prices (the rows showed vendor prices, the totals did not)
+- History: gear worth more at the vendor than at the AH is saved and shown at its vendor price, so its rows add up to the item value the list showed; saved sessions are corrected once on the next login
+- History: rows of Warband/BoP gear that had an AH price when saved no longer disappear; the Plunder count no longer counts an item once per row; sessions of a day or month are never lost if merging a month fails
+- Reagent tier rows use the same vendor price as the category total (a category could vanish from the list while its value was still counted)
+- Main window: collapsing it during combat now applies the collapsed height after combat; Reset refreshes the footer line
+- Loot from chat: only lines that start with the self-loot text count as own loot
+- Gear threshold sound: a drop whose AH price is not known yet is checked again later instead of being skipped for good
+- Sell List: the Delete button re-checks the Delete List and equipment sets of each item before deleting
+- Fishing Lure Bar: right-clicking a lure in combat no longer shifts the saved list against the shown bar
+- Settings: a number box that applies its value while the page rebuilds no longer garbles the page; the session length is applied when the box loses focus (typing "60" no longer ends a longer session at "6"); the Default profile cannot be renamed
+- Minimap HUD: the restored zoom level is within the valid range
+- Item tooltips: an error while the item tooltip is built no longer disables the Auctionator line refresh; the tooltip of drop list rows follows the screen side
+- Repairs: a failing repair is reported as an error instead of being lost silently; failing deferred combat calls no longer drop the rest of the queue
 
 ### Removed
 
@@ -18,7 +31,7 @@
 
 ### Internal
 
-- All repairs of saved sessions (timestamp fix, Gear AH Threshold freeze) live in `Core/Repairs.lua`; stale comments in the repair registry corrected
+- All repairs of saved sessions live in `Core/Repairs.lua`; dead code removed (item pre-sort, unused row fields, session totals re-pricing branch), shared helpers for the gray hint tooltip, hiding a window after combat, the amount of a Detail row, the freeze of gear prices and saved vendor-only items; stale comments corrected
 
 ## 1.8.5
 

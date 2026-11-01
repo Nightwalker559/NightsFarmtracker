@@ -225,13 +225,7 @@ function ns.RepairSessionTotals(sessions)
         local totalVendor, totalAH = 0, 0
         for _, d in pairs(session.items or {}) do
             totalVendor = totalVendor + (d.vendorTotal or 0)
-            local ah = d.ahTotal
-            if d.q and d.qIDs
-            and ((d.q[1] or 0) + (d.q[2] or 0) + (d.q[3] or 0)) ~= (d.amount or 0) then
-                local p = ns.GetAHPriceForID(d.itemID, d.itemLink)
-                ah = p and (p * (d.amount or 0)) or nil
-            end
-            totalAH = totalAH + (ah or 0)
+            totalAH = totalAH + (d.ahTotal or 0)
         end
 
         if totalGold   ~= (session.totalGold or 0)
@@ -456,8 +450,8 @@ function ns.RepairLastSessionGearVariants()
 end
 
 ------------------------------------------------------------------------
--- Session repairs: the day-key timestamp fix (registry #13) and the Gear AH
--- Threshold freeze (registry #14).
+-- Session repairs: the day-key timestamp fix (registry #13) and the freeze of
+-- the gear prices the list showed (registry #14, #15).
 ------------------------------------------------------------------------
 -- Sessions saved before the timestamp became the real start time carry the
 -- save (Reset) time, so a session farmed on day A and reset on day B sits
@@ -485,22 +479,23 @@ function ns.RepairSessionTimestampsToDayKey(sessions)
     return fixed
 end
 
--- Session-total value of one saved item, the way SaveCurrentSession's
--- ns.ItemValue call saw it: vendor-only items at vendor price, gear per
--- variant with the Gear AH Threshold (below it = vendor price), the rest
--- max(AH, vendor). Same rules as ns.ItemValue, but on the frozen AH values
--- instead of live lookups; History's histValue is the same value.
+-- Value of one saved item as the list showed it while farming: vendor-only
+-- items at vendor price, scaling gear per variant (max of AH and vendor, vendor
+-- below the Gear AH Threshold), the rest max(AH, vendor) - the frozen AH values
+-- instead of live lookups. Nil when a vendor price is missing and cannot be
+-- looked up yet (cold item cache at login).
 local function FrozenItemValue(d)
     local vendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
-    if ns.IsVendorOnly(d) then
+    if ns.IsSavedVendorOnly(d) then
         return vendor or ns.VendorTotal(d) or 0
     end
     if d.variants and ns.IsGear(d) then
         local total = 0
         for _, gv in pairs(d.variants) do
             local sp = ns.VariantSellPrice(gv, d)
-            local v  = (sp and sp > 0 and gv.amount) and sp * gv.amount or nil
             local a  = (gv.ahTotal or 0) > 0 and gv.ahTotal or nil
+            if not sp and not a then return nil end
+            local v = (sp and sp > 0 and gv.amount) and sp * gv.amount or nil
             total = total + (ns.PickValue(d, v, a, gv.amount) or 0)
         end
         return total
@@ -509,28 +504,25 @@ local function FrozenItemValue(d)
     return ns.PickValue(d, vendor, a, d.amount) or 0
 end
 
--- Freezes the current Gear AH Threshold into saved sessions, the way
--- SaveCurrentSession does now: a gear variant (or plain gear item) whose AH
--- value per item is below it loses its AH value and counts at vendor price.
--- No re-pricing, the other frozen AH values stay. The caller refreshes the
--- session totals (ns.RepairSessionTotals). Returns how many items changed.
-function ns.RepairGearThresholdFreeze(sessions)
+-- Freezes the Gear AH Threshold and "vendor is worth more" into the saved AH
+-- values of scaling gear, the way SaveCurrentSession does (see
+-- ns.FreezeVariantPrices); plain gear items only get the threshold. No
+-- re-pricing, the other frozen AH values stay. The caller refreshes the session
+-- totals (ns.RepairSessionTotals). Returns how many items changed.
+function ns.RepairGearVariantFreeze(sessions)
     local fixed = 0
     ns.ForEachSession(sessions, function(session)
         for _, d in pairs(session.items or {}) do
-            if not ns.IsVendorOnly(d) and ns.IsGearThresholdApplicable(d) then
+            if ns.IsGear(d) and not ns.IsSavedVendorOnly(d) then
                 local changed = false
                 if d.variants then
-                    local n, v = 0, 0
-                    for _, gv in pairs(d.variants) do
-                        if (gv.ahTotal or 0) > 0 and ns.IsGearThresholdVendorOnly(d, gv.ahTotal, gv.amount) then
-                            gv.ahTotal, gv.ahAmount = 0, 0
-                            changed = true
-                        end
-                        n = n + (gv.ahAmount or 0)
-                        v = v + (gv.ahTotal or 0)
-                    end
+                    changed = ns.FreezeVariantPrices(d, d.variants, false)
                     if changed then
+                        local n, v = 0, 0
+                        for _, gv in pairs(d.variants) do
+                            n = n + (gv.ahAmount or 0)
+                            v = v + (gv.ahTotal or 0)
+                        end
                         d.ahTotal = v > 0 and v or nil
                         if d.ahAmount ~= nil then d.ahAmount = n end
                         if d.ahValue  ~= nil then d.ahValue  = v end
@@ -542,7 +534,7 @@ function ns.RepairGearThresholdFreeze(sessions)
                     changed = true
                 end
                 if changed then
-                    if d.histValue ~= nil then d.histValue = FrozenItemValue(d) end
+                    if d.histValue ~= nil then d.histValue = FrozenItemValue(d) or d.histValue end
                     fixed = fixed + 1
                 end
             end
@@ -584,10 +576,12 @@ ns.ACCOUNT_REPAIRS = {
     { 11, "gearVariantItemLevelsV2", function() return ns.RepairGearVariantItemLevels(NightsFarmtrackerAccountDB.sessions) end },
     { 12, "gearVariantPricingV2", function() return ns.RepairGearVariantPricing(NightsFarmtrackerAccountDB.sessions) end },
     { 13, "timestampsToDayKey", function() return ns.RepairSessionTimestampsToDayKey(NightsFarmtrackerAccountDB.sessions) end },
-    -- Freezes the Gear AH Threshold (per item) into the saved AH values, with the
-    -- threshold of the profile active at that login; SaveCurrentSession does the
-    -- same for every new session.
-    { 14, "gearThresholdFreeze", function() return ns.RepairGearThresholdFreeze(NightsFarmtrackerAccountDB.sessions) end },
+    -- Freeze the gear prices the list showed (SaveCurrentSession does the same
+    -- for every new session); the Gear AH Threshold is the one of the profile
+    -- active at that login. #14 only knew the threshold, #15 also applies
+    -- "vendor is worth more" on accounts that are past #14 already.
+    { 14, "gearThresholdFreeze", function() return ns.RepairGearVariantFreeze(NightsFarmtrackerAccountDB.sessions) end },
+    { 15, "gearVendorWins", function() return ns.RepairGearVariantFreeze(NightsFarmtrackerAccountDB.sessions) end },
 }
 
 -- Per-character repairs, applied directly to the LIVE (unsaved) session in
@@ -663,7 +657,8 @@ local function RunRepairs(db, registry, legacyFlags)
         if num > db.repairVersion then
             local ok, err = pcall(fn)
             if not ok then
-                ns.Log("Repair '" .. name .. "' failed: " .. tostring(err))
+                -- Shown, not only logged: a failed repair counts as done and is not retried
+                geterrorhandler()("NightsFarmtracker: repair '" .. name .. "' failed: " .. tostring(err))
             end
             ranAny = true
         end
@@ -680,8 +675,8 @@ end
 -- above change per-item values those totals are built from.
 function ns.RunAccountRepairs()
     if RunRepairs(NightsFarmtrackerAccountDB, ns.ACCOUNT_REPAIRS, LEGACY_ACCOUNT_FLAGS) then
-        ns.RepairSessionTotals(NightsFarmtrackerAccountDB.sessions)
-        if ns.RebuildHistory then ns.RebuildHistory() end
+        local ok, err = pcall(ns.RepairSessionTotals, NightsFarmtrackerAccountDB.sessions)
+        if not ok then geterrorhandler()("NightsFarmtracker: session totals repair failed: " .. tostring(err)) end
     end
 end
 

@@ -38,8 +38,7 @@ ns.RegisterConfirmDialog("NFT_CONFIRM_RESET_ADDON", ns.L["reset_addon_confirm"],
 
 ------------------------------------------------------------------------
 -- Sidebar navigation — pooled category buttons on the left, rebuilt to
--- match whatever sections actually exist this rebuild (TSM section is
--- conditional). Clicking a row scrolls the content so that section's
+-- match the sections of this rebuild. Clicking a row scrolls the content so that section's
 -- header lands at the top of the visible area.
 ------------------------------------------------------------------------
 local sidebarRows = {}
@@ -225,15 +224,16 @@ end
 -- running y-offset and returns the new one; a sidebar entry is recorded for
 -- each section's starting position so the nav list can jump to it.
 ------------------------------------------------------------------------
-function ns.RebuildSettingsContent()
-    if not SListFrame then return end
+local rebuilding
+local function RebuildContent()
     K.CloseMenus()
     local prevScroll = SScrollFrame:GetVerticalScroll()
-    for _, entry in ipairs(settingsContent) do
+    local old = settingsContent
+    settingsContent = {}
+    for _, entry in ipairs(old) do
         local release = RELEASE_FN[entry.kind]
         if release then release(entry.widget) else entry.widget:Hide() end
     end
-    settingsContent = {}
 
     local ui = NewBuildContext(NightsFarmtrackerDB)
 
@@ -259,6 +259,16 @@ function ns.RebuildSettingsContent()
     })
     SSidebar:SetHeight(visH)
     SScrollFrame:SetVerticalScroll(math.min(prevScroll, math.max(0, contentH - visH)))
+end
+
+-- Hiding a focused number box applies its value, which asks for a rebuild while
+-- this one is running: that nested request is covered by the running rebuild.
+function ns.RebuildSettingsContent()
+    if not SListFrame or rebuilding then return end
+    rebuilding = true
+    local ok, err = pcall(RebuildContent)
+    rebuilding = false
+    if not ok then geterrorhandler()(err) end
 end
 
 ------------------------------------------------------------------------

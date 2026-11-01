@@ -19,11 +19,12 @@ ns.RegisterConfirmDialog("NFT_CONFIRM_HISTORY_COMPACT", ns.L["compact_history_co
     ns.RebuildSettingsContent()
 end)
 
--- Fixed session length in minutes
+-- Fixed session length in minutes. Applied when the field loses focus / Enter
+-- is pressed, not per keystroke - typing "6" on the way to "60" would otherwise
+-- end a session that ran longer than 6 minutes on the first digit.
 local function MakeSessionLengthEB(parent, yOff)
     local frame, eb = MakeNumberBox(parent, yOff, 4, ns.L["minutes_suffix"])
-    eb:SetScript("OnTextChanged", function(self, userInput)
-        if not userInput then return end
+    eb:HookScript("OnEditFocusLost", function(self)
         NightsFarmtrackerDB.sessionLength = tonumber(self:GetText()) or 0
         ns.UpdateTimerDisplay()
         ns.ApplyPauseVisuals()

@@ -304,7 +304,7 @@ function ns.SetVenomTrackerEnabled(enabled)
         ScanVenom()
         ScanCurrency()
     elseif VenomFrame then
-        if not ns.DeferInCombat(function() VenomFrame:Hide() end) then VenomFrame:Hide() end
+        ns.HideOutOfCombat(VenomFrame)
     end
 end
 

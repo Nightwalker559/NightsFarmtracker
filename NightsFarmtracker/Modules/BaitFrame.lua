@@ -266,9 +266,11 @@ local function AcquireButton(index)
     -- disables the attribute-driven action (button appears to do nothing).
     -- PreClick/PostClick are separate hooks and don't have this problem.
     btn:SetScript("PostClick", function(self, button)
-        if button == "RightButton" then
+        if button == "RightButton" and not InCombatLockdown() then
             -- type2 is nil (see ConfigureButtonAction), so right click never
-            -- ran a secure action -- safe to remove the slot here.
+            -- ran a secure action -- safe to remove the slot here. Not in
+            -- combat: the bar is not refreshed then and would keep showing the
+            -- removed slot, so the next click would remove a different lure.
             RemoveBaitSlot(self.slotIndex)
         end
         -- Lure consumed -> BAG_UPDATE_DELAYED; lure applied to the pole ->

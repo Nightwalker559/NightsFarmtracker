@@ -17,7 +17,7 @@ local helpTipSections = {
 local helpSections = {
     categoriesSection,
     { title = ns.L["help_items"],      lines = { ns.L["help_item_hover"], ns.L["help_item_ctrl_lclick"], ns.L["help_item_ctrl_rclick"], ns.L["help_item_rclick"],
-                                                 ns.L["help_detail_vendor"], ns.L["help_detail_blacklist"], ns.L["help_detail_undo"] } },
+                                                 ns.L["help_detail_vendor"], ns.L["help_detail_blacklist"], ns.L["help_detail_lists"] } },
     { title = ns.L["help_gold"],       lines = { ns.L["help_gold_click"] } },
     { title = ns.L["help_reset"],      lines = { ns.L["help_reset_shift"] } },
     { title = ns.L["help_histlog"],    lines = { ns.L["help_histlog_left"], ns.L["help_histlog_right"] } },

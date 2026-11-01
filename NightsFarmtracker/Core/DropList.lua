@@ -92,7 +92,7 @@ function ns.CreateDropListItemRow(parent, onShiftRemove)
 
     r:SetScript("OnEnter", function(self)
         if self.itemID then
-            ns.ShowItemTooltipNoCompare(self, "ANCHOR_RIGHT", nil, self.itemID)
+            ns.ShowItemTooltipNoCompare(self, ns.SmartAnchor(self, "RIGHT"), nil, self.itemID)
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine(ns.L["filter_tip_shift_rclick"],0.5,0.5,0.5)
             GameTooltip:Show()
@@ -228,8 +228,8 @@ function ns.RebuildCheckboxSection(frame, header, rows, padX, secTop, titleText,
     return secTop + ns.CAT_ROW_H + n * ns.CHECKBOX_ROW_H + 4
 end
 
--- Per-profile table of collapsed item groups (expansionID -> true), created
--- on first use; read fresh on every rebuild so a profile switch is picked up.
+-- Per-character table of collapsed item groups (expansionID -> true), created
+-- on first use; read fresh on every rebuild.
 function ns.GetCollapsedTable(key)
     local db = NightsFarmtrackerDB
     if type(db[key]) ~= "table" then db[key] = {} end
@@ -345,7 +345,7 @@ function ns.RebuildDropItemList(cfg)
                 r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
                 r.nameText:SetText(ns.DisplayName(e.name, e.itemID) or ("Item " .. e.itemID))
                 r.itemID = e.itemID
-                ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
+                ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, ns.COL_ITEM_GRAY)
                 rows[#rows + 1] = r
                 yOff = yOff + ns.ROW_H
             end

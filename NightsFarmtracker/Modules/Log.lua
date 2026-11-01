@@ -81,7 +81,7 @@ local function RebuildLogList()
         r.rankBadge:SetText(e.rankIcon or "")
         r.countText:SetText("x" .. e.amount)
         r.itemLink = e.itemLink
-        ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
+        ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, ns.COL_ITEM_GRAY)
         activeRows[#activeRows+1] = r
         yOff = yOff + ROW_H
         widest = math.max(widest, ROW_EDGE + TIME_W + ROW_GAP + ns.ICON_SIZE + ROW_GAP
@@ -255,6 +255,6 @@ end
 function ns.OnLogWindowDisabled()
     NightsFarmtrackerDB.logWindowShown = false
     if LogFrame then
-        if not ns.DeferInCombat(function() LogFrame:Hide() end) then LogFrame:Hide() end
+        ns.HideOutOfCombat(LogFrame)
     end
 end

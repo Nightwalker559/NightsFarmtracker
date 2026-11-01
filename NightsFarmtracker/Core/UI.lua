@@ -458,7 +458,7 @@ heightWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
 heightWatcher:SetScript("OnEvent", function()
     if pendingHeightUpdate then
         pendingHeightUpdate = false
-        UpdateFrameHeight()
+        if NightsFarmtrackerDB.expanded then UpdateFrameHeight() else SafeSetMainHeight(COLLAPSED_H) end
     end
 end)
 
@@ -650,7 +650,7 @@ local function PlaceRow(row, yOff, name, icon, nameColor, quality)
     if nameColor then
         row.nameText:SetTextColor(unpack(nameColor)); row.iconBorder:Hide()
     else
-        ns.ApplyQualityColor(row.nameText, row.iconBorder, quality, {1,1,1})
+        ns.ApplyQualityColor(row.nameText, row.iconBorder, quality)
     end
     itemOrder[#itemOrder+1] = name
     itemRows[name] = row
@@ -748,12 +748,6 @@ function ns.GoalReached() return goalReached end
 -- after each drop, so ns.RefreshHUD only queues one rebuild for the next frame
 -- and any number of requests within a frame collapse into it.
 ------------------------------------------------------------------------
-local function ItemSort(a, b)
-    if a.gold ~= b.gold then return a.gold > b.gold end
-    if a.data.amount ~= b.data.amount then return a.data.amount > b.data.amount end
-    return a.name < b.name
-end
-
 -- Groups db.count into categories ({ items, totalGold, classID }) and returns
 -- them with the grand total. Quest items (never sellable) and items
 -- blacklisted after they were looted are dropped from the live count too.
@@ -784,7 +778,7 @@ end
 -- per-item list at once.
 local function MergeJunkCategories(cats)
     for catName, cat in pairs(cats) do
-        if ns.IsJunkCategory(catName) and #cat.items >= 1 then
+        if ns.IsJunkCategory(catName) then
             local totalAmount = 0
             for _, it in ipairs(cat.items) do
                 totalAmount = totalAmount + (it.data.amount or 0)
@@ -817,10 +811,10 @@ local function PlayGearThresholdSound(db, hasAH)
                 local prevCount = data.thresholdNotifiedCounts[gKey] or 0
                 if gv.amount > prevCount then
                     local ap = ns.GetAHPriceForID(data.itemID, gv.itemLink)
-                    if ap and ap >= threshold then
-                        ns.PlayThresholdAlertSound()
+                    if ap then
+                        if ap >= threshold then ns.PlayThresholdAlertSound() end
+                        data.thresholdNotifiedCounts[gKey] = gv.amount
                     end
-                    data.thresholdNotifiedCounts[gKey] = gv.amount
                 end
             end
         end
@@ -866,7 +860,8 @@ local function AddTierEntries(flat, item, fv, qAtlas)
                 local ap = ns.GetAHPriceForID(tid)
                 if ap then tAH = ap * tc end
             end
-            if gv.sellPrice and gv.sellPrice > 0 then tV = gv.sellPrice * tc end
+            local sp = ns.VariantSellPrice(gv, d)
+            if sp and sp > 0 then tV = sp * tc end
             local tGold = fv and (tV or 0) or math.max(tAH or 0, tV or 0)
             if tGold > 0 then
                 flat[#flat + 1] = {
@@ -910,14 +905,16 @@ local function BuildFlatList(cat, hasAH, qAtlas)
     local flat = {}
     for _, item in ipairs(cat.items) do
         local d = item.data
-        local fv = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, item.ah, d.amount)
-        if d.variants and not ns.IsGear(d) then
-            AddTierEntries(flat, item, fv, qAtlas)
-        elseif d.variants then
+        if d.variants and ns.IsGear(d) then
             AddGearEntries(flat, item, hasAH)
         else
-            local gold = fv and (item.vendor or 0) or math.max(item.ah or 0, item.vendor or 0)
-            flat[#flat + 1] = {isRank = false, name = item.name, d = d, item = item, gold = gold, fv = fv}
+            local fv = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, item.ah, d.amount)
+            if d.variants then
+                AddTierEntries(flat, item, fv, qAtlas)
+            else
+                local gold = fv and (item.vendor or 0) or math.max(item.ah or 0, item.vendor or 0)
+                flat[#flat + 1] = {isRank = false, name = item.name, d = d, item = item, gold = gold, fv = fv}
+            end
         end
     end
     table.sort(flat, function(a, b)
@@ -936,7 +933,7 @@ local function RenderFlatRow(fi, yOffset)
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); row.icon:Show()
     row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", ICON_X, 0)
     row:SetPoint("TOPLEFT", 0, -yOffset)
-    ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality, {1, 1, 1})
+    ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality)
     row.nameText:ClearAllPoints()
     row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", NAME_GAP, 0)
     row.nameText:SetPoint("RIGHT", row,      "RIGHT", -108, 0)
@@ -982,7 +979,6 @@ local function BuildHUD()
     local db = NightsFarmtrackerDB
     local cats, grandTotal = CollectCategories(db)
     if db.mergeJunkEntries then MergeJunkCategories(cats) end
-    for _, cat in pairs(cats) do table.sort(cat.items, ItemSort) end
 
     -- With no AH source (or "none" selected) every item is valued at vendor price
     local hasAH = ns.HasAnyAH() and db.ahSource ~= "none"
@@ -1006,7 +1002,7 @@ local function BuildHUD()
         yOffset = yOffset + CAT_ROW_H
 
         if not isCollapsed then
-            local flat = BuildFlatList(cat, hasAH, db.qAtlas or {})
+            local flat = BuildFlatList(cat, hasAH, db.qAtlas)
             if #flat == 0 then
                 -- nothing displayable: skip the category entirely
                 DropLastHeader(hdr, catName)
@@ -1081,6 +1077,8 @@ function ns.Reset(skipSave)
     btnRate.text:SetText("")
     ScrollFrame:SetVerticalScroll(0)
     UpdateFrameHeight()
+    listFlow, listScrolls = ns.NewHeaderFlow(), false
+    UpdateFooterLine()
     ns.ApplyPauseVisuals()
 end
 

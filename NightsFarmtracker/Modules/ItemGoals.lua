@@ -85,7 +85,7 @@ function ns.RebuildGoalsList()
         r.itemID = e.itemID
         r.icon:SetTexture(e.goal.icon or ns.FALLBACK_ICON)
         r.nameText:SetText(ns.DisplayName(e.goal.name, e.itemID) or ("Item " .. e.itemID))
-        ns.ApplyQualityColor(r.nameText, r.iconBorder, e.goal.quality, {0.85, 0.85, 0.85})
+        ns.ApplyQualityColor(r.nameText, r.iconBorder, e.goal.quality, ns.COL_ITEM_GRAY)
         local amount = tonumber(e.goal.amount) or 0
         r.amountBox:SetText(amount > 0 and tostring(amount) or "")
         rows[#rows + 1] = r

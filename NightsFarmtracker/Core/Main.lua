@@ -660,7 +660,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         -- isMe: sender GUID = own GUID (language-independent) OR prefix check
         -- ("Ihr "/"You ") OR sender = own player name
         local guidMatch   = guid and not issecretvalue(guid) and guid == UnitGUID("player")
-        local prefixMatch = SELF_LOOT_PREFIX and msg:find(SELF_LOOT_PREFIX, 1, true)
+        local prefixMatch = SELF_LOOT_PREFIX and msg:sub(1, #SELF_LOOT_PREFIX) == SELF_LOOT_PREFIX
         local senderShort = (sender and not issecretvalue(sender)) and sender:match("^([^%-]+)") or ""
         local senderMatch = senderShort ~= "" and senderShort == UnitName("player")
         if not guidMatch and not prefixMatch and not senderMatch then return end

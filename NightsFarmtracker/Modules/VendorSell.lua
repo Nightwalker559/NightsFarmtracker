@@ -255,7 +255,9 @@ local function DeleteClick()
     if not MerchantFrame:IsShown() or CursorHasItem() then return end
     for _, e in ipairs(trash) do
         local info = C_Container.GetContainerItemInfo(e.bag, e.slot)
-        if info and info.itemID == e.itemID and not info.isLocked then
+        -- the list can be stale (an item put into an equipment set, taken off the Delete List)
+        if info and info.itemID == e.itemID and not info.isLocked
+           and ns.IsOnDeleteList(e.itemID) and not InEquipmentSet(e.bag, e.slot) then
             C_Container.PickupContainerItem(e.bag, e.slot)
             DeleteCursorItem()
             if CursorHasItem() then ClearCursor(); return end   -- refused: the next one would be too
@@ -273,7 +275,7 @@ local function AddRow(yOff, e, valueText)
     r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
     local name = ns.TruncateName(e.name)
     r.nameText:SetText(e.count > 1 and (name .. " |cffffd100x" .. e.count .. "|r") or name)
-    ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
+    ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, ns.COL_ITEM_GRAY)
     r.valueText:SetText(valueText)
     rows[#rows + 1] = r
     return yOff + ns.ROW_H
@@ -353,11 +355,7 @@ local function EnsureFrame()
     frame.deleteBtn:SetPoint("BOTTOMLEFT", pad, 8 + BTN_H + 4)
     frame.deleteBtn:SetPoint("BOTTOMRIGHT", -pad, 8 + BTN_H + 4)
     frame.deleteBtn.lbl:SetTextColor(1, 0.4, 0.4)
-    frame.deleteBtn:HookScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:AddLine(ns.L["vendor_sell_delete_tip"], 0.5, 0.5, 0.5, true)
-        GameTooltip:Show()
-    end)
+    frame.deleteBtn:HookScript("OnEnter", function(self) ns.ShowGrayTip(self, ns.L["vendor_sell_delete_tip"]) end)
     frame.deleteBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Registered only while the window is open

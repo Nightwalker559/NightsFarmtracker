@@ -70,7 +70,7 @@ end
 local function CopyItemFields(d)
     return {
         amount=d.amount, icon=d.icon, quality=d.quality, itemSubType=d.itemSubType, sellPrice=d.sellPrice,
-        isVendorTrash=d.isVendorTrash, isBoE=d.isBoE, isBoP=d.isBoP, isBoA=d.isBoA, canAH=d.canAH,
+        isVendorTrash=d.isVendorTrash, isBoE=d.isBoE, isBoP=d.isBoP, isBoA=d.isBoA, isWarbound=d.isWarbound, canAH=d.canAH,
         isCosmetic=d.isCosmetic, name=d.name,
         classID=d.classID, subClassID=d.subClassID, itemID=d.itemID, itemLink=d.itemLink,
     }
@@ -205,6 +205,38 @@ local function MergeSessionList(list)
     return merged
 end
 
+-- True for a saved item that always counts at vendor price. Entries saved with
+-- filterFrozen already had the Vendor-Only filters applied (forced-vendor items
+-- carry no AH value), so only the item's own flags count; older entries still
+-- follow the live filters.
+function ns.IsSavedVendorOnly(d)
+    if d.filterFrozen then return d.isBoP or d.canAH == false end
+    return ns.IsVendorOnly(d)
+end
+
+-- Freezes what the list showed into the AH value of each variant of scaling
+-- gear: a variant the list priced at vendor - below the Gear AH Threshold (per
+-- item) or worth more at vendor - keeps no AH value, so History shows the same
+-- value as the list. useLive: a missing vendor price may be looked up from the
+-- item (when saving); otherwise only the stored one counts. Returns true if a
+-- variant changed.
+function ns.FreezeVariantPrices(d, variants, useLive)
+    if not ns.IsGear(d) then return false end
+    local changed = false
+    for _, gv in pairs(variants) do
+        local ah = gv.ahTotal or 0
+        if ah > 0 then
+            local sp = useLive and ns.VariantSellPrice(gv, d) or gv.sellPrice
+            local atVendor = sp and sp > 0 and sp * (gv.amount or 0) > ah
+            if atVendor or ns.IsGearThresholdVendorOnly(d, ah, gv.amount) then
+                gv.ahTotal, gv.ahAmount = 0, 0
+                changed = true
+            end
+        end
+    end
+    return changed
+end
+
 function ns.SaveCurrentSession()
     local db = NightsFarmtrackerDB
     if not db or not next(db.count or {}) then return end
@@ -241,16 +273,8 @@ function ns.SaveCurrentSession()
             or ns.IsForceVendorExpansion(data)   -- not ns.IsVendorOnly: BoP/canAH are decided separately below
         if forceVendor and variantsCopy then
             for _, gv in pairs(variantsCopy) do gv.ahTotal = 0; gv.ahAmount = 0 end
-        end
-        -- The Gear AH Threshold is frozen the same way: a gear variant below it
-        -- is saved vendor-priced, so History shows what the list showed while
-        -- farming (per variant, as in ns.GearVariantItemValue).
-        if variantsCopy and ns.IsGear(data) then
-            for _, gv in pairs(variantsCopy) do
-                if (gv.ahTotal or 0) > 0 and ns.IsGearThresholdVendorOnly(data, gv.ahTotal, gv.amount) then
-                    gv.ahTotal = 0; gv.ahAmount = 0
-                end
-            end
+        elseif variantsCopy then
+            ns.FreezeVariantPrices(data, variantsCopy, true)
         end
         local ah
         if forceVendor then
@@ -367,7 +391,7 @@ function ns.CompactOldMonths()
     if not sessions or not next(sessions) then return end
 
     local currentKey = date("%Y-%m")
-    local byMonth = {}
+    local byMonth, oldDays = {}, {}
     for dayKey, dayList in pairs(sessions) do
         local sample = dayList[1]
         if sample and date("%Y-%m", sample.timestamp) ~= currentKey then
@@ -376,17 +400,22 @@ function ns.CompactOldMonths()
             for _, session in ipairs(dayList) do
                 table.insert(byMonth[mKey], session)
             end
-            sessions[dayKey] = nil
+            oldDays[#oldDays + 1] = dayKey
         end
     end
     if not next(byMonth) then return end
 
+    -- Merge first, drop the old days only when every month is merged: an error
+    -- in a merge must not lose the sessions.
+    local compacted = {}
     for mKey, list in pairs(byMonth) do
         local merged = MergeSessionList(list)
         merged.timestamp = ns.EndOfMonthTimestamp(mKey)
         merged.isMonthCompact = true
-        sessions[date("%Y-%m-%d", merged.timestamp)] = { merged }
+        compacted[date("%Y-%m-%d", merged.timestamp)] = { merged }
     end
+    for _, dayKey in ipairs(oldDays) do sessions[dayKey] = nil end
+    for dayKey, list in pairs(compacted) do sessions[dayKey] = list end
 end
 
 ns.RegisterConfirmDialog("NFT_CONFIRM_MERGE_DAY", "%s", function(_, data) ns.MergeDaySessions(data) end)
@@ -425,9 +454,9 @@ ns.RegisterConfirmDialog("NFT_CONFIRM_CLEAR_ALL_HISTORY", ns.L["clear_all_histor
     function() ns.ClearAllSessionHistory() end)
 
 ------------------------------------------------------------------------
--- One-time, account-wide prompt (see ns.MaybePromptSessionResetMigration
--- in Main.lua) offering to clear session history saved before the itemLink
--- fix, since those old sessions can't show an accurate tooltip
+-- One-time, account-wide prompt (shown by ns.MaybePromptSessionResetMigration
+-- below, called from Main.lua) offering to clear session history saved before
+-- the itemLink fix, since those old sessions can't show an accurate tooltip
 -- for scaling gear and never will be able to.
 ------------------------------------------------------------------------
 -- hideOnEscape off: explicit choice only, avoid it silently vanishing on login
@@ -468,7 +497,7 @@ local function VariantRowValue(gv, amount, sellPrice, useAH, priceID, link, hasA
     if sp then tV = sp * amount end
     local tGold = (tAH and tAH > 0) and tAH or tV or 0
     local breakdown
-    if gv.ahAmount ~= nil then
+    if useAH and gv.ahAmount ~= nil then
         -- Amount split is known: AH-priced units at their frozen AH total,
         -- the rest at vendor price (mixed sessions).
         local vN = math.max(0, amount - gv.ahAmount)
@@ -477,6 +506,14 @@ local function VariantRowValue(gv, amount, sellPrice, useAH, priceID, link, hasA
         breakdown = { ahN = gv.ahAmount, ahV = tAH or 0, vN = vN, vV = vV }
     end
     return tAH, tV, tGold, breakdown
+end
+
+-- Amount one Detail row stands for: a reagent tier, an item-level group of
+-- scaling gear, or the whole item.
+function ns.EntryAmount(entry)
+    if entry.isRank then return tonumber(entry.tc) or 0 end
+    if entry.isGearVariant then return tonumber(entry.gv.amount) or 0 end
+    return tonumber(entry.d.amount) or 0
 end
 
 -- Category/item builder used by the Detail window.
@@ -498,12 +535,7 @@ local function BuildSessionCategories(session)
         -- filters applied at save time (forced-vendor items carry no AH
         -- value), so only the item's own flags count here. Older entries
         -- still follow the live filters.
-        local isVendorOnly
-        if d.filterFrozen then
-            isVendorOnly = d.isBoP or d.canAH == false
-        else
-            isVendorOnly = ns.IsVendorOnly(d)
-        end
+        local isVendorOnly = ns.IsSavedVendorOnly(d)
         -- A reagent-tier breakdown (item is not Equipment - see ns.IsGear)
         -- that doesn't sum to the item's own amount means GetReagentQualityInfo
         -- mis-tagged a tier at tracking time (see ProcessLoot's guard) - this
@@ -544,13 +576,13 @@ local function BuildSessionCategories(session)
                 local tc  = gv and gv.amount or 0
                 local tid = gv and gv.priceItemID
                 if tc > 0 then
-                    local tAH, tV, tGold, breakdown = VariantRowValue(gv, tc, gv.sellPrice,
+                    local _, _, tGold, breakdown = VariantRowValue(gv, tc, gv.sellPrice,
                         tid and not isVendorOnly, tid, nil, hasAH)
                     if tGold > 0 then
                         local rankIcon = ns.RankBadgeMarkup(qAtlas[tier], tier)
                         cats[cat].items[#cats[cat].items+1] = {
                             name=d.name, d=d, gold=tGold, isRank=true,
-                            tier=tier, tc=tc, tid=tid, tAH=tAH, tV=tV, rankIcon=rankIcon,
+                            tier=tier, tc=tc, tid=tid, rankIcon=rankIcon,
                             breakdown=breakdown,
                         }
                     end
@@ -563,14 +595,14 @@ local function BuildSessionCategories(session)
             -- Grouped by displayed (itemLevel, quality) first so two drops that
             -- only differ in a hidden bonus-ID component still show as one
             -- summed row (see GroupGearVariantsForDisplay).
-            for ilvl, gv in pairs(ns.GroupGearVariantsForDisplay(d.variants)) do
+            for _, gv in pairs(ns.GroupGearVariantsForDisplay(d.variants)) do
                 if gv.amount > 0 then
-                    local tAH, tV, tGold, breakdown = VariantRowValue(gv, gv.amount, ns.VariantSellPrice(gv, d),
+                    local _, _, tGold, breakdown = VariantRowValue(gv, gv.amount, ns.VariantSellPrice(gv, d),
                         not isVendorOnly, d.itemID, gv.itemLink, hasAH)
                     if tGold > 0 then
                         cats[cat].items[#cats[cat].items+1] = {
                             name=d.name, d=d, gold=tGold, isGearVariant=true,
-                            ilvl=ilvl, gv=gv, tAH=tAH, tV=tV, breakdown=breakdown,
+                            gv=gv, breakdown=breakdown,
                         }
                     end
                 end
@@ -596,8 +628,7 @@ local function BuildSessionCategories(session)
             if ns.IsJunkCategory(catName) and #cat.items >= 1 then
                 local totalAmount = 0
                 for _, entry in ipairs(cat.items) do
-                    local ed = entry.d
-                    totalAmount = totalAmount + (ed.amount or (entry.gv and entry.gv.amount) or 0)
+                    totalAmount = totalAmount + ns.EntryAmount(entry)
                 end
                 local merged = ns.JunkMergedRecord(totalAmount, cat.gold)
                 cat.items = { { name = merged.name, d = merged, gold = cat.gold, isRank = false } }

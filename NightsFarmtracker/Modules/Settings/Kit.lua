@@ -271,11 +271,7 @@ local function ConfigureCheckbox(row, label, yOff, getValue, setValue, opts)
     Refresh()
     row:EnableMouse(not disabled)
     row:SetScript("OnMouseUp", not disabled and function() setValue(not getValue()); Refresh() end or nil)
-    row:SetScript("OnEnter", tip and not disabled and function(self)
-        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:AddLine(tip, 0.5, 0.5, 0.5, true)
-        GameTooltip:Show()
-    end or nil)
+    row:SetScript("OnEnter", tip and not disabled and function(self) ns.ShowGrayTip(self, tip) end or nil)
     row:SetScript("OnLeave", tip and not disabled and function() GameTooltip:Hide() end or nil)
     return row
 end
