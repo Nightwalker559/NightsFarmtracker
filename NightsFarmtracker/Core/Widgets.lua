@@ -538,9 +538,10 @@ end
 -- button. Callers add their content below the header and can hook extra close
 -- behavior via frame:SetScript("OnHide", ...) or
 -- frame.closeBtn:HookScript("OnClick", ...). opts (all optional): width, pad
--- (default ns.PAD), titleY (default -10), dockChain ("right" or "left": the window sits in that docking chain, see
--- ns.WINDOW_CHAINS, and the others close ranks when it hides), noEsc (Esc does
--- not close it: it is closed by whatever owns it).
+-- (default ns.PAD), titleY (default -10), dockChain ("right" or "left": the
+-- window sits in that docking chain, see ns.WINDOW_CHAINS, and the others close
+-- ranks when it hides), noEsc (Esc does not close it: it is closed by whatever
+-- owns it). The title always uses the theme accent color.
 ------------------------------------------------------------------------
 function ns.CreateWindowFrame(name, title, opts)
     opts = opts or {}
