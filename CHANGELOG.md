@@ -12,6 +12,10 @@
 - Sessions & History: gear below the Gear AH Threshold (per item) is saved at its vendor price, so History shows the values the list showed while farming instead of the plain AH values. Sessions saved earlier are corrected once on the next login with the threshold of the active profile; `/nft repairthreshold` does it again on demand
 - Item tooltips of gear in the item list and History: the Auctionator lines (vendor and auction price) are added from Auctionator's own helpers when its own call leaves them out (seen with gear shown through its item key)
 
+### Internal
+
+- All repairs of saved sessions (timestamp fix, Gear AH Threshold freeze, `/nft repairprices`, `/nft repairthreshold`) live in `Core/Repairs.lua`; stale comments in the repair registry corrected
+
 ## 1.8.5
 
 ### Fixed
