@@ -1,9 +1,9 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Repairs
--- Data repairs and migrations of saved sessions and of the live session: the
--- one-time ones run once per account/character from the numbered registry at
--- the end of this file (ns.ACCOUNT_REPAIRS / ns.CHARACTER_REPAIRS), the
--- manual ones from /nft commands.
+-- One-time data repairs and migrations of saved sessions and of the live
+-- session, run once per account/character from the numbered registry at the
+-- end of this file (ns.ACCOUNT_REPAIRS / ns.CHARACTER_REPAIRS). No slash
+-- command changes saved values.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -456,9 +456,8 @@ function ns.RepairLastSessionGearVariants()
 end
 
 ------------------------------------------------------------------------
--- Session repairs: the day-key timestamp fix (registry #13), the Gear AH
--- Threshold freeze (registry #14) and the manual re-pricing commands
--- (/nft repairprices, /nft repairthreshold).
+-- Session repairs: the day-key timestamp fix (registry #13) and the Gear AH
+-- Threshold freeze (registry #14).
 ------------------------------------------------------------------------
 -- Sessions saved before the timestamp became the real start time carry the
 -- save (Reset) time, so a session farmed on day A and reset on day B sits
@@ -486,10 +485,6 @@ function ns.RepairSessionTimestampsToDayKey(sessions)
     return fixed
 end
 
-local function LinkCached(link)
-    return link == nil or C_Item.GetItemInfo(link) ~= nil
-end
-
 -- Session-total value of one saved item, the way SaveCurrentSession's
 -- ns.ItemValue call saw it: vendor-only items at vendor price, gear per
 -- variant with the Gear AH Threshold (below it = vendor price), the rest
@@ -512,94 +507,6 @@ local function FrozenItemValue(d)
     end
     local a = (d.ahTotal or 0) > 0 and d.ahTotal or nil
     return ns.PickValue(d, vendor, a, d.amount) or 0
-end
-
-------------------------------------------------------------------------
--- Re-prices a saved session whose AH prices are wrong or missing (the relog
--- save can run before the AH addon answers or the item cache is warm). Every
--- AH-priced item/variant gets the current price for its exact link. Vendor-only
--- items and items whose data is not loaded yet are skipped; a second run picks
--- those up. Idempotent while the AH data stays the same. Returns: re-priced
--- items, items still without AH price, skipped items, gold change.
-------------------------------------------------------------------------
-function ns.RepairSessionAHPrices(session)
-    local db = NightsFarmtrackerDB
-    if not session or not session.items or db.ahSource == "none" or not ns.HasAnyAH() then
-        return 0, 0, 0, 0
-    end
-    local fixed, missing, skipped = 0, 0, 0
-    for _, d in pairs(session.items) do
-        if not ns.IsVendorOnly(d) then
-            local oldAH, newAH, changed, skip, cut = d.ahTotal or 0, 0, false, false, false
-            local gear = ns.IsGearThresholdApplicable(d)
-            if d.variants then
-                for _, gv in pairs(d.variants) do
-                    if (gv.amount or 0) > 0 then
-                        if not LinkCached(gv.itemLink) then
-                            skip = true
-                        else
-                            local ap = ns.GetAHPriceForID(gv.priceItemID or d.itemID, gv.itemLink)
-                            local total = ap and ap * gv.amount or (gv.ahTotal or 0)
-                            -- Gear AH Threshold: a variant below it is vendor-priced
-                            -- (frozen like a Vendor-Only item), per variant as in ns.GearVariantItemValue
-                            if gear and total > 0 and ns.IsGearThresholdVendorOnly(d, total, gv.amount) then
-                                total, cut = 0, true
-                            end
-                            if total ~= (gv.ahTotal or 0) then changed = true end
-                            gv.ahTotal  = total
-                            gv.ahAmount = total > 0 and gv.amount or 0
-                        end
-                    end
-                    newAH = newAH + (gv.ahTotal or 0)
-                end
-            elseif (d.amount or 0) > 0 then
-                if not LinkCached(d.itemLink) then
-                    skip = true
-                else
-                    local ap = ns.GetAHPriceForID(d.itemID, d.itemLink)
-                    newAH = ap and ap * d.amount or oldAH
-                    if gear and newAH > 0 and ns.IsGearThresholdVendorOnly(d, newAH, d.amount) then
-                        newAH, cut = 0, true
-                    end
-                end
-            end
-            if skip then skipped = skipped + 1 end
-            if newAH ~= oldAH then changed = true end
-            if changed then
-                d.ahTotal = newAH > 0 and newAH or nil
-                if d.variants then
-                    local n, v = 0, 0
-                    for _, gv in pairs(d.variants) do
-                        n = n + (gv.ahAmount or 0)
-                        v = v + (gv.ahTotal or 0)
-                    end
-                    if d.ahAmount ~= nil then d.ahAmount = n end
-                    if d.ahValue  ~= nil then d.ahValue  = v end
-                else
-                    local vendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
-                    local ahWins = newAH > 0 and (vendor == nil or newAH >= vendor)
-                    if d.ahAmount ~= nil then d.ahAmount = ahWins and (d.amount or 0) or 0 end
-                    if d.ahValue  ~= nil then d.ahValue  = ahWins and newAH or 0 end
-                end
-                -- History value rule: max(AH, vendor), vendor where the threshold cut the AH price
-                if d.histValue ~= nil then d.histValue = FrozenItemValue(d) end
-                fixed = fixed + 1
-            elseif newAH == 0 and not skip and not cut then
-                missing = missing + 1
-            end
-        end
-    end
-    -- Session totals from the (now corrected) items. Done as a full sum, not
-    -- as deltas, so the Gear AH Threshold stays in (see FrozenItemValue) and
-    -- an earlier partial repair can't leave the total out of step.
-    local oldTotal = session.totalGold or 0
-    local totalGold, totalAH = 0, 0
-    for _, d in pairs(session.items) do
-        totalGold = totalGold + FrozenItemValue(d)
-        totalAH   = totalAH + ((d.ahTotal or 0) > 0 and d.ahTotal or 0)
-    end
-    session.totalGold, session.totalAH = totalGold, totalAH
-    return fixed, missing, skipped, totalGold - oldTotal
 end
 
 -- Freezes the current Gear AH Threshold into saved sessions, the way
@@ -644,35 +551,6 @@ function ns.RepairGearThresholdFreeze(sessions)
     return fixed
 end
 
--- Re-prices the newest saved session (ns.GetNewestSession). Run via /nft repairprices.
-function ns.RepairLastSessionPrices()
-    local L = ns.L
-    local session, dayKey = ns.GetNewestSession()
-    if not session then
-        ns.Print(L["repair_prices_nosession"])
-        return
-    end
-    if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then
-        ns.Print(L["repair_prices_noah"])
-        return
-    end
-    local fixed, missing, skipped, gained = ns.RepairSessionAHPrices(session)
-    ns.Print(L["repair_prices_done"]:format(
-        dayKey, fixed, (gained < 0 and "-" or "+") .. ns.FormatGold(math.abs(gained)), missing, skipped))
-    if ns.RebuildHistory then ns.RebuildHistory() end
-end
-
--- Freezes the current Gear AH Threshold into every saved session and refreshes
--- their totals. Run via /nft repairthreshold (the registry repair does the same
--- once, with the threshold of whichever profile was active then).
-function ns.RepairGearThresholdSessions()
-    local sessions = NightsFarmtrackerAccountDB.sessions
-    local fixed = ns.RepairGearThresholdFreeze(sessions)
-    ns.RepairSessionTotals(sessions)
-    ns.Print(ns.L["repair_threshold_done"]:format(fixed))
-    if ns.RebuildHistory then ns.RebuildHistory() end
-end
-
 ------------------------------------------------------------------------
 -- Central one-time repair registry. Account-wide (NightsFarmtrackerAccountDB)
 -- and per-character (NightsFarmtrackerDB) repairs each run once, tracked by an
@@ -708,7 +586,7 @@ ns.ACCOUNT_REPAIRS = {
     { 13, "timestampsToDayKey", function() return ns.RepairSessionTimestampsToDayKey(NightsFarmtrackerAccountDB.sessions) end },
     -- Freezes the Gear AH Threshold (per item) into the saved AH values, with the
     -- threshold of the profile active at that login; SaveCurrentSession does the
-    -- same for every new session. /nft repairthreshold repeats it.
+    -- same for every new session.
     { 14, "gearThresholdFreeze", function() return ns.RepairGearThresholdFreeze(NightsFarmtrackerAccountDB.sessions) end },
 }
 

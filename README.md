@@ -133,8 +133,6 @@ A small frame below the main window with the resets in the last hour (x/9), the 
 | `/nft hud rotate` | Toggle minimap rotation of the HUD |
 | `/nft venom` | Show or hide the Venom Tracker (if enabled) |
 | `/nft bait` | Show or hide the Fishing Lure Bar (if enabled) |
-| `/nft repairprices` | Re-price the newest saved session with the current AH prices |
-| `/nft repairthreshold` | Apply the Gear AH Threshold (per item) to all saved sessions and refresh their totals |
 
 Debug commands for bug reports: `/nft debug` opens a live debug log window (copyable, no chat output). `/nft venomdump`, `/nft test`, `/nft itemdb`, `/nft monthdump [itemID]` and `/nft sessionsdump` write their output into the same window.
 

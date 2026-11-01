@@ -9,12 +9,16 @@
 ### Fixed
 
 - Gear AH Threshold: the threshold is checked per item, not against the whole stack. Two rings worth 799g each no longer count as AH-priced at a 1000g threshold (the stack of 2 reached it)
-- Sessions & History: gear below the Gear AH Threshold (per item) is saved at its vendor price, so History shows the values the list showed while farming instead of the plain AH values. Sessions saved earlier are corrected once on the next login with the threshold of the active profile; `/nft repairthreshold` does it again on demand
+- Sessions & History: gear below the Gear AH Threshold (per item) is saved at its vendor price, so History shows the values the list showed while farming instead of the plain AH values. Sessions saved earlier are corrected once on the next login with the threshold of the active profile
 - Item tooltips of gear in the item list and History: the Auctionator lines (vendor and auction price) are added from Auctionator's own helpers when its own call leaves them out (seen with gear shown through its item key)
+
+### Removed
+
+- `/nft repairprices` (re-priced the newest saved session with live AH prices): no command changes saved values anymore
 
 ### Internal
 
-- All repairs of saved sessions (timestamp fix, Gear AH Threshold freeze, `/nft repairprices`, `/nft repairthreshold`) live in `Core/Repairs.lua`; stale comments in the repair registry corrected
+- All repairs of saved sessions (timestamp fix, Gear AH Threshold freeze) live in `Core/Repairs.lua`; stale comments in the repair registry corrected
 
 ## 1.8.5
 
