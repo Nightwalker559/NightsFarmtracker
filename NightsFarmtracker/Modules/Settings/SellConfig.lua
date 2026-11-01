@@ -153,7 +153,7 @@ function ns.ToggleVendorSellConfig(owner)
 
     if not sellCfgPop then
         local pop = ns.CreateWindowFrame("NightsFarmtrackerSellConfigWnd", ns.L["vendor_sell_config"],
-            { width = S_W, pad = S_PAD, titleColor = ns.COL_ACCENT, dockChain = "left", noEsc = true })
+            { width = S_W, pad = S_PAD, dockChain = "left", noEsc = true })
         sellCfgPop = pop
         K.RegisterPopup(pop)
         ns.AddHLine(pop, "TOP", S_PAD, -(S_HDR_H - 1))

@@ -99,7 +99,7 @@ function ns.ToggleGearThresholdConfig()
 
     if not gearCfgPop then
         gearCfgPop = ns.CreateWindowFrame("NightsFarmtrackerGearThresholdWnd", ns.L["gear_ah_threshold_config_title"],
-            { width = S_W, pad = S_PAD, titleColor = ns.COL_ACCENT, dockChain = "left", noEsc = true })
+            { width = S_W, pad = S_PAD, dockChain = "left", noEsc = true })
         ns.GearThresholdFrame = gearCfgPop
         K.RegisterPopup(gearCfgPop)   -- closes with Settings and on every rebuild of its content
         ns.AddHLine(gearCfgPop, "TOP", S_PAD, -(S_HDR_H - 1))

@@ -43,7 +43,7 @@ function ns.ToggleHelpWindow()
     if ns.DeferInCombat(ns.ToggleHelpWindow) then return end
     if not HelpFrame then
         local W = 420
-        HelpFrame = ns.CreateWindowFrame("NightsFarmtrackerHelpWnd", ns.L["help_detail_title"], {width = W, titleColor = ns.COL_ACCENT})
+        HelpFrame = ns.CreateWindowFrame("NightsFarmtrackerHelpWnd", ns.L["help_detail_title"], {width = W})
         HelpFrame:SetPoint("CENTER")
         -- Above the main window, Venom Tracker and Lure Bar (all MEDIUM) which it can overlap.
         HelpFrame:SetFrameStrata("HIGH")

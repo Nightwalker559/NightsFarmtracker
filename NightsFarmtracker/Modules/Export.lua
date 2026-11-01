@@ -207,7 +207,7 @@ end
 local function EnsurePickFrame()
     if PickFrame then return end
     PickFrame = ns.CreateWindowFrame("NightsFarmtrackerExportPickWnd", ns.L["export_pick_title"],
-        {width = PICK_W, pad = ns.PAD, titleColor = ns.COL_ACCENT, dockChain = "left"})
+        {width = PICK_W, pad = ns.PAD, dockChain = "left"})
     ns.ExportPickFrame = PickFrame
 
     ns.AddHLine(PickFrame, "TOP", ns.PAD, -(ns.WINDOW_HDR_H - 1))

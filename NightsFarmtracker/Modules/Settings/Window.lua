@@ -268,7 +268,7 @@ local function EnsureSettingsFrame()
     if SF then return end
 
     SF = ns.CreateWindowFrame("NightsFarmtrackerSettingsWnd", ns.L["settings_title"],
-        {width = S_W + S_SIDEBAR_W, pad = S_PAD, titleColor = ns.COL_ACCENT, dockChain = "left"})
+        {width = S_W + S_SIDEBAR_W, pad = S_PAD, dockChain = "left"})
     SF:SetHeight(280)
     ns.SettingsFrame = SF  -- exposed so Session History can dock next to it in the left-side chain
     -- Closes the floating dropdown lists and the option windows whenever
