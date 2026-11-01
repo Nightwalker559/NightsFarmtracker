@@ -268,6 +268,16 @@ function ns.SaveCurrentSession()
         if forceVendor and variantsCopy then
             for _, gv in pairs(variantsCopy) do gv.ahTotal = 0; gv.ahAmount = 0 end
         end
+        -- The Gear AH Threshold is frozen the same way: a gear variant below it
+        -- is saved vendor-priced, so History shows what the list showed while
+        -- farming (per variant, as in ns.GearVariantItemValue).
+        if variantsCopy and ns.IsGear(data) then
+            for _, gv in pairs(variantsCopy) do
+                if (gv.ahTotal or 0) > 0 and ns.IsGearThresholdVendorOnly(data, gv.ahTotal, gv.amount) then
+                    gv.ahTotal = 0; gv.ahAmount = 0
+                end
+            end
+        end
         local ah
         if forceVendor then
             ah = nil
@@ -279,17 +289,20 @@ function ns.SaveCurrentSession()
             ah = any and sum or nil
         else
             ah = ns.AHTotal(data)
+            if ah and ns.IsGearThresholdVendorOnly(data, ah, data.amount) then ah = nil end
         end
         local val    = ns.ItemValue(data, vendor, ah) or 0
-        -- Item value as History shows it (same rule as BuildSessionCategories:
-        -- vendor-only items vendor, else max(AH, vendor); no Gear AH
-        -- Threshold) frozen per item, so merging sessions priced differently
-        -- (e.g. filters changed in between) adds up instead of re-pricing
-        -- the combined amount at one price.
+        -- Item value as History shows it, frozen per item, so merging sessions
+        -- priced differently (e.g. filters changed in between) adds up instead of
+        -- re-pricing the combined amount at one price. It is the value the list
+        -- showed while farming: vendor-only items vendor, below the Gear AH
+        -- Threshold vendor, else max(AH, vendor) - for scaling gear per variant
+        -- (the variants above were frozen the same way).
         local histAH = (not (forceVendor or data.isBoP or data.canAH == false))
             and ns.HasAnyAH() and db.ahSource ~= "none" and (ah or 0) > 0 and ah or nil
         local histVendor = (vendor or 0) > 0 and vendor or nil
         local histValue  = (histAH and histVendor) and math.max(histAH, histVendor) or histAH or histVendor or 0
+        if variantsCopy and ns.IsGear(data) then histValue = val end
         -- Which part of histValue came from the AH price (the whole item
         -- when AH wins, nothing otherwise) - shown in the Detail tooltip.
         local histAHWins = histAH ~= nil and (histVendor == nil or histAH >= histVendor)
@@ -349,8 +362,7 @@ end
 -- ns.ItemValue call saw it: vendor-only items at vendor price, gear per
 -- variant with the Gear AH Threshold (below it = vendor price), the rest
 -- max(AH, vendor). Same rules as ns.ItemValue, but on the frozen AH values
--- instead of live lookups. (The per-item histValue deliberately ignores
--- the threshold, see BuildSessionCategories - only session.totalGold uses it.)
+-- instead of live lookups; History's histValue is the same value.
 local function FrozenItemValue(d)
     local vendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
     if ns.IsVendorOnly(d) then
@@ -458,6 +470,48 @@ function ns.RepairSessionAHPrices(session)
     return fixed, missing, skipped, totalGold - oldTotal
 end
 
+-- Freezes the current Gear AH Threshold into saved sessions, the way
+-- SaveCurrentSession does now: a gear variant (or plain gear item) whose AH
+-- value per item is below it loses its AH value and counts at vendor price.
+-- No re-pricing, the other frozen AH values stay. The caller refreshes the
+-- session totals (ns.RepairSessionTotals). Returns how many items changed.
+function ns.RepairGearThresholdFreeze(sessions)
+    local fixed = 0
+    ns.ForEachSession(sessions, function(session)
+        for _, d in pairs(session.items or {}) do
+            if not ns.IsVendorOnly(d) and ns.IsGearThresholdApplicable(d) then
+                local changed = false
+                if d.variants then
+                    local n, v = 0, 0
+                    for _, gv in pairs(d.variants) do
+                        if (gv.ahTotal or 0) > 0 and ns.IsGearThresholdVendorOnly(d, gv.ahTotal, gv.amount) then
+                            gv.ahTotal, gv.ahAmount = 0, 0
+                            changed = true
+                        end
+                        n = n + (gv.ahAmount or 0)
+                        v = v + (gv.ahTotal or 0)
+                    end
+                    if changed then
+                        d.ahTotal = v > 0 and v or nil
+                        if d.ahAmount ~= nil then d.ahAmount = n end
+                        if d.ahValue  ~= nil then d.ahValue  = v end
+                    end
+                elseif (d.ahTotal or 0) > 0 and ns.IsGearThresholdVendorOnly(d, d.ahTotal, d.amount) then
+                    d.ahTotal = nil
+                    if d.ahAmount ~= nil then d.ahAmount = 0 end
+                    if d.ahValue  ~= nil then d.ahValue  = 0 end
+                    changed = true
+                end
+                if changed then
+                    if d.histValue ~= nil then d.histValue = FrozenItemValue(d) end
+                    fixed = fixed + 1
+                end
+            end
+        end
+    end)
+    return fixed
+end
+
 -- Most recently saved session = the first (newest) entry of the newest day
 -- key. ISO-format day keys ("YYYY-MM-DD") sort correctly as plain strings.
 -- Returns session, dayKey (nothing if there is no saved session).
@@ -486,6 +540,17 @@ function ns.RepairLastSessionPrices()
     local fixed, missing, skipped, gained = ns.RepairSessionAHPrices(session)
     ns.Print(L["repair_prices_done"]:format(
         dayKey, fixed, (gained < 0 and "-" or "+") .. ns.FormatGold(math.abs(gained)), missing, skipped))
+    if ns.RebuildHistory then ns.RebuildHistory() end
+end
+
+-- Freezes the current Gear AH Threshold into every saved session and refreshes
+-- their totals. Run via /nft repairthreshold (the registry repair does the same
+-- once, with the threshold of whichever profile was active then).
+function ns.RepairGearThresholdSessions()
+    local sessions = NightsFarmtrackerAccountDB.sessions
+    local fixed = ns.RepairGearThresholdFreeze(sessions)
+    ns.RepairSessionTotals(sessions)
+    ns.Print(ns.L["repair_threshold_done"]:format(fixed))
     if ns.RebuildHistory then ns.RebuildHistory() end
 end
 
@@ -669,11 +734,9 @@ local function BuildSessionCategories(session)
         end
 
         -- Category total: max(AH,Vendor) per item — vendor-only items (junk, BoP, forceVendor/category, canAH=false) always vendor only.
-        -- Note: the Gear AH Threshold setting is deliberately NOT applied here.
-        -- It's a live-session decision aid ("is this worth listing on the AH
-        -- right now") for the main frame only (see ItemHelper.lua/UI.lua) -
-        -- History is a record of what was actually tracked, so it always
-        -- shows the item's real AH/vendor value regardless of that setting.
+        -- The Gear AH Threshold is not applied here: SaveCurrentSession froze it
+        -- into the saved AH values (variants below it carry no AH value), so
+        -- History shows what the list showed while farming.
         local itemAH     = (not isVendorOnly) and hasAH and (ahTotal or 0) > 0 and ahTotal or nil
         local itemVendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
         local itemGold   = (itemAH and itemVendor) and math.max(itemAH, itemVendor) or itemAH or itemVendor or 0

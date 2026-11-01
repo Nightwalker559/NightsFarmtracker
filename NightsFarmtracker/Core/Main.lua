@@ -456,6 +456,7 @@ local SLASH_COMMANDS = {
     monthdump    = function(args) ns.DebugMonthDump(tonumber(args)) end,
     sessionsdump = function() ns.DebugSessionsDump() end,
     repairprices = function() ns.RepairLastSessionPrices() end,
+    repairthreshold = function() ns.RepairGearThresholdSessions() end,
 }
 
 SLASH_FARMTRACK1 = "/nft"
@@ -467,7 +468,7 @@ SlashCmdList["FARMTRACK"] = function(msg)
     elseif SLASH_COMMANDS[cmd] then
         SLASH_COMMANDS[cmd](args)
     else
-        ns.Print("/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump · /nft repairprices")
+        ns.Print("/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump · /nft repairprices · /nft repairthreshold")
     end
 end
 

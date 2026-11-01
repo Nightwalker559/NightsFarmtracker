@@ -489,6 +489,8 @@ ns.ACCOUNT_REPAIRS = {
     -- Re-run of #4 with the same field-name bug fixed.
     { 12, "gearVariantPricingV2", function() return ns.RepairGearVariantPricing(NightsFarmtrackerAccountDB.sessions) end },
     { 13, "timestampsToDayKey", function() return ns.RepairSessionTimestampsToDayKey(NightsFarmtrackerAccountDB.sessions) end },
+    -- Gear AH Threshold frozen into the saved AH values (new sessions get it at save time).
+    { 14, "gearThresholdFreeze", function() return ns.RepairGearThresholdFreeze(NightsFarmtrackerAccountDB.sessions) end },
 }
 
 -- Per-character repairs, applied directly to the LIVE (unsaved) session in
