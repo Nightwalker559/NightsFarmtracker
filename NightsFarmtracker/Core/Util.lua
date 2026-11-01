@@ -51,17 +51,46 @@ end
 
 -- Safety net for the SetHyperlink path: if Auctionator is loaded but its
 -- lines did not get added, add them ourselves (never twice).
-local function EnsureAuctionatorLines(link)
-    local A = Auctionator
-    if not (A and A.Tooltip and A.Tooltip.ShowTipWithPricing and A.Locales and A.Locales.Apply) then return end
-    local ok, label = pcall(A.Locales.Apply, "AUCTION")
-    if not ok or not label then return end
+local function HasAuctionatorLines()
+    local labels = {}
+    for _, key in ipairs({ "VENDOR", "AUCTION" }) do
+        local ok, label = pcall(Auctionator.Locales.Apply, key)
+        if ok and label then labels[#labels + 1] = label end
+    end
     for i = 2, GameTooltip:NumLines() do
         local fs = _G["GameTooltipTextLeft" .. i]
         local text = fs and fs:GetText()
-        if text and text:find(label, 1, true) == 1 then return end
+        if text then
+            for _, label in ipairs(labels) do
+                if text:find(label, 1, true) == 1 then return true end
+            end
+        end
     end
+    return false
+end
+
+local function EnsureAuctionatorLines(link)
+    local A = Auctionator
+    if not (A and A.Tooltip and A.Tooltip.ShowTipWithPricing and A.Locales and A.Locales.Apply) then return end
+    if HasAuctionatorLines() then return end
     A.Tooltip.ShowTipWithPricing(GameTooltip, link, 1)
+end
+
+-- Auctionator's own call can stay without lines (it waits for item data and
+-- skips a request while another one is pending), so the lines are built from its
+-- own helpers with the price of the exact link, as the list shows it.
+local function AddAuctionatorLinesDirect(link)
+    local A = Auctionator
+    if not (A and A.Tooltip and A.Tooltip.AddVendorTip and A.Tooltip.AddAuctionTip and A.Utilities
+            and A.Constants and A.Locales and A.Locales.Apply) or HasAuctionatorLines() then return end
+    local info = { C_Item.GetItemInfo(link) }
+    if #info == 0 then return end
+    if A.Utilities.IsVendorable(info) then
+        A.Tooltip.AddVendorTip(GameTooltip, info[A.Constants.ITEM_INFO.SELL_PRICE], "")
+    end
+    A.Tooltip.AddAuctionTip(GameTooltip, ns.GetAuctionatorPrice((C_Item.GetItemInfoInstant(link)), link),
+        "", A.Utilities.IsBound(info))
+    GameTooltip:Show()
 end
 
 -- A saved gear link can render with the item's base item level in a tooltip
@@ -89,7 +118,11 @@ end
 local ownLink, inOwnCall
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then
     TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tip)
-        if ownLink and not inOwnCall and tip == GameTooltip then EnsureAuctionatorLines(ownLink) end
+        if ownLink and not inOwnCall and tip == GameTooltip then
+            EnsureAuctionatorLines(ownLink)
+            local link = ownLink
+            RunNextFrame(function() if ownLink == link then AddAuctionatorLinesDirect(link) end end)
+        end
     end)
     GameTooltip:HookScript("OnHide", function() ownLink = nil end)
 end
@@ -116,6 +149,7 @@ function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID, itemLevel
         ShowGearTooltip(hyperlink, linkID, itemLevel)
         EnsureAuctionatorLines(hyperlink)
         inOwnCall, ownLink = false, hyperlink
+        RunNextFrame(function() if ownLink == hyperlink then AddAuctionatorLinesDirect(hyperlink) end end)
     else
         GameTooltip:SetItemByID(linkID or itemID)
     end
