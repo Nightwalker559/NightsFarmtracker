@@ -75,7 +75,7 @@ end
 ------------------------------------------------------------------------
 ns.WINDOW_CHAINS = {
     right = { "LogFrame", "FilterFrame", "GoalsFrame" },
-    left  = { "HistFrame", "SettingsFrame", "SellConfigFrame", "ExportPickFrame", "ExportFrame", "DebugFrame" },
+    left  = { "HistFrame", "SettingsFrame", "SellConfigFrame", "GearThresholdFrame", "ExportPickFrame", "ExportFrame", "DebugFrame" },
 }
 
 function ns.RefreshWindowChain(side)

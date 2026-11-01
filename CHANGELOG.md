@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.5
+
+### Changed
+
+- The category list of the Gear AH Threshold (gear icon next to the threshold field) is a window in the docking chain behind Settings and the Sell List options instead of floating over Settings
+- Internal: the Settings code is split into the folder `Modules\Settings` (shared widgets, one file per topic, the window itself); no change in behavior
+
 ## 1.8.4
 
 ### New
