@@ -8,6 +8,7 @@
 - Number fields (Item Goals amounts, number boxes in Settings) are right-aligned
 - Item Goals window: the hint of the empty list is no longer cut off
 - Window titles of all windows use the theme color (some already did); gold is kept for gold amounts and checked options
+- Settings: the color theme list shows Default and Custom first, then the presets alphabetically in the client language
 - Settings: the color theme list scrolls with the mouse wheel and is only as tall as the space below the dropdown, so the last themes are no longer cut off at the screen bottom
 - Filter window (all tabs) and Item Goals: item names use the whole row width instead of being cut after 20 characters
 - Settings: an open dropdown list (theme, profile, ...) closes when the page scrolls or you jump to another section in the sidebar, instead of floating away from its dropdown

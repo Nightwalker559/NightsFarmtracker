@@ -61,6 +61,20 @@ local function ThemeForKey(key)
     return ns.COLOR_THEMES[key] or ns.COLOR_THEMES.default
 end
 
+-- Default and Custom first, then the presets alphabetically by their name in
+-- the current client language.
+local function SortedThemeKeys()
+    local keys = {}
+    for _, key in ipairs(ns.COLOR_THEME_ORDER) do
+        if key ~= "default" and key ~= "custom" then keys[#keys + 1] = key end
+    end
+    local function name(key) return (ns.L[ns.COLOR_THEMES[key].labelKey] or ns.COLOR_THEMES[key].name):lower() end
+    table.sort(keys, function(a, b) return name(a) < name(b) end)
+    table.insert(keys, 1, "default")
+    table.insert(keys, 2, "custom")
+    return keys
+end
+
 local function MakeThemeDropdown(parent, yOff)
     local frame = MakeDropdownBox(parent, S_W - S_PAD*2 - 40)
     frame:SetPoint("TOPLEFT", S_PAD, yOff)
@@ -87,7 +101,7 @@ local function MakeThemeDropdown(parent, yOff)
     end
 
     list.rows = {}
-    for i, key in ipairs(ns.COLOR_THEME_ORDER) do
+    for i, key in ipairs(SortedThemeKeys()) do
         local theme = ns.COLOR_THEMES[key]
         local row = CreateFrame("Button", nil, content)
         row:SetSize(listW, THEME_ROW_H)
