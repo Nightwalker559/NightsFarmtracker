@@ -4,18 +4,17 @@
 
 ### New
 
-- Sell List: a dropdown under "Keep Warband items" (several tracks can be ticked, the list stays open) sells Warband gear anyway by upgrade track (Explorer, Adventurer, Veteran, Champion, Hero, Myth), e.g. tick "Adventurer" and Warband gear of that track is offered at the vendor while all other Warband items stay in the bags. The tracks are matched by the name the game shows (client language or English); gear without a track stays. Greyed out while "Keep Warband items" or the Sell List is off
-- Delete List: items that can be neither sold nor auctioned (e.g. Warband-bound potions) go on a new third tab of the Filter window ("Delete", drop items there like on the other tabs; items only, no categories). At a vendor the Sell List shows them below the sale items with a "Delete" tag and gets a second button "Delete: <item> (n)" above the Sell button that deletes the next item with its whole stack for good. The game allows one deletion per click, so it is one click per item; nothing is deleted without a click on the button. Can be switched off in Settings, Filters ("Enable Delete List")
+- Sell List: a dropdown under "Keep Warband items" sells Warband gear of the ticked upgrade tracks (Explorer, Adventurer, Veteran, Champion, Hero, Myth); all other Warband items and gear without a track stay in the bags. Greyed out while "Keep Warband items" or the Sell List is off
+- Delete List: a third tab in the Filter window for items that can be neither sold nor auctioned (e.g. Warband-bound potions; items only, no categories). At a vendor the Sell List shows them with a "Delete" tag and a second button "Delete: <item> (n)" that deletes the next item with its whole stack, one click per item, never without a click. Can be switched off in Settings, Filters
 
 ### Changed
 
-- Sell List options (Keep Warband items, upgrade tracks, protection) moved out of the Settings page into their own window behind a gear icon next to "Show the sell list at vendors" and in the Sell List window (docked next to Settings, or below/above it when the screen has no room; at the vendor next to the Sell List window); they follow the active profile (the upgrade tracks are a profile setting and are copied with it)
-- Filter window: the Vendor-Only Filter and the Blacklist are one window with a tab each instead of two windows. Left-click on the Filter button opens the Vendor-Only tab, right-click the Blacklist tab, a click on a tab switches; items dropped on the window go into the shown tab, and a tab whose feature is switched off in Settings is not shown. The last used tab is remembered (`/nft filter` opens it). The window is built so another list can be added as a further tab
+- Sell List options (Keep Warband items, upgrade tracks, protection) moved into their own window behind a gear icon in Settings and in the Sell List window; they follow the active profile
+- The Vendor-Only Filter and the Blacklist are one Filter window with a tab each. Left-click on the Filter button opens the Vendor-Only tab, right-click the Blacklist tab; dropped items go into the shown tab, a tab whose feature is off is not shown, the last tab is remembered (`/nft filter`). The window has the same height in every tab
+- The Filter button tooltip reads "Filter" and shows the click hints only while both lists are on; the info window, `/nft filter` and Reset all mention the Delete List
+- All docked windows keep the same distance (2 px), the Venom Tracker above the Lure Bar included
 - Marked as compatible with game patch 12.1.7
-- The Filter window has the same height in every tab (the maximum window height, the list scrolls inside), so its title and tab labels stay where they are when the tab changes
-- All windows keep the same distance (2 px) when docked next to or below each other; before it was 1, 2 or 4 px depending on the window (the Venom Tracker above the Lure Bar included)
-- The tooltip of the Filter button reads "Filter" and only shows the left-/right-click hints while the Vendor-Only Filter and the Blacklist are both on (it named a single list before, which was wrong once the Delete List is on); the info window, `/nft filter` and the Reset all text mention the Delete List
-- Internal: the four bag scans (price update, gear variant repair, Sell List) share one helper, Session History, Settings and the copy text windows join their docking chain through the window option instead of their own hide scripts, and unused text keys and a stale CHANGELOG copy in the addon folder are gone
+- Internal: one shared helper for the bag scans, Session History, Settings and the copy text windows join the docking chain through the window option, unused text keys are gone
 
 ## 1.8.3
 
