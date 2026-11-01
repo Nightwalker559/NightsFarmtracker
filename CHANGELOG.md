@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Session detail window: the tooltip of a gear row shows the item level saved with the drop (a link the game rendered as the base level 133 now reads 253); the stats below it are still the game's
+- Session detail window: the tooltip of a gear row shows the item level saved with the drop and its stats (like the Auction House does) instead of the base level 133 the game rendered for the saved link
 - Number fields (Item Goals amounts, number boxes in Settings) are right-aligned
 - Item Goals window: the hint of the empty list is no longer cut off
 - Settings: an open dropdown list (theme, profile, ...) closes when the page scrolls or you jump to another section in the sidebar, instead of floating away from its dropdown
