@@ -2,6 +2,10 @@
 
 ## 1.8.5
 
+### Fixed
+
+- Settings: an open dropdown list (theme, profile, ...) closes when the page scrolls or you jump to another section in the sidebar, instead of floating away from its dropdown
+
 ### Changed
 
 - The category list of the Gear AH Threshold (gear icon next to the threshold field) is a window in the docking chain behind Settings and the Sell List options instead of floating over Settings

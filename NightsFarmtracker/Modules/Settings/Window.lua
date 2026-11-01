@@ -77,6 +77,7 @@ local function RebuildSidebar(jumpTargets)
         row:SetHeight(math.max(16, row.txt:GetStringHeight()))
         row:EnableMouse(true)
         row:SetScript("OnClick", function()
+            K.CloseLists()
             local maxS = math.max(0, SListFrame:GetHeight() - SScrollFrame:GetHeight())
             SScrollFrame:SetVerticalScroll(math.max(0, math.min(target.y, maxS)))
         end)
@@ -293,6 +294,7 @@ local function EnsureSettingsFrame()
 
     -- Scroll container — right of the sidebar, below header sep
     SScrollFrame, SListFrame, contentWheel = ns.CreateScrollList(SF, S_W, S_SCROLL_STEP)
+    SScrollFrame:HookScript("OnVerticalScroll", K.CloseLists)   -- wheel, sidebar jump: an open list would float away from its dropdown
     SScrollFrame:SetPoint("TOPLEFT",  S_SIDEBAR_W, -S_HDR_H)
     SScrollFrame:SetPoint("TOPRIGHT", 0, -S_HDR_H)
 

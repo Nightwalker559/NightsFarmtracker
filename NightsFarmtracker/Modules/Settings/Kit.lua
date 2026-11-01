@@ -146,7 +146,7 @@ end
 -- Popup lists and the option windows (Sell List, Gear AH threshold) are frames
 -- of their own (not children of Settings), so CloseMenus has to hide them
 -- explicitly.
-local popups = {}
+local popups, lists = {}, {}
 local function RegisterPopup(frame) popups[#popups + 1] = frame end
 
 -- Popup list shown under a dropdown; its own frame on UIParent so it can
@@ -160,6 +160,7 @@ local function MakePopupList()
     ns.StyleBackdropBox(list, {0.05,0.08,0.09,1})
     list:Hide()
     RegisterPopup(list)
+    lists[#lists + 1] = list
     return list
 end
 
@@ -176,6 +177,12 @@ end
 
 local function CloseMenus()
     for _, frame in ipairs(popups) do frame:Hide() end
+end
+
+-- Only the dropdown lists: they hang off their dropdown, so they must close
+-- before the page scrolls it away.
+local function CloseLists()
+    for _, list in ipairs(lists) do list:Hide() end
 end
 
 ------------------------------------------------------------------------
@@ -304,7 +311,8 @@ K.TITLE_STEP, K.TITLE_STEP_CTRL = TITLE_STEP, TITLE_STEP_CTRL
 K.radioPool, K.checkboxPool = radioPool, checkboxPool
 K.sectionLabelPool, K.hintLabelPool, K.wrappedHintPool = sectionLabelPool, hintLabelPool, wrappedHintPool
 K.ConfigureRadio, K.ConfigureCheckbox = ConfigureRadio, ConfigureCheckbox
-K.MenuTextColor, K.FillMenu, K.ToggleMenu, K.CloseMenus = MenuTextColor, FillMenu, ToggleMenu, CloseMenus
+K.MenuTextColor, K.FillMenu, K.ToggleMenu = MenuTextColor, FillMenu, ToggleMenu
+K.CloseMenus, K.CloseLists = CloseMenus, CloseLists
 K.MakeDropdownBox, K.MakePopupList, K.RegisterPopup = MakeDropdownBox, MakePopupList, RegisterPopup
 K.MakeNumberBox = MakeNumberBox
 
