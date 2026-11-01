@@ -6,6 +6,11 @@
 
 - Sell List: the Delete button deletes all listed Delete List items with one click instead of one per click; it shows the number of items, not the name of the first one
 
+### Fixed
+
+- Gear AH Threshold: the threshold is checked per item, not against the whole stack. Two rings worth 799g each no longer count as AH-priced at a 1000g threshold (the stack of 2 reached it)
+- Item tooltips of gear in the item list and History: the Auctionator lines (vendor and auction price) are put back when the game rebuilds the tooltip
+
 ## 1.8.5
 
 ### Fixed

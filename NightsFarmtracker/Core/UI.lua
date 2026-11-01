@@ -893,7 +893,7 @@ local function AddGearEntries(flat, item, hasAH)
             -- Decided per variant, not from the item's combined AH total: one
             -- variant crossing the Gear AH Threshold must not force AH pricing
             -- onto a cheaper sibling below it.
-            local vfv   = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, tAH)
+            local vfv   = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, tAH, gv.amount)
             local tGold = vfv and (tV or 0) or math.max(tAH or 0, tV or 0)
             if tGold > 0 then
                 flat[#flat + 1] = {
@@ -910,7 +910,7 @@ local function BuildFlatList(cat, hasAH, qAtlas)
     local flat = {}
     for _, item in ipairs(cat.items) do
         local d = item.data
-        local fv = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, item.ah)
+        local fv = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, item.ah, d.amount)
         if d.variants and not ns.IsGear(d) then
             AddTierEntries(flat, item, fv, qAtlas)
         elseif d.variants then

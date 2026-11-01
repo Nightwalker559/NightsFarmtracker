@@ -81,6 +81,19 @@ local function ShownItemLevel()
     end
 end
 
+-- The item-key tooltip (ShowGearTooltip) is filled in again once the game has
+-- its data, which wipes lines added in the meantime. ownLink is the link of our
+-- tooltip while it is shown; the post-call puts the Auctionator lines back after
+-- such a refresh (not during our own call, ShowItemTooltipNoCompare adds them
+-- itself then).
+local ownLink, inOwnCall
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then
+    TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tip)
+        if ownLink and not inOwnCall and tip == GameTooltip then EnsureAuctionatorLines(ownLink) end
+    end)
+    GameTooltip:HookScript("OnHide", function() ownLink = nil end)
+end
+
 local function ShowGearTooltip(hyperlink, itemID, itemLevel)
     GameTooltip:SetHyperlink(hyperlink)
     local shown = ShownItemLevel()
@@ -97,9 +110,12 @@ function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID, itemLevel
         local id, _, _, _, _, cls = C_Item.GetItemInfoInstant(hyperlink)
         linkID, classID = id, cls
     end
+    ownLink = nil
     if hyperlink and (not linkID or TooltipNeedsLink(linkID, classID)) then
+        inOwnCall = true
         ShowGearTooltip(hyperlink, linkID, itemLevel)
         EnsureAuctionatorLines(hyperlink)
+        inOwnCall, ownLink = false, hyperlink
     else
         GameTooltip:SetItemByID(linkID or itemID)
     end

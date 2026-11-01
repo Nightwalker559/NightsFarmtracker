@@ -362,12 +362,12 @@ local function FrozenItemValue(d)
             local sp = ns.VariantSellPrice(gv, d)
             local v  = (sp and sp > 0 and gv.amount) and sp * gv.amount or nil
             local a  = (gv.ahTotal or 0) > 0 and gv.ahTotal or nil
-            total = total + (ns.PickValue(d, v, a) or 0)
+            total = total + (ns.PickValue(d, v, a, gv.amount) or 0)
         end
         return total
     end
     local a = (d.ahTotal or 0) > 0 and d.ahTotal or nil
-    return ns.PickValue(d, vendor, a) or 0
+    return ns.PickValue(d, vendor, a, d.amount) or 0
 end
 
 ------------------------------------------------------------------------
@@ -398,7 +398,7 @@ function ns.RepairSessionAHPrices(session)
                             local total = ap and ap * gv.amount or (gv.ahTotal or 0)
                             -- Gear AH Threshold: a variant below it is vendor-priced
                             -- (frozen like a Vendor-Only item), per variant as in ns.GearVariantItemValue
-                            if gear and total > 0 and ns.IsGearThresholdVendorOnly(d, total) then
+                            if gear and total > 0 and ns.IsGearThresholdVendorOnly(d, total, gv.amount) then
                                 total, cut = 0, true
                             end
                             if total ~= (gv.ahTotal or 0) then changed = true end
@@ -414,7 +414,7 @@ function ns.RepairSessionAHPrices(session)
                 else
                     local ap = ns.GetAHPriceForID(d.itemID, d.itemLink)
                     newAH = ap and ap * d.amount or oldAH
-                    if gear and newAH > 0 and ns.IsGearThresholdVendorOnly(d, newAH) then
+                    if gear and newAH > 0 and ns.IsGearThresholdVendorOnly(d, newAH, d.amount) then
                         newAH, cut = 0, true
                     end
                 end

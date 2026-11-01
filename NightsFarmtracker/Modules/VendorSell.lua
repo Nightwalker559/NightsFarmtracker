@@ -60,7 +60,7 @@ local function IsVendorGood(data, count)
     if not ns.IsGearClass(data.classID) then return false end
     if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then return false end
     local ahPrice = ns.GetAHPriceForID(data.itemID, data.itemLink)
-    return ns.IsGearThresholdVendorOnly(data, ahPrice and ahPrice * count)
+    return ns.IsGearThresholdVendorOnly(data, ahPrice and ahPrice * count, count)
 end
 
 -- Bound to the Warband, or until equipped (older clients report the latter as
