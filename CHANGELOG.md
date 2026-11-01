@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.6
+
+### Changed
+
+- Sell List: the Delete button deletes all listed Delete List items with one click instead of one per click; it shows the number of items, not the name of the first one
+
 ## 1.8.5
 
 ### Fixed

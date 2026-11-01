@@ -62,7 +62,7 @@ Every item is valued at the higher of its AH and vendor price. Vendor-only items
 
 - **Vendor-Only Filter:** drop items from your bags onto it, or tick whole categories, to value them at vendor price. Account-wide.
 - **Blacklist:** items and categories on it are never tracked. Account-wide, and it wins over everything else.
-- **Delete List:** items that can be neither sold nor auctioned (e.g. Warband-bound potions). At a vendor the Sell List offers them for deletion, one item per click. Items only, no categories. Account-wide.
+- **Delete List:** items that can be neither sold nor auctioned (e.g. Warband-bound potions). At a vendor the Sell List offers them for deletion, all of them with one click. Items only, no categories. Account-wide.
 - The three lists are the tabs of one Filter window. They group their items by expansion, can be cleared per expansion or completely, and can each be switched off in the settings (a tab whose list is off is not shown).
 - **Sell List:** at a vendor, a window next to the merchant window lists the bag items the Vendor-Only Filter and the Gear AH Threshold mark as vendor goods (most gold first) and sells them with one button. Equipment-set items and Warband items are left out (the latter can be switched off, or limited to the upgrade tracks you tick), and a protection limits one click to 12 items, the size of the vendor's buyback list. Options: the gear icon in the Sell List window or in Settings, Windows & Buttons.
 - **Ctrl+left-click** an item adds it to the Vendor-Only Filter, **Ctrl+right-click** blacklists it, **Shift+right-click** stops tracking it. On a category header, Shift+right-click excludes the whole category.

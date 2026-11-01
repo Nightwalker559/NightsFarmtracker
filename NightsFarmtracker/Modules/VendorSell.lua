@@ -8,8 +8,7 @@
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
 -- ticked there. The options live in a window (ns.ToggleVendorSellConfig, Settings\SellConfig.lua)
 -- that the gear icon of this window and the one in Settings open. Below the sale
--- list come the bag items of the Delete List, deleted by a second button: one
--- item per click, the game allows no more per click.
+-- list come the bag items of the Delete List, all deleted by a second button.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -239,26 +238,28 @@ local function SellClick()
 end
 
 ------------------------------------------------------------------------
--- Deleting: the next Delete List item per click. DeleteCursorItem needs a
--- hardware event and takes one item per event, so there is no queue; the cursor
--- is cleared again should the game refuse, so no item stays "in the hand".
+-- Deleting: one click deletes every Delete List item in the list. DeleteCursorItem
+-- needs a hardware event, so it all happens inside the click handler, each item
+-- checked against its slot first. Should the game refuse, the cursor is cleared
+-- again (no item stays "in the hand") and the run stops; the next click goes on.
 ------------------------------------------------------------------------
 local function UpdateDeleteButton()
     local btn = frame.deleteBtn
     btn:SetShown(#trash > 0)
     if #trash > 0 then
-        btn.lbl:SetText(string.format(ns.L["vendor_sell_delete_btn"], ns.TruncateName(trash[1].name), #trash))
+        btn.lbl:SetText(string.format(ns.L["vendor_sell_delete_btn"], #trash))
     end
 end
 
 local function DeleteClick()
-    local e = trash[1]
-    if not e or not MerchantFrame:IsShown() or CursorHasItem() then return end
-    local info = C_Container.GetContainerItemInfo(e.bag, e.slot)
-    if info and info.itemID == e.itemID and not info.isLocked then
-        C_Container.PickupContainerItem(e.bag, e.slot)
-        DeleteCursorItem()
-        if CursorHasItem() then ClearCursor() end
+    if not MerchantFrame:IsShown() or CursorHasItem() then return end
+    for _, e in ipairs(trash) do
+        local info = C_Container.GetContainerItemInfo(e.bag, e.slot)
+        if info and info.itemID == e.itemID and not info.isLocked then
+            C_Container.PickupContainerItem(e.bag, e.slot)
+            DeleteCursorItem()
+            if CursorHasItem() then ClearCursor(); return end   -- refused: the next one would be too
+        end
     end
 end
 
