@@ -5,6 +5,7 @@
 ### Changed
 
 - Sell List: the Delete button deletes all listed Delete List items with one click instead of one per click; it shows the number of items, not the name of the first one
+- Sessions tab: a header row on top shows the running month with its total (items plus looted gold) and play time, in the look of the History tab's month rows; hovering it shows items, looted gold, total and the average per day, a click opens the month summary
 
 ### Fixed
 

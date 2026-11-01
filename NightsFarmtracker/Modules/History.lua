@@ -138,7 +138,7 @@ local monthPool = ns.NewPool(function(parent)
     return r
 end, function(r)
     r:SetScript("OnMouseUp",nil)
-    r.delBtn:SetScript("OnClick",nil)
+    r.delBtn:SetScript("OnClick",nil); r.delBtn:Show()
     r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
 end)
 
@@ -450,6 +450,26 @@ local function AveragePerDay(gold, days)
     return math.floor(gold / days)
 end
 
+-- Tooltip of a month row: items, looted gold, total and the average per day.
+-- withHint adds the click hint of the History tab's month rows above.
+local function ShowMonthTooltip(row, month, mKey, combined, withHint)
+    GameTooltip:SetOwner(row,"ANCHOR_TOP")
+    if withHint then
+        GameTooltip:AddLine(ns.L["month_summary_tooltip"])
+        GameTooltip:AddLine(" ")
+    end
+    if combined>0 then
+        GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(month.totalGold or 0), 0.75,0.75,0.75, 1,1,1)
+        GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(month.lootedGold or 0), 0.75,0.75,0.75, 1,1,1)
+        GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(combined), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+        local avg = AveragePerDay(combined, MonthDays(mKey, month.isCurrent))
+        if avg then
+            GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+        end
+    end
+    if withHint or combined>0 then GameTooltip:Show() end
+end
+
 -- Day header (with the Merge button) and session rows of one day; returns the
 -- new y offset. Shared by the Sessions tab and the expanded months of the
 -- History tab.
@@ -591,6 +611,28 @@ function ns.RebuildHistory()
         local month=currentMonth
         nShown=nCurrent
         if month then
+            -- month total on top, in the look of the History tab's month rows (a click opens the month)
+            local mrow=monthPool.acquire(HListFrame); mrow:SetSize(ns.CONTENT_W, MONTH_H); mrow:SetPoint("TOPLEFT",0,-yOffset)
+            flow.header(mrow)
+            ns.SetHeaderArrow(mrow, false); mrow.headerArrow:Hide()
+            mrow.delBtn:Hide()
+            mrow.nameText:ClearAllPoints(); mrow.nameText:SetPoint("LEFT",4,0)
+            mrow.nameText:SetText(month.label)
+            mrow.infoText:SetText(month.duration>0 and ns.FormatTime(month.duration) or "")
+            local monthCombined = (month.totalGold or 0) + (month.lootedGold or 0)
+            mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
+            mrow:SetScript("OnEnter",function(self)
+                self.nameText:SetTextColor(1,1,1)
+                ShowMonthTooltip(self, month, currentMonthKey, monthCombined, false)
+            end)
+            mrow:SetScript("OnMouseUp",function()
+                if DetailFrame and DetailFrame:IsShown() and currentDetailSession and currentDetailSession.monthKey == currentMonthKey then
+                    ns.HideOutOfCombat(DetailFrame)
+                else
+                    ShowDetail(BuildMonthAggregate(currentMonthKey, month))
+                end
+            end)
+            activeMonthRows[#activeMonthRows+1]=mrow; yOffset=yOffset+MONTH_H
             for _,dStr in ipairs(month.dayList) do
                 yOffset=AddDayRows(days[dStr], dStr, month, flow, yOffset)
             end
@@ -618,21 +660,7 @@ function ns.RebuildHistory()
             mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
             mrow:SetScript("OnEnter",function(self)
                 self.nameText:SetTextColor(1,1,1)
-                GameTooltip:SetOwner(self,"ANCHOR_TOP")
-                if not flat then
-                    GameTooltip:AddLine(ns.L["month_summary_tooltip"])
-                    GameTooltip:AddLine(" ")
-                end
-                if monthCombined>0 then
-                    GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(month.totalGold or 0), 0.75,0.75,0.75, 1,1,1)
-                    GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(month.lootedGold or 0), 0.75,0.75,0.75, 1,1,1)
-                    GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(monthCombined), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
-                    local avg = AveragePerDay(monthCombined, MonthDays(mKey, month.isCurrent))
-                    if avg then
-                        GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
-                    end
-                end
-                if not flat or monthCombined>0 then GameTooltip:Show() end
+                ShowMonthTooltip(self, month, mKey, monthCombined, not flat)
             end)
             mrow:SetScript("OnMouseUp",function(self)
                 if self.delBtn:IsMouseOver() then return end
