@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Item Goals window: the hint of the empty list is no longer cut off
 - Settings: an open dropdown list (theme, profile, ...) closes when the page scrolls or you jump to another section in the sidebar, instead of floating away from its dropdown
 
 ### Changed

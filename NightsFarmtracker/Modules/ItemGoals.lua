@@ -97,7 +97,8 @@ function ns.RebuildGoalsList()
     ns.FitScrollWindow({
         window = frame, scroll = scrollFrame, list = listFrame,
         hdrH = hdrH, ftrH = FTR_H + (inactive and NOTE_H or 0),
-        contentH = yOff + (#list == 0 and MIN_VIS_H or 0),
+        -- empty: room for the wrapped hint below the drop zone (14 px gap, 8 px air)
+        contentH = yOff + (#list == 0 and math.max(MIN_VIS_H, 14 + math.ceil(frame.emptyLabel:GetStringHeight()) + 8) or 0),
     })
 
     frame.emptyLabel:ClearAllPoints()
