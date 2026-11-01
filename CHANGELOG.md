@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.8.4
+
+### New
+
+- Sell List: a dropdown under "Keep Warband items" sells Warband gear of the ticked upgrade tracks (Explorer, Adventurer, Veteran, Champion, Hero, Myth); all other Warband items and gear without a track stay in the bags. Greyed out while "Keep Warband items" or the Sell List is off
+- Delete List: a third tab in the Filter window for items that can be neither sold nor auctioned (e.g. Warband-bound potions; items only, no categories). At a vendor the Sell List shows them with a "Delete" tag and a second button "Delete: <item> (n)" that deletes the next item with its whole stack, one click per item, never without a click. Can be switched off in Settings, Filters
+
+### Changed
+
+- Sell List options (Keep Warband items, upgrade tracks, protection) moved into their own window behind a gear icon in Settings and in the Sell List window; they follow the active profile
+- The Vendor-Only Filter and the Blacklist are one Filter window with a tab each. Left-click on the Filter button opens the Vendor-Only tab, right-click the Blacklist tab; dropped items go into the shown tab, a tab whose feature is off is not shown, the last tab is remembered (`/nft filter`). The window has the same height in every tab
+- The Filter button tooltip reads "Filter" and shows the click hints only while both lists are on; the info window, `/nft filter` and Reset all mention the Delete List
+- All docked windows keep the same distance (2 px), the Venom Tracker above the Lure Bar included
+- Marked as compatible with game patch 12.1.7
+- Internal: one shared helper for the bag scans, Session History, Settings and the copy text windows join the docking chain through the window option, unused text keys are gone
+
 ## 1.8.3
 
 ### New
@@ -20,7 +36,7 @@
 ### Changed
 
 - Session length and Item goals each have a checkbox now (Settings, Session Limit); only one of the two can be active at a time, and the other keeps its values instead of having to be cleared. Existing settings are carried over
-- Settings reorganized: Session length and Item goals moved out of Display into a new Session Limit section; the window height, lock, minimap and addon-menu buttons, Loot Log and Instance Lockout options moved into a new Windows & Buttons section. Display keeps the gold rate, gold format, price source and value bar
+- Settings reorganized: Session length and Item goals moved out of Display into a new Session Limit section; the window height, lock, minimap and addon-menu buttons, Loot Log and Instance Lockout options moved into a new Windows & Buttons section. Display keeps the gold rate, gold format, price source and value bar
 - 4 px (was 10) between a window's border and its content on the sides, in the main window and the list windows; the lists are 12 px wider
 - The value bar starts where the item name starts (4 px right of the icon, was 1 px)
 - Internal cleanup: shared helpers for scroll lists, number boxes, checkbox boxes and the drop zone, and several small fixes (recent-loot memory, Venom Tracker slot lookup, session storage)

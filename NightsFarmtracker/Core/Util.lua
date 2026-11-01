@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Util
--- Debug log hook, chat output, item tooltips and bag drag-and-drop helpers,
--- and the time / gold / item-name formatting used by every window.
+-- Debug log hook, chat output, item tooltips, bag drag-and-drop and bag scan
+-- helpers, and the time / gold / item-name formatting used by every window.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -124,6 +124,20 @@ end
 function ns.EnableItemDrop(frame, onDrop)
     frame:SetScript("OnReceiveDrag", onDrop)
     frame:SetScript("OnMouseUp", function(_, btn) if btn == "LeftButton" then onDrop() end end)
+end
+
+------------------------------------------------------------------------
+-- Bags
+------------------------------------------------------------------------
+-- Calls fn(bag, slot, info) for every occupied slot, backpack to reagent bag
+-- (info = C_Container.GetContainerItemInfo).
+function ns.ForEachBagItem(fn)
+    for bag = 0, ns.LAST_BAG do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local info = C_Container.GetContainerItemInfo(bag, slot)
+            if info then fn(bag, slot, info) end
+        end
+    end
 end
 
 ------------------------------------------------------------------------

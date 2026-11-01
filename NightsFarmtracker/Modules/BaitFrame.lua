@@ -204,10 +204,10 @@ local function ApplyBaitPosition()
     local top, right = main:GetTop(), main:GetRight()
     if top and right then
         local s = main:GetEffectiveScale() / BaitFrame:GetEffectiveScale()
-        BaitFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", right * s, top * s + 1)
+        BaitFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", right * s, top * s + ns.WINDOW_GAP)
         syncedTop, syncedRight = top, right
     else
-        BaitFrame:SetPoint("BOTTOMRIGHT", main, "TOPRIGHT", 0, 1)
+        BaitFrame:SetPoint("BOTTOMRIGHT", main, "TOPRIGHT", 0, ns.WINDOW_GAP)
         baitAnchoredToMain = true
         syncedTop, syncedRight = nil, nil
     end

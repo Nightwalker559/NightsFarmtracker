@@ -72,7 +72,7 @@ ns.MainFrame = MainFrame
 
 ------------------------------------------------------------------------
 -- Button bar — always visible
--- Left:  [▶] [↺] [history/log] [filter/blacklist]
+-- Left:  [▶] [↺] [history/log] [filter]
 -- Right: [⚙] [?] [▼/▲] [✕]
 ------------------------------------------------------------------------
 local BtnBar = CreateFrame("Frame", nil, MainFrame)
@@ -199,7 +199,7 @@ ScrollFrame:Hide()
 ------------------------------------------------------------------------
 local GoldFrame = CreateFrame("Frame","NightsFarmtrackerGoldFrame",UIParent,"BackdropTemplate")
 GoldFrame:SetWidth(FRAME_W)
-GoldFrame:SetPoint("TOPLEFT", MainFrame, "BOTTOMLEFT", 0, -2)
+GoldFrame:SetPoint("TOPLEFT", MainFrame, "BOTTOMLEFT", 0, -ns.WINDOW_GAP)
 GoldFrame:SetFrameStrata("MEDIUM")
 GoldFrame:SetClampedToScreen(true)
 ns.ApplyFrameStyle(GoldFrame)
@@ -266,11 +266,11 @@ function ns.KeepStackOnScreen()
     if not bottom or not MainFrame:IsShown() then return end
     if InCombatLockdown() and ns.BaitDependsOnMainFrame and ns.BaitDependsOnMainFrame() then return end
     local below = 0
-    if GoldFrame:IsShown() then below = below + GoldFrame:GetHeight() + 2 end
+    if GoldFrame:IsShown() then below = below + GoldFrame:GetHeight() + ns.WINDOW_GAP end
     local lockout = ns.LockoutFrame
-    if lockout and lockout:IsShown() then below = below + lockout:GetHeight() + 2 end
+    if lockout and lockout:IsShown() then below = below + lockout:GetHeight() + ns.WINDOW_GAP end
     local log = ns.LogFrame   -- docked below the stack while the main window is collapsed
-    if log and log:IsShown() and NightsFarmtrackerDB.expanded == false then below = below + ns.STACK_GAP + log:GetHeight() end
+    if log and log:IsShown() and NightsFarmtrackerDB.expanded == false then below = below + ns.WINDOW_GAP + log:GetHeight() end
     local missing = below - bottom
     if missing <= 0 then return end
     local x, y = ns.AnchorToTop(MainFrame)
@@ -290,7 +290,7 @@ end
 
 -- Closing the main window closes every popout that docks off it, so the
 -- user doesn't end up with orphaned windows floating on screen.
-local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "BlacklistFrame", "GoalsFrame",
+local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "GoalsFrame",
                          "HistFrame", "DetailFrame", "VenomFrame" }
 
 MainFrame:HookScript("OnHide", function()
@@ -472,7 +472,7 @@ end
 ------------------------------------------------------------------------
 -- Ctrl+Left-click: item -> Vendor-Only Filter, Ctrl+Right-click -> Blacklist.
 -- Name/icon/quality come from the session data (db.count) so the entry
--- looks right in the Filter/Blacklist windows without an item-info lookup.
+-- looks right in the Filter window without an item-info lookup.
 ------------------------------------------------------------------------
 local function AddItemToList(itemID, itemName, toBlacklist)
     local d = NightsFarmtrackerDB.count[itemID]
@@ -480,15 +480,14 @@ local function AddItemToList(itemID, itemName, toBlacklist)
     if toBlacklist then
         ns.AddBlacklist(itemID, name, icon, quality)
         ns.Print(ns.L["msg_added_blacklist"]:format(name))
-        ns.RebuildBlacklistList()
     elseif ns.IsForceVendor(itemID) then
         ns.Print(ns.L["msg_already_vendor"]:format(name))
         return
     else
         ns.AddForceVendor(itemID, name, icon, quality)
         ns.Print(ns.L["msg_added_vendor"]:format(name))
-        ns.RebuildFilterList()
     end
+    ns.RebuildFilterList()
     ns.RefreshHUD()  -- also drops a just-blacklisted item from the live count
 end
 
@@ -1043,9 +1042,7 @@ local function BuildHUD()
     UpdateFooterLine()
     UpdateSummary(grandTotal)
 
-    if ns.FilterFrame and ns.FilterFrame:IsShown() then
-        ns.RebuildFilterList()
-    end
+    if ns.RebuildFilterList then ns.RebuildFilterList() end
 end
 
 local refreshQueued = false
@@ -1210,24 +1207,14 @@ end)
 -- Left-click: Vendor-Only Filter · Right-click: Blacklist
 btnFilter:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 btnFilter:SetScript("OnClick", function(_, button)
-    if button == "RightButton" then
-        if NightsFarmtrackerDB.blacklistEnabled ~= false then ns.ToggleBlacklistWindow() end
-    else
-        if NightsFarmtrackerDB.vendorFilterEnabled ~= false then ns.ToggleFilterWindow() end
-    end
+    ns.ToggleFilterWindow(button == "RightButton" and "blacklist" or "vendor")
 end)
 SetBtnTooltip(btnFilter, "ANCHOR_RIGHT", function(tip)
     local db = NightsFarmtrackerDB
-    local vendorShown = db.vendorFilterEnabled ~= false
-    local blackShown  = db.blacklistEnabled ~= false
-    if vendorShown and blackShown then
-        tip:SetText(ns.L["filter_button"])
+    tip:SetText(ns.L["filter_button"])
+    if db.vendorFilterEnabled ~= false and db.blacklistEnabled ~= false then
         tip:AddLine(ns.L["filter_left_hint"], 0.7, 0.7, 0.7)
         tip:AddLine(ns.L["filter_right_hint"], 0.7, 0.7, 0.7)
-    elseif blackShown then
-        tip:SetText(ns.L["blacklist_title"])
-    else
-        tip:SetText(ns.L["filter_title"])
     end
 end)
 
@@ -1237,14 +1224,14 @@ SetBtnTooltip(btnSettings, "ANCHOR_RIGHT", function(tip) tip:SetText(ns.L["setti
 btnHelp:SetScript("OnClick", function() ns.ToggleHelpWindow() end)
 SetBtnTooltip(btnHelp, "ANCHOR_BOTTOMRIGHT", function(tip) ns.FillHelpTooltip(tip) end)
 
--- Re-evaluates and re-lays-out the History/Log/Filter/Blacklist buttons.
+-- Re-evaluates and re-lays-out the History/Log and Filter buttons.
 -- Called whenever a setting affecting their visibility changes (session
--- history, loot log, vendor filter, or blacklist toggled on/off).
+-- history, loot log, or one of the filter lists toggled on/off).
 function ns.RefreshLeftButtons()
     local db           = NightsFarmtrackerDB
     local historyShown = db.sessionHistoryEnabled ~= false
     local logShown     = db.logWindowEnabled      == true
-    local filterShown  = (db.vendorFilterEnabled ~= false) or (db.blacklistEnabled ~= false)
+    local filterShown  = (db.vendorFilterEnabled ~= false) or (db.blacklistEnabled ~= false) or (db.deleteListEnabled ~= false)
     local histLogShown = historyShown or logShown
 
     if histLogShown then btnHistory:Show(); btnHistory:EnableMouse(true)
@@ -1260,4 +1247,5 @@ function ns.RefreshLeftButtons()
     else
         btnFilter:SetPoint("LEFT", btnReset, "RIGHT", 10, 0)
     end
+    if ns.RefreshFilterTabs then ns.RefreshFilterTabs() end
 end

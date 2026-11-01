@@ -73,7 +73,7 @@ ns.CLASS_PRIORITY = {
 
 -- UI layout
 ns.FRAME_W     = 330
-ns.STACK_GAP   = 4    -- space between the windows stacked below the collapsed main window (the Loot Log)
+ns.WINDOW_GAP  = 2    -- space between neighbouring windows: docked side by side, stacked, below or above the main window
 ns.PAD         = 4    -- side gap between a window's border and its content
 ns.ROW_H       = 34   -- 30 px icon + 1 px border each side: 2 px between the borders of adjacent rows
 ns.CAT_GAP     = 5    -- extra space above/below a category's rows: 6 px between header and icon border
@@ -112,8 +112,7 @@ end
 function ns.ApplyWindowHeightSetting()
     if ns.RefreshHUD then ns.RefreshHUD() end
     if ns.HistFrame and ns.HistFrame:IsShown() and ns.RebuildHistory then ns.RebuildHistory() end
-    if ns.FilterFrame and ns.FilterFrame:IsShown() and ns.RebuildFilterList then ns.RebuildFilterList() end
-    if ns.BlacklistFrame and ns.BlacklistFrame:IsShown() and ns.RebuildBlacklistList then ns.RebuildBlacklistList() end
+    if ns.RebuildFilterList then ns.RebuildFilterList() end
     if ns.GoalsFrame and ns.GoalsFrame:IsShown() and ns.RebuildGoalsList then ns.RebuildGoalsList() end
     if ns.LogFrame and ns.LogFrame:IsShown() and ns.RebuildLogList then ns.RebuildLogList() end
     if ns.RefitHelpWindow then ns.RefitHelpWindow() end
@@ -128,6 +127,6 @@ ns.FONT_NORMAL = 12  -- default row/item text
 ns.FONT_HEADER = 14  -- emphasized headers/titles
 
 -- Header height for title-only secondary windows (History, Detail, Filter,
--- Blacklist, Log, Settings). MainFrame keeps its own taller header (it has
+-- Log, Settings). MainFrame keeps its own taller header (it has
 -- to fit the icon toolbar) and isn't affected by this constant.
 ns.WINDOW_HDR_H = 34

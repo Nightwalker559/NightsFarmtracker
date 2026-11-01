@@ -1,18 +1,18 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Drop list windows
--- Building blocks and the window factory shared by the Vendor-Only Filter
--- and the Blacklist: collapsible checkbox sections, a drop zone for items
--- dragged from the bags, and an item list grouped by expansion.
+-- Building blocks and the pane factory shared by the tabs of the Filter
+-- window (Vendor-Only, Blacklist, Delete List) and Item Goals: collapsible
+-- checkbox sections, a drop zone for items dragged from the bags, and an item
+-- list grouped by expansion.
 ------------------------------------------------------------------------
 local _, ns = ...
 
 ------------------------------------------------------------------------
 -- Shared collapsible section header (category/expansion-style headers).
 -- One recipe for the frame + header band (ns.AddHeaderBand) + accent-colored
--- label used by the Filter and Blacklist windows (and matching History's month
--- header), so all of them share one height/font setup instead of each file
--- rebuilding slightly different versions that can drift out of sync (that
--- mismatch is what caused the header text to render off-center in 1.4.x).
+-- label used by the Filter window (and matching History's month header), so
+-- all of them share one height/font setup instead of slightly different
+-- versions that can drift out of sync and render the header text off-center.
 -- Caller still positions it (SetPoint) and wires OnMouseUp/OnEnter/OnLeave
 -- for its own collapse/tooltip behavior.
 ------------------------------------------------------------------------
@@ -73,8 +73,8 @@ end
 ------------------------------------------------------------------------
 -- Shared "drop-list" item row — icon + name, item
 -- tooltip on hover, Shift+Right-click removes it via the given callback.
--- Used by the Vendor-Only Filter and Blacklist item lists (identical row
--- shape; only the removal/rebuild behavior differs between the two).
+-- Used by the Filter window's item lists and Item Goals (same row shape; only
+-- the removal/rebuild behavior differs).
 ------------------------------------------------------------------------
 function ns.CreateDropListItemRow(parent, onShiftRemove)
     local r = CreateFrame("Frame", nil, parent)
@@ -109,8 +109,8 @@ end
 
 ------------------------------------------------------------------------
 -- Shared permanent drop-target zone (dashed accent border, centered hint
--- label) used by the Vendor-Only Filter and Blacklist windows to accept
--- item drags from bags. onDrop is called for both the real drag-hold-
+-- label) used by the Filter window and Item Goals to accept item drags from
+-- bags. onDrop is called for both the real drag-hold-
 -- release gesture (OnReceiveDrag) and a left-click while holding an item
 -- (OnMouseUp), matching ns.HandleItemDrop's two-script pattern.
 ------------------------------------------------------------------------
@@ -139,8 +139,8 @@ function ns.CreateDropZone(parent, height, onDrop)
 end
 
 ------------------------------------------------------------------------
--- Scroll frame + list frame pair for the Vendor-Only Filter / Blacklist
--- item lists: mouse-wheel scrolling in row steps, item drops accepted on
+-- Scroll frame + list frame pair for the item lists of the Filter window and
+-- Item Goals: mouse-wheel scrolling in row steps, item drops accepted on
 -- the list area too. Caller sizes/positions the scroll frame (see
 -- ns.RebuildDropItemList). Returns scrollFrame, listFrame.
 ------------------------------------------------------------------------
@@ -154,9 +154,10 @@ end
 
 ------------------------------------------------------------------------
 -- Drop zone plus the separator line below it, at the top of a drop-list
--- window's list (Filter, Blacklist, Item Goals). CreateDropZoneRow builds them
--- once (frame.DropZone, frame.dzSep); PlaceDropZoneRow puts them at `top` (Y
--- inside listFrame) and returns the Y where the item rows start.
+-- window's list (Filter window panes, Item Goals). CreateDropZoneRow
+-- builds them once (owner.DropZone, owner.dzSep, owner = the pane or the
+-- window); PlaceDropZoneRow puts them at `top` (Y inside listFrame) and
+-- returns the Y where the item rows start.
 ------------------------------------------------------------------------
 local DZ_H = 34   -- drop zone height
 ns.DROPLIST_MIN_VIS_H = 30   -- room for the "list empty" label
@@ -273,7 +274,8 @@ local groupHeaderPool = ns.NewPool(CreateItemGroupHeader)
 -- grows with its content up to ns.GetMaxWindowH(), then scrolls.
 --
 -- cfg: window, listFrame, scrollFrame, emptyLabel; itemPool, rows (the
--- window's item row pool, see ns.NewPool, and its active rows); headers (active
+-- window's item row pool, see ns.NewPool, and its active rows); fixedVisH
+-- (optional: the list area never gets smaller than this); headers (active
 -- group headers); padX; bodyTop (window Y where the scroll area starts);
 -- itemsTop (Y inside listFrame where the rows start); ftrH; minVisH (room for
 -- the "list empty" label); items (itemID -> { name, icon, quality,
@@ -356,7 +358,7 @@ function ns.RebuildDropItemList(cfg)
 
     ns.FitScrollWindow({
         window = cfg.window, scroll = cfg.scrollFrame, list = cfg.listFrame,
-        hdrH = cfg.bodyTop, ftrH = cfg.ftrH,
+        hdrH = cfg.bodyTop, ftrH = cfg.ftrH, minH = cfg.fixedVisH,
         contentH = yOff + (count == 0 and cfg.minVisH or 0),
     })
 
@@ -366,35 +368,39 @@ function ns.RebuildDropItemList(cfg)
 end
 
 ------------------------------------------------------------------------
--- Window factory. The Vendor-Only Filter and the Blacklist are the same
--- window with different data behind it; Modules/Filter.lua and
--- Modules/Blacklist.lua only describe that data here.
+-- Pane factory: the content of one tab of the Filter window. The Vendor-Only
+-- Filter, the Blacklist and the Delete List are the same pane with different
+-- data behind it; Modules/Filter.lua, Blacklist.lua and DeleteList.lua only
+-- describe that data (ns.RegisterFilterTab) and Modules/FilterWindow.lua hosts
+-- the panes.
 --
+-- window: the shared window; bodyTop: window Y where the scroll area starts.
 -- cfg:
---   frameName, frameKey      global frame name / ns.<frameKey>
---   rebuildKey, toggleKey    names of the ns functions this call defines
---   enabledKey               setting that switches the feature off
 --   itemsKey                 account table: itemID -> { name, icon, quality, expansionID }
---   categoriesKey            account table of per-category switches
---   titleKey, categoriesTitleKey, emptyKey, clearConfirmKey, removeGroupKey   locale keys
+--   categoriesKey (optional) account table of per-category switches; without it there are no
+--                            category checkboxes (the Delete List)
+--   categoriesTitleKey, emptyKey, clearConfirmKey, removeGroupKey   locale keys
 --   clearPopup, removeGroupPopup                  StaticPopup names
 --   categoriesCollapsedKey, groupsCollapsedKey    collapse state in the character DB
---   isCategoryEnabled, setCategory                category switch accessors
+--   isCategoryEnabled, setCategory                category switch accessors (with categoriesKey)
 --   add(itemID, name, icon, quality), remove(itemID), clear()
 --   expansions (optional)    { titleKey, hintKey, collapsedKey }: AH-by-expansion section
+-- Returns pane = { Rebuild(), Show(), Hide(), HandleDrop() }.
 ------------------------------------------------------------------------
 local MIN_VIS_H = ns.DROPLIST_MIN_VIS_H
 local FTR_H     = ns.DROPLIST_FTR_H
 local SEC_GAP   = 4 + 1 + 4  -- space, separator, space between sections
 
-function ns.CreateDropListWindow(cfg)
-    local pad, hdrH = ns.PAD, ns.WINDOW_HDR_H
-    local frame, scrollFrame, listFrame, Rebuild
+function ns.CreateDropListPane(window, cfg, bodyTop)
+    local pad = ns.PAD
+    local pane = {}   -- also carries the drop zone row and the section parts (see ns.CreateDropZoneRow)
+    local scrollFrame, listFrame, Rebuild
     local catRows, expRows, itemRows, headers = {}, {}, {}, {}
 
     local function RefreshAll()
         Rebuild()
         ns.RefreshHUD()
+        if ns.RefreshVendorSell then ns.RefreshVendorSell() end   -- the Sell List at a vendor follows the lists
     end
 
     local function RemoveItem(itemID)
@@ -428,13 +434,16 @@ function ns.CreateDropListWindow(cfg)
     -- Category checkboxes, then the optional AH-by-expansion list. Returns the
     -- Y where the drop zone starts; a separator closes the last section.
     local function RebuildSections()
-        local names = ns.GetTrackedCategoryNames(NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB[cfg.categoriesKey])
-        local entries = {}
-        for i, name in ipairs(names) do entries[i] = { key = name, label = name } end
-        local y = ns.RebuildCheckboxSection(
-            listFrame, frame.catHeader, catRows, 0, 0, ns.L[cfg.categoriesTitleKey],
-            NightsFarmtrackerDB[cfg.categoriesCollapsedKey], entries,
-            cfg.isCategoryEnabled, cfg.setCategory, ns.RefreshHUD)
+        local y = 0
+        if cfg.categoriesKey then
+            local names = ns.GetTrackedCategoryNames(NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB[cfg.categoriesKey])
+            local entries = {}
+            for i, name in ipairs(names) do entries[i] = { key = name, label = name } end
+            y = ns.RebuildCheckboxSection(
+                listFrame, pane.catHeader, catRows, 0, 0, ns.L[cfg.categoriesTitleKey],
+                NightsFarmtrackerDB[cfg.categoriesCollapsedKey], entries,
+                cfg.isCategoryEnabled, cfg.setCategory, ns.RefreshHUD)
+        end
 
         if cfg.expansions then
             local exps = {}
@@ -442,27 +451,28 @@ function ns.CreateDropListWindow(cfg)
                 exps[i] = { key = expID, label = ns.EXPANSION_NAMES[expID] or ("Expansion " .. expID) }
             end
             y = ns.RebuildCheckboxSection(
-                listFrame, frame.expHeader, expRows, 0, y, ns.L[cfg.expansions.titleKey],
+                listFrame, pane.expHeader, expRows, 0, y, ns.L[cfg.expansions.titleKey],
                 NightsFarmtrackerDB[cfg.expansions.collapsedKey], exps,
                 ns.IsAHExpansionEnabled, ns.SetAHExpansionEnabled, ns.RefreshHUD)
         end
 
-        frame.sectionSep:ClearAllPoints()
-        frame.sectionSep:SetPoint("TOPLEFT", 0, -y)
-        frame.sectionSep:SetPoint("TOPRIGHT", 0, -y)
+        if not pane.sectionSep then return 0 end   -- no sections: the drop zone starts at the top
+        pane.sectionSep:ClearAllPoints()
+        pane.sectionSep:SetPoint("TOPLEFT", 0, -y)
+        pane.sectionSep:SetPoint("TOPRIGHT", 0, -y)
         return y + SEC_GAP
     end
 
     function Rebuild()
-        if not listFrame then return end
         local dzTop = RebuildSections()
 
-        local itemsTop = ns.PlaceDropZoneRow(frame, dzTop)
+        local itemsTop = ns.PlaceDropZoneRow(pane, dzTop)
 
         ns.RebuildDropItemList({
-            window = frame, listFrame = listFrame, scrollFrame = scrollFrame, emptyLabel = frame.emptyLabel,
-            itemPool = itemPool, rows = itemRows, padX = pad, bodyTop = hdrH, itemsTop = itemsTop,
+            window = window, listFrame = listFrame, scrollFrame = scrollFrame, emptyLabel = pane.emptyLabel,
+            itemPool = itemPool, rows = itemRows, padX = pad, bodyTop = bodyTop, itemsTop = itemsTop,
             ftrH = FTR_H, minVisH = MIN_VIS_H, items = Items(),
+            fixedVisH = ns.GetMaxWindowH() - bodyTop - FTR_H,   -- same window height in every tab
             headers = headers,
             collapsed = ns.GetCollapsedTable(cfg.groupsCollapsedKey),
             rebuild = Rebuild,
@@ -471,7 +481,6 @@ function ns.CreateDropListWindow(cfg)
             end,
         })
     end
-    ns[cfg.rebuildKey] = Rebuild
 
     local function CollapsibleHeader(titleKey, collapsedKey, hintKey)
         local header = ns.CreateSectionHeader(listFrame, ns.CONTENT_W)
@@ -482,53 +491,37 @@ function ns.CreateDropListWindow(cfg)
         return header
     end
 
-    -- Built once, on first open. Only parts whose position never changes are
-    -- placed here; Rebuild positions everything below the first section.
-    local function EnsureFrame()
-        if frame then return end
-        frame = ns.CreateWindowFrame(cfg.frameName, ns.L[cfg.titleKey], { width = ns.FRAME_W, dockChain = "right" })
-        frame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", 4, 0)
-        ns[cfg.frameKey] = frame  -- other windows anchor to it
+    -- The scroll area holds the whole body, flush below the tab strip. Only
+    -- parts whose position never changes are placed here; Rebuild positions
+    -- everything below the first section.
+    scrollFrame, listFrame = ns.CreateDropListScroll(window, HandleDrop)
+    scrollFrame:SetPoint("TOPLEFT", pad, -bodyTop)
 
-        ns.AddHLine(frame, "TOP", pad, -(hdrH - 1))
-
-        ns.EnableItemDrop(frame, HandleDrop)
-
-        -- The scroll area holds the whole body, flush below the title line.
-        scrollFrame, listFrame = ns.CreateDropListScroll(frame, HandleDrop)
-        scrollFrame:SetPoint("TOPLEFT", pad, -hdrH)
-
-        frame.catHeader = CollapsibleHeader(cfg.categoriesTitleKey, cfg.categoriesCollapsedKey)
-        frame.catHeader:SetPoint("TOPLEFT", 0, 0)
-        if cfg.expansions then
-            frame.expHeader = CollapsibleHeader(cfg.expansions.titleKey, cfg.expansions.collapsedKey, cfg.expansions.hintKey)
-        end
-        frame.sectionSep = ns.AddHLine(listFrame, "TOP", 0, 0)   -- separator lines: Rebuild positions them
-
-        ns.CreateDropZoneRow(frame, listFrame, HandleDrop)
-
-        frame.emptyLabel = listFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        frame.emptyLabel:SetJustifyH("CENTER")
-        frame.emptyLabel:SetTextColor(0.55, 0.55, 0.55)
-        frame.emptyLabel:SetText(ns.L[cfg.emptyKey])
-
-        frame.clrBtn = ns.CreateClearAllButton(frame, pad, function()
-            local list = Items()
-            return list and next(list) ~= nil
-        end, cfg.clearPopup)
+    if cfg.categoriesKey then
+        pane.catHeader = CollapsibleHeader(cfg.categoriesTitleKey, cfg.categoriesCollapsedKey)
+        pane.catHeader:SetPoint("TOPLEFT", 0, 0)
+    end
+    if cfg.expansions then
+        pane.expHeader = CollapsibleHeader(cfg.expansions.titleKey, cfg.expansions.collapsedKey, cfg.expansions.hintKey)
+    end
+    if cfg.categoriesKey or cfg.expansions then
+        pane.sectionSep = ns.AddHLine(listFrame, "TOP", 0, 0)   -- separator lines: Rebuild positions them
     end
 
-    local function Toggle()
-        if NightsFarmtrackerDB[cfg.enabledKey] == false then return end
-        if ns.DeferInCombat(Toggle) then return end
-        EnsureFrame()
-        if frame:IsShown() then
-            frame:Hide()
-        else
-            Rebuild()
-            frame:Show()
-        end
-        ns.RefreshWindowChain("right")
-    end
-    ns[cfg.toggleKey] = Toggle
+    ns.CreateDropZoneRow(pane, listFrame, HandleDrop)
+
+    pane.emptyLabel = listFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    pane.emptyLabel:SetJustifyH("CENTER")
+    pane.emptyLabel:SetTextColor(0.55, 0.55, 0.55)
+    pane.emptyLabel:SetText(ns.L[cfg.emptyKey])
+
+    pane.clrBtn = ns.CreateClearAllButton(window, pad, function()
+        local list = Items()
+        return list and next(list) ~= nil
+    end, cfg.clearPopup)
+
+    pane.Rebuild, pane.HandleDrop = Rebuild, HandleDrop
+    function pane.Show() scrollFrame:Show(); pane.clrBtn:Show() end
+    function pane.Hide() scrollFrame:Hide(); pane.clrBtn:Hide() end
+    return pane
 end

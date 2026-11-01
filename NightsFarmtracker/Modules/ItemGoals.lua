@@ -3,8 +3,8 @@
 -- Items dragged in here get a target amount; while Item goals is the active
 -- limit (Settings, Session Limit) and their own goals are switched on, their
 -- bars show the progress and the session pauses as soon as one of them reaches
--- its amount. Per profile; the goals
--- themselves live in db.itemGoals (see ns.SetItemGoal, ns.GetItemGoal).
+-- its amount. Per profile; the goals themselves live in db.itemGoals (see
+-- ns.SetItemGoal, ns.GetItemGoal).
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -121,7 +121,7 @@ end
 local function EnsureFrame()
     if frame then return end
     frame = ns.CreateWindowFrame("NightsFarmtrackerGoalsWnd", ns.L["goals_title"], { width = ns.FRAME_W, dockChain = "right" })
-    frame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", 4, 0)
+    frame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", ns.WINDOW_GAP, 0)
     ns.GoalsFrame = frame   -- docking chain, see ns.WINDOW_CHAINS
 
     ns.AddHLine(frame, "TOP", pad, -(hdrH - 1))
