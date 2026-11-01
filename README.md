@@ -29,8 +29,8 @@ The toolbar, left to right:
 | --- | --- |
 | Play / pause | Starts and pauses tracking and the timer |
 | Reset | Saves the session to the history and clears the list and timer. **Shift+click** resets without saving |
-| History | **Left-click** the Session History, **right-click** the Loot Log (if enabled) |
-| Filter | **Left-click** the Vendor-Only Filter, **right-click** the Blacklist |
+| History | **Left-click** the Sessions & History window, **right-click** the Loot Log (if enabled) |
+| Filter | **Left-click** the Filter window on the Vendor-Only tab, **right-click** on the Blacklist tab |
 | Settings, Help, Collapse, Close | On the right. Collapse folds the window down to toolbar and footer |
 
 The footer shows the total gold, the session timer and the gold rate. Click the total for a breakdown of item value and directly looted gold. The Help button shows the essentials on hover and the full list of shortcuts and commands on click.
@@ -62,26 +62,28 @@ Every item is valued at the higher of its AH and vendor price. Vendor-only items
 
 - **Vendor-Only Filter:** drop items from your bags onto it, or tick whole categories, to value them at vendor price. Account-wide.
 - **Blacklist:** items and categories on it are never tracked. Account-wide, and it wins over everything else.
-- Both lists group their items by expansion, can be cleared per expansion or completely, and can each be switched off in the settings.
-- **Sell List:** at a vendor, a window next to the merchant window lists the bag items the Vendor-Only Filter and the Gear AH Threshold mark as vendor goods (most gold first) and sells them with one button. Equipment-set items and Warband items are left out (the latter can be switched off), and a protection limits one click to 12 items, the size of the vendor's buyback list. Options: Settings, Windows & Buttons.
+- **Delete List:** items that can be neither sold nor auctioned (e.g. Warband-bound potions). At a vendor the Sell List offers them for deletion, one item per click. Items only, no categories. Account-wide.
+- The three lists are the tabs of one Filter window. They group their items by expansion, can be cleared per expansion or completely, and can each be switched off in the settings (a tab whose list is off is not shown).
+- **Sell List:** at a vendor, a window next to the merchant window lists the bag items the Vendor-Only Filter and the Gear AH Threshold mark as vendor goods (most gold first) and sells them with one button. Equipment-set items and Warband items are left out (the latter can be switched off, or limited to the upgrade tracks you tick), and a protection limits one click to 12 items, the size of the vendor's buyback list. Options: the gear icon in the Sell List window or in Settings, Windows & Buttons.
 - **Ctrl+left-click** an item adds it to the Vendor-Only Filter, **Ctrl+right-click** blacklists it, **Shift+right-click** stops tracking it. On a category header, Shift+right-click excludes the whole category.
 
 ## History, Loot Log and export
 
-- **Session History** is account-wide and has no session limit. Sessions are grouped by month and day; same-day sessions are merged automatically (can be switched off, or merged by hand per day). Click a session for its detail window, Shift+click a month for a month summary.
-- **Compact mode** folds all past months into one entry each to keep the saved data small. Single sessions and whole months can be deleted.
+- **Sessions & History** is account-wide and has no session limit. It has two tabs: *Sessions* shows the running month day by day, *History* lists the past months with their farm time. Same-day sessions are merged automatically (can be switched off, or merged by hand per day). Click a session for its detail window (title: date and farm time), Shift+click a month for a month summary. Hover a month for its gold, and optionally the average per day.
+- **Full mode** (default) keeps every session: a past month opens up to its days and sessions, and single sessions or whole months can be deleted.
+- **Compact mode** folds all past months into one entry each to keep the saved data small. A month is then a plain row, a click opens its summary, and only whole months can be deleted. The data export still contains what was saved.
 - **Loot Log:** a chronological, quality-colored list of the last 100 drops, kept per character across reloads (off by default).
 - **Data export** (`/nft export`): copy the saved history, all months or a single one, as JSON for use outside the game.
 
 ## Look and feel
 
-- 16 color themes plus a custom color with live preview (Settings → Colors), an optional gradient on section headers and optional theme-colored toolbar icons.
+- 16 color themes plus a custom color with live preview (Settings → Colors), an optional gradient on section headers and optional theme-colored toolbar icons. Window titles follow the theme; gold is kept for gold amounts and checked options.
 - Windows dock next to each other without overlapping (below or above when there is no room beside) and can be dragged. The maximum window height is adjustable; longer lists scroll.
 - A minimap button (movable) and an entry in the minimap addon menu, both optional.
 
 ## Settings
 
-Everything is in one window (Settings button or right-click on the minimap button), with a sidebar to jump between sections: AH Price Source, Display, Session Limit, Windows & Buttons, Colors, Session History, Categories & Grouping, Filters, Fishing, Minimap HUD, Data Export and Profiles.
+Everything is in one window (Settings button or right-click on the minimap button), with a sidebar to jump between sections: AH Price Source, Categories & Grouping, Colors, Data Export, Display, Filters, Fishing, Minimap HUD, Session History, Session Limit, Windows & Buttons and Profiles.
 
 Most settings belong to a **profile**: create, copy, rename and delete profiles, and switch between them at any time. Window positions and the current session are stored per character. *Reset all* at the bottom wipes every saved setting and list.
 
@@ -124,7 +126,7 @@ A small frame below the main window with the resets in the last hour (x/9), the 
 | Command | What it does |
 | --- | --- |
 | `/nft` | Open or close the window |
-| `/nft filter` | Open or close the Vendor-Only Filter |
+| `/nft filter` | Open or close the Filter window (Vendor-Only, Blacklist, Delete List) |
 | `/nft export` | Open the data export (JSON) |
 | `/nft hud` | Toggle the Minimap HUD (if enabled) |
 | `/nft hud size\|scale\|alpha <n>` | Adjust the Minimap HUD |

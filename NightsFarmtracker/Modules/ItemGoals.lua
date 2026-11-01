@@ -42,6 +42,7 @@ local function CreateGoalRow(parent)
     eb:SetPoint("LEFT", 6, 0)
     eb:SetAutoFocus(false)
     eb:SetNumeric(true)
+    eb:SetJustifyH("RIGHT")
     eb:SetMaxLetters(5)
     eb:SetFontObject(GameFontNormalSmall)
     eb:SetTextColor(0.85, 0.85, 0.85)
@@ -83,7 +84,7 @@ function ns.RebuildGoalsList()
         r:SetPoint("TOPLEFT", 0, -yOff)
         r.itemID = e.itemID
         r.icon:SetTexture(e.goal.icon or ns.FALLBACK_ICON)
-        r.nameText:SetText(ns.TruncateName(ns.DisplayName(e.goal.name, e.itemID) or ("Item " .. e.itemID)))
+        r.nameText:SetText(ns.DisplayName(e.goal.name, e.itemID) or ("Item " .. e.itemID))
         ns.ApplyQualityColor(r.nameText, r.iconBorder, e.goal.quality, {0.85, 0.85, 0.85})
         local amount = tonumber(e.goal.amount) or 0
         r.amountBox:SetText(amount > 0 and tostring(amount) or "")
@@ -97,7 +98,8 @@ function ns.RebuildGoalsList()
     ns.FitScrollWindow({
         window = frame, scroll = scrollFrame, list = listFrame,
         hdrH = hdrH, ftrH = FTR_H + (inactive and NOTE_H or 0),
-        contentH = yOff + (#list == 0 and MIN_VIS_H or 0),
+        -- empty: room for the wrapped hint below the drop zone (14 px gap, 8 px air)
+        contentH = yOff + (#list == 0 and math.max(MIN_VIS_H, 14 + math.ceil(frame.emptyLabel:GetStringHeight()) + 8) or 0),
     })
 
     frame.emptyLabel:ClearAllPoints()

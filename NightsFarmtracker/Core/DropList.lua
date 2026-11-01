@@ -87,6 +87,7 @@ function ns.CreateDropListItemRow(parent, onShiftRemove)
     r.nameText:SetPoint("LEFT",  r.icon, "RIGHT", 8, 0)
     r.nameText:SetPoint("RIGHT", r,      "RIGHT", -4, 0)
     r.nameText:SetJustifyH("LEFT"); r.nameText:SetFontHeight(ns.FONT_NORMAL)
+    r.nameText:SetWordWrap(false)   -- the name gets the whole row width, one line
     r.nameText:SetTextColor(0.85,0.85,0.85)
 
     r:SetScript("OnEnter", function(self)
@@ -342,7 +343,7 @@ function ns.RebuildDropItemList(cfg)
                 local r = itemPool.acquire(cfg.listFrame)
                 r:SetPoint("TOPLEFT", 0, -yOff)
                 r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
-                r.nameText:SetText(ns.TruncateName(ns.DisplayName(e.name, e.itemID) or ("Item " .. e.itemID)))
+                r.nameText:SetText(ns.DisplayName(e.name, e.itemID) or ("Item " .. e.itemID))
                 r.itemID = e.itemID
                 ns.ApplyQualityColor(r.nameText, r.iconBorder, e.quality, {0.85, 0.85, 0.85})
                 rows[#rows + 1] = r

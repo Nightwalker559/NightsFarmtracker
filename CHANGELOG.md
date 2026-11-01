@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.8.5
+
+### Fixed
+
+- Session detail window: when the game renders the saved link of a gear row with the wrong item level (base level 133 instead of 253), the tooltip is shown with the saved item level and its stats instead, like the Auction House does
+- Number fields (Item Goals amounts, number boxes in Settings) are right-aligned
+- Item Goals window: the hint of the empty list is no longer cut off
+- Window titles of all windows use the theme color (some already did); gold is kept for gold amounts and checked options
+- Settings: the color theme list shows Default and Custom first, then the presets alphabetically in the client language
+- Settings: the color theme list scrolls with the mouse wheel and is only as tall as the space below the dropdown, so the last themes are no longer cut off at the screen bottom
+- Filter window (all tabs) and Item Goals: item names use the whole row width instead of being cut after 20 characters
+- Settings: an open dropdown list (theme, profile, ...) closes when the page scrolls or you jump to another section in the sidebar, instead of floating away from its dropdown
+
+### Changed
+
+- Session History is now the "Sessions & History" window with two tabs: Sessions shows the running month day by day, History lists the past months with their farm time. In Full mode a month opens up to its days and sessions (Shift+Click: month summary); in Compact mode it is a plain row and a click opens the month. The detail window title shows the farm time ("September 2026 • 39:50:06"). The window has the same height in both tabs, the last tab is remembered, "Clear all" sits at the bottom of both
+- The category list of the Gear AH Threshold (gear icon next to the threshold field) is a window in the docking chain behind Settings and the Sell List options instead of floating over Settings
+- Internal: the tab strip of the Filter window is a shared widget (`ns.CreateTabStrip`), now also used by Sessions & History
+- Internal: the Settings code is split into the folder `Modules\Settings` (shared widgets, one file per topic, the window itself); no change in behavior
+- Internal: the text links in the header of the copy text windows (Select all, Back, Clear) share one helper, and those windows are placed by the docking chain alone
+
 ## 1.8.4
 
 ### New

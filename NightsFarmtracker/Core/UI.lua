@@ -1194,13 +1194,13 @@ SetBtnTooltip(btnHistory, "ANCHOR_RIGHT", function(tip)
     local historyShown = db.sessionHistoryEnabled ~= false
     local logShown     = db.logWindowEnabled == true
     if historyShown and logShown then
-        tip:SetText(ns.L["session_history"] .. " / " .. ns.L["log_title"])
+        tip:SetText(ns.L["history_window_title"] .. " / " .. ns.L["log_title"])
         tip:AddLine(ns.L["hist_log_left_hint"], 0.7, 0.7, 0.7)
         tip:AddLine(ns.L["hist_log_right_hint"], 0.7, 0.7, 0.7)
     elseif logShown then
         tip:SetText(ns.L["log_title"])
     else
-        tip:SetText(ns.L["session_history"])
+        tip:SetText(ns.L["history_window_title"])
     end
 end)
 

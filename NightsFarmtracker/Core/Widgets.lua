@@ -75,7 +75,7 @@ end
 ------------------------------------------------------------------------
 ns.WINDOW_CHAINS = {
     right = { "LogFrame", "FilterFrame", "GoalsFrame" },
-    left  = { "HistFrame", "SettingsFrame", "SellConfigFrame", "ExportPickFrame", "ExportFrame", "DebugFrame" },
+    left  = { "HistFrame", "SettingsFrame", "SellConfigFrame", "GearThresholdFrame", "ExportPickFrame", "ExportFrame", "DebugFrame" },
 }
 
 function ns.RefreshWindowChain(side)
@@ -349,6 +349,22 @@ function ns.CreateDangerLink(parent, pad, text, onClick)
     return btn
 end
 
+-- Small right-aligned text link in the accent color (white on hover): "Select
+-- all", "Back", "Clear" in the header strip of the copy-text windows. The
+-- caller anchors it.
+function ns.CreateAccentLink(parent, width, text, onClick)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(width, 16)
+    local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lbl:SetAllPoints(); lbl:SetJustifyH("RIGHT")
+    lbl:SetTextColor(unpack(ns.COL_ACCENT))
+    lbl:SetText(text)
+    btn:SetScript("OnEnter", function() lbl:SetTextColor(1, 1, 1) end)
+    btn:SetScript("OnLeave", function() lbl:SetTextColor(unpack(ns.COL_ACCENT)) end)
+    btn:SetScript("OnClick", onClick)
+    return btn
+end
+
 -- "Clear all" link: hasDataFn guards against asking about an empty list.
 function ns.CreateClearAllButton(parent, pad, hasDataFn, popupName)
     return ns.CreateDangerLink(parent, pad, ns.L["clear_all"], function()
@@ -522,10 +538,10 @@ end
 -- button. Callers add their content below the header and can hook extra close
 -- behavior via frame:SetScript("OnHide", ...) or
 -- frame.closeBtn:HookScript("OnClick", ...). opts (all optional): width, pad
--- (default ns.PAD), titleColor (default ns.COL_GOLD), titleY (default -10),
--- dockChain ("right" or "left": the window sits in that docking chain, see
--- ns.WINDOW_CHAINS, and the others close ranks when it hides), noEsc (Esc does
--- not close it: it is closed by whatever owns it).
+-- (default ns.PAD), titleY (default -10), dockChain ("right" or "left": the
+-- window sits in that docking chain, see ns.WINDOW_CHAINS, and the others close
+-- ranks when it hides), noEsc (Esc does not close it: it is closed by whatever
+-- owns it). The title always uses the theme accent color.
 ------------------------------------------------------------------------
 function ns.CreateWindowFrame(name, title, opts)
     opts = opts or {}
@@ -553,7 +569,7 @@ function ns.CreateWindowFrame(name, title, opts)
     titleFS:SetPoint("TOPRIGHT", -pad, opts.titleY or -10)
     titleFS:SetJustifyH("CENTER")
     titleFS:SetText(title)
-    titleFS:SetTextColor(unpack(opts.titleColor or ns.COL_GOLD))
+    titleFS:SetTextColor(unpack(ns.COL_ACCENT))   -- gold stays for money and checked options
     titleFS:SetFontHeight(ns.FONT_HEADER)
     frame.titleFS = titleFS
 
@@ -565,6 +581,72 @@ function ns.CreateWindowFrame(name, title, opts)
     frame.closeBtn = xBtn
 
     return frame
+end
+
+------------------------------------------------------------------------
+-- Tab strip right under a window's title (Filter, History): equal-width tabs
+-- with centered labels, the active one gold with an underline. The caller
+-- draws the separator lines and owns the panes; onClick(key) runs when a tab
+-- is clicked.
+--   strip.Add(key, label)     creates the tab's button, in order
+--   strip.Layout(isShown)     shows the tabs for which isShown(key) is true (all
+--                             without it) and shares the width between them
+--   strip.SetActive(key)      paints the active tab
+------------------------------------------------------------------------
+ns.TAB_H = 22
+
+function ns.CreateTabStrip(window, onClick)
+    local strip, buttons, order, active = {}, {}, {}, nil
+
+    local function Paint()
+        for _, key in ipairs(order) do
+            local btn, on = buttons[key], key == active
+            -- Gold like a checked option in Settings: the accent red is darker and made the active label look smaller
+            if on then btn.text:SetTextColor(1, 0.82, 0) else btn.text:SetTextColor(0.6, 0.6, 0.6) end
+            btn.underline:SetShown(on)
+        end
+    end
+
+    function strip.Add(key, label)
+        local btn = CreateFrame("Button", nil, window)
+        btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        btn.text:SetAllPoints()   -- as wide as the tab, centered: the label cannot drift with its own width
+        btn.text:SetJustifyH("CENTER")
+        btn.text:SetFontHeight(ns.FONT_NORMAL)
+        btn.text:SetText(label)
+        btn.underline = btn:CreateTexture(nil, "ARTWORK")
+        btn.underline:SetHeight(2)
+        btn.underline:SetPoint("BOTTOMLEFT", 0, 0)
+        btn.underline:SetPoint("BOTTOMRIGHT", 0, 0)
+        btn.underline:SetColorTexture(unpack(ns.COL_ACCENT))
+        btn:SetScript("OnEnter", function(self) if key ~= active then self.text:SetTextColor(1, 1, 1) end end)
+        btn:SetScript("OnLeave", Paint)
+        btn:SetScript("OnClick", function() onClick(key) end)
+        buttons[key] = btn
+        order[#order + 1] = key
+    end
+
+    function strip.Layout(isShown)
+        local shown = {}
+        for _, key in ipairs(order) do
+            if not isShown or isShown(key) then shown[#shown + 1] = key else buttons[key]:Hide() end
+        end
+        local w = ns.CONTENT_W / math.max(#shown, 1)
+        for i, key in ipairs(shown) do
+            local btn = buttons[key]
+            btn:ClearAllPoints()
+            btn:SetPoint("TOPLEFT", window, "TOPLEFT", ns.PAD + (i - 1) * w, -ns.WINDOW_HDR_H)
+            btn:SetSize(w, ns.TAB_H)
+            btn:Show()
+        end
+    end
+
+    function strip.SetActive(key)
+        active = key
+        Paint()
+    end
+
+    return strip
 end
 
 ------------------------------------------------------------------------
@@ -664,15 +746,14 @@ end
 -- Copyable text window: a scrolling, pre-selected EditBox (addons cannot write
 -- the clipboard, so the player presses Ctrl+C). Shared by the data export and
 -- the debug dumps. ns.CreateCopyTextWindow(name, title) builds it once;
--- ns.ShowCopyText(frame, text) fills and shows it, docked next to Settings if
--- that is open, else centered. noEsc: Esc does not close it (see
--- ns.CreateWindowFrame).
+-- ns.ShowCopyText(frame, text) fills and shows it. noEsc: Esc does not close
+-- it (see ns.CreateWindowFrame).
 ------------------------------------------------------------------------
 function ns.CreateCopyTextWindow(name, title, noEsc)
     local W, HDR_H, FTR_H = 460, ns.WINDOW_HDR_H, 12
 
     local frame = ns.CreateWindowFrame(name, title,
-        {width = W, pad = ns.PAD, titleColor = ns.COL_ACCENT, dockChain = "left", noEsc = noEsc})
+        {width = W, pad = ns.PAD, dockChain = "left", noEsc = noEsc})
     frame:SetHeight(360)
 
     ns.AddHLine(frame, "TOP", ns.PAD, -(HDR_H - 1))
@@ -682,16 +763,9 @@ function ns.CreateCopyTextWindow(name, title, noEsc)
     hint:SetTextColor(0.5, 0.5, 0.5)
     hint:SetText(ns.L["copy_hint_window"])
 
-    local selectBtn = CreateFrame("Button", nil, frame)
-    selectBtn:SetSize(90, 16)
+    local selectBtn = ns.CreateAccentLink(frame, 90, ns.L["export_select_all"],
+        function() frame.box:SetFocus(); frame.box:HighlightText() end)
     selectBtn:SetPoint("TOPRIGHT", -ns.PAD, -(HDR_H + 6))
-    local selectText = selectBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    selectText:SetAllPoints(); selectText:SetJustifyH("RIGHT")
-    selectText:SetTextColor(unpack(ns.COL_ACCENT))
-    selectText:SetText(ns.L["export_select_all"])
-    selectBtn:SetScript("OnEnter", function() selectText:SetTextColor(1, 1, 1) end)
-    selectBtn:SetScript("OnLeave", function() selectText:SetTextColor(unpack(ns.COL_ACCENT)) end)
-    selectBtn:SetScript("OnClick", function() frame.box:SetFocus(); frame.box:HighlightText() end)
 
     local scrollFrame = CreateFrame("ScrollFrame", nil, frame)
     scrollFrame:SetPoint("TOPLEFT", ns.PAD, -(HDR_H + 26))
@@ -723,19 +797,14 @@ function ns.CreateCopyTextWindow(name, title, noEsc)
 end
 
 -- Fills a window built by ns.CreateCopyTextWindow with `text` and shows
--- it (docked next to Settings if open, else centered), pre-selected for
--- an immediate Ctrl+C. `live` (the debug log): no focus/selection grab, so
--- the window can keep refreshing; the caller handles scrolling.
+-- it (the left docking chain places it), pre-selected for an immediate
+-- Ctrl+C. The caller registers the window as ns.<Key>Frame in that chain.
+-- `live` (the debug log): no focus/selection grab, so the window can keep
+-- refreshing; the caller handles scrolling.
 function ns.ShowCopyText(frame, text, live)
     frame.box:SetText(text)
     frame.scrollFrame:UpdateScrollChildRect()
     if not live then frame.scrollFrame:SetVerticalScroll(0) end
-    frame:ClearAllPoints()
-    if ns.SettingsFrame and ns.SettingsFrame:IsShown() then
-        ns.DockFrame(frame, ns.SettingsFrame, "left")
-    else
-        frame:SetPoint("CENTER")
-    end
     frame:Show()
     if not live then
         frame.box:SetFocus()

@@ -6,7 +6,7 @@
 -- as many as the merchant's buyback list holds, so a wrong click can still be
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
--- ticked there. The options live in a window (ns.ToggleVendorSellConfig, Settings.lua)
+-- ticked there. The options live in a window (ns.ToggleVendorSellConfig, Settings\SellConfig.lua)
 -- that the gear icon of this window and the one in Settings open. Below the sale
 -- list come the bag items of the Delete List, deleted by a second button: one
 -- item per click, the game allows no more per click.

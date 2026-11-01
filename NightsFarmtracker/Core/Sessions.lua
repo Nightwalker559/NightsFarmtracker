@@ -329,9 +329,8 @@ end
 
 ------------------------------------------------------------------------
 -- Manual merge of all sessions belonging to one calendar day (identified
--- by its "YYYY-MM-DD" storage key). Used when "merge_daily_sessions" was
--- off and the user wants to combine already-saved separate entries
--- afterwards.
+-- by its "YYYY-MM-DD" storage key). Used when db.mergeDaily was off and the
+-- user wants to combine already-saved separate entries afterwards.
 ------------------------------------------------------------------------
 function ns.MergeDaySessions(dayKey)
     local sessions = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.sessions

@@ -64,7 +64,33 @@ local function EnsureAuctionatorLines(link)
     A.Tooltip.ShowTipWithPricing(GameTooltip, link, 1)
 end
 
-function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID)
+-- A saved gear link can render with the item's base item level in a tooltip
+-- (133 for a drop the game itself reports as 253), and then with the wrong
+-- stats. The link is still the best source (quality, upgrade track), so it is
+-- shown first; only when its level line differs from the stored item level the
+-- item is shown through an item key (item ID + item level), as the Auction
+-- House does.
+local function ShownItemLevel()
+    if type(ITEM_LEVEL) ~= "string" then return end
+    local pattern = ns.FormatToPattern(ITEM_LEVEL)
+    for i = 2, math.min(GameTooltip:NumLines(), 5) do
+        local fs = _G["GameTooltipTextLeft" .. i]
+        local text = fs and fs:GetText()
+        local level = text and text:match(pattern)
+        if level then return tonumber(level) end
+    end
+end
+
+local function ShowGearTooltip(hyperlink, itemID, itemLevel)
+    GameTooltip:SetHyperlink(hyperlink)
+    local shown = ShownItemLevel()
+    if itemLevel and itemID and shown and shown ~= itemLevel and GameTooltip.SetItemKey then
+        GameTooltip:SetItemKey(itemID, itemLevel, 0, select(5, C_Item.GetItemInfo(itemID)))
+    end
+end
+
+-- itemLevel (optional): the stored item level of a gear drop, see ShowGearTooltip.
+function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID, itemLevel)
     GameTooltip:SetOwner(owner, anchor or "ANCHOR_RIGHT")
     local linkID, classID
     if hyperlink then
@@ -72,7 +98,7 @@ function ns.ShowItemTooltipNoCompare(owner, anchor, hyperlink, itemID)
         linkID, classID = id, cls
     end
     if hyperlink and (not linkID or TooltipNeedsLink(linkID, classID)) then
-        GameTooltip:SetHyperlink(hyperlink)
+        ShowGearTooltip(hyperlink, linkID, itemLevel)
         EnsureAuctionatorLines(hyperlink)
     else
         GameTooltip:SetItemByID(linkID or itemID)

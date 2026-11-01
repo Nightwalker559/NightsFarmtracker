@@ -173,16 +173,9 @@ local function ShowExport(monthKey)
         ExportFrame = ns.CreateCopyTextWindow("NightsFarmtrackerExportWnd", ns.L["export_title"])
         ns.ExportFrame = ExportFrame
 
-        local back = CreateFrame("Button", nil, ExportFrame)
-        back:SetSize(90, 16)
+        local back = ns.CreateAccentLink(ExportFrame, 90, ns.L["export_back"],
+            function() ExportFrame:Hide(); ShowPicker() end)
         back:SetPoint("TOPRIGHT", -ns.PAD - 100, -(ns.WINDOW_HDR_H + 6))
-        local backText = back:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        backText:SetAllPoints(); backText:SetJustifyH("RIGHT")
-        backText:SetTextColor(unpack(ns.COL_ACCENT))
-        backText:SetText(ns.L["export_back"])
-        back:SetScript("OnEnter", function() backText:SetTextColor(1, 1, 1) end)
-        back:SetScript("OnLeave", function() backText:SetTextColor(unpack(ns.COL_ACCENT)) end)
-        back:SetScript("OnClick", function() ExportFrame:Hide(); ShowPicker() end)
     end
     ExportFrame.titleFS:SetText(ns.L["export_title_fmt"]:format(monthKey and MonthLabel(monthKey) or ns.L["export_all"]))
     ns.ShowCopyText(ExportFrame, ns.BuildFullExportJSON(monthKey))
@@ -214,7 +207,7 @@ end
 local function EnsurePickFrame()
     if PickFrame then return end
     PickFrame = ns.CreateWindowFrame("NightsFarmtrackerExportPickWnd", ns.L["export_pick_title"],
-        {width = PICK_W, pad = ns.PAD, titleColor = ns.COL_ACCENT, dockChain = "left"})
+        {width = PICK_W, pad = ns.PAD, dockChain = "left"})
     ns.ExportPickFrame = PickFrame
 
     ns.AddHLine(PickFrame, "TOP", ns.PAD, -(ns.WINDOW_HDR_H - 1))
@@ -251,8 +244,6 @@ ShowPicker = function()
     PickFrame:SetHeight(ns.WINDOW_HDR_H + 14 + math.min(#entries, PICK_MAX_ROWS) * PICK_ROW_H)
     PickFrame.scroll:SetVerticalScroll(0)
 
-    PickFrame:ClearAllPoints()
-    PickFrame:SetPoint("CENTER")
     PickFrame:Show()
     ns.RefreshWindowChain("left")
 end

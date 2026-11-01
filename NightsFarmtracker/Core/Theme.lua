@@ -156,7 +156,8 @@ ns.COLOR_THEMES = {
         accent = {0.92, 0.96, 1.00},
     },
 }
--- Display order for the Settings dropdown
+-- Every theme key; the Settings dropdown sorts them by localized name
+-- (Default and Custom first, see SortedThemeKeys in Settings/Colors.lua)
 ns.COLOR_THEME_ORDER = {
     "default", "void", "silvermoon", "fel", "frost", "bloodmoon",
     "molten", "emerald", "arcane", "bronze", "plague", "nether", "argent",
