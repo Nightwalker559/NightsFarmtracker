@@ -67,7 +67,7 @@ end
 
 ------------------------------------------------------------------------
 -- Helper: button that opens a window ("Open Export Window", "Edit Item Goals") -
--- single persistent instance, reused across rebuilds like gearThresholdEB above.
+-- single persistent instance, reused across rebuilds like the number boxes.
 -- btn:SetActive(false) greys it out and makes it inert.
 ------------------------------------------------------------------------
 local function MakeWindowButton(labelKey, onClick)

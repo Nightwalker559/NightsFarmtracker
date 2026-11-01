@@ -15,6 +15,7 @@
 - The category list of the Gear AH Threshold (gear icon next to the threshold field) is a window in the docking chain behind Settings and the Sell List options instead of floating over Settings
 - Internal: the tab strip of the Filter window is a shared widget (`ns.CreateTabStrip`), now also used by Sessions & History
 - Internal: the Settings code is split into the folder `Modules\Settings` (shared widgets, one file per topic, the window itself); no change in behavior
+- Internal: the text links in the header of the copy text windows (Select all, Back, Clear) share one helper, and those windows are placed by the docking chain alone
 
 ## 1.8.4
 

@@ -71,19 +71,11 @@ local function CreateDebugWindow()
     -- Esc must not close the log: only /nft debug (off) or the close button hide it.
     local frame = ns.CreateCopyTextWindow("NightsFarmtrackerDebugWnd", ns.L["debug_title"], true)
 
-    local clearBtn = CreateFrame("Button", nil, frame)
-    clearBtn:SetSize(60, 16)
-    clearBtn:SetPoint("TOPRIGHT", -ns.PAD - 100, -(ns.WINDOW_HDR_H + 6))
-    local clearText = clearBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    clearText:SetAllPoints(); clearText:SetJustifyH("RIGHT")
-    clearText:SetTextColor(unpack(ns.COL_ACCENT))
-    clearText:SetText(ns.L["debug_clear"])
-    clearBtn:SetScript("OnEnter", function() clearText:SetTextColor(1, 1, 1) end)
-    clearBtn:SetScript("OnLeave", function() clearText:SetTextColor(unpack(ns.COL_ACCENT)) end)
-    clearBtn:SetScript("OnClick", function()
+    local clearBtn = ns.CreateAccentLink(frame, 60, ns.L["debug_clear"], function()
         ClearLog()
         frame.box:ClearFocus()
     end)
+    clearBtn:SetPoint("TOPRIGHT", -ns.PAD - 100, -(ns.WINDOW_HDR_H + 6))
 
     local elapsed = 0
     frame:SetScript("OnUpdate", function(self, dt)

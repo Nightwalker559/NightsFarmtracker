@@ -349,6 +349,22 @@ function ns.CreateDangerLink(parent, pad, text, onClick)
     return btn
 end
 
+-- Small right-aligned text link in the accent color (white on hover): "Select
+-- all", "Back", "Clear" in the header strip of the copy-text windows. The
+-- caller anchors it.
+function ns.CreateAccentLink(parent, width, text, onClick)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(width, 16)
+    local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lbl:SetAllPoints(); lbl:SetJustifyH("RIGHT")
+    lbl:SetTextColor(unpack(ns.COL_ACCENT))
+    lbl:SetText(text)
+    btn:SetScript("OnEnter", function() lbl:SetTextColor(1, 1, 1) end)
+    btn:SetScript("OnLeave", function() lbl:SetTextColor(unpack(ns.COL_ACCENT)) end)
+    btn:SetScript("OnClick", onClick)
+    return btn
+end
+
 -- "Clear all" link: hasDataFn guards against asking about an empty list.
 function ns.CreateClearAllButton(parent, pad, hasDataFn, popupName)
     return ns.CreateDangerLink(parent, pad, ns.L["clear_all"], function()
@@ -730,9 +746,8 @@ end
 -- Copyable text window: a scrolling, pre-selected EditBox (addons cannot write
 -- the clipboard, so the player presses Ctrl+C). Shared by the data export and
 -- the debug dumps. ns.CreateCopyTextWindow(name, title) builds it once;
--- ns.ShowCopyText(frame, text) fills and shows it, docked next to Settings if
--- that is open, else centered. noEsc: Esc does not close it (see
--- ns.CreateWindowFrame).
+-- ns.ShowCopyText(frame, text) fills and shows it. noEsc: Esc does not close
+-- it (see ns.CreateWindowFrame).
 ------------------------------------------------------------------------
 function ns.CreateCopyTextWindow(name, title, noEsc)
     local W, HDR_H, FTR_H = 460, ns.WINDOW_HDR_H, 12
@@ -748,16 +763,9 @@ function ns.CreateCopyTextWindow(name, title, noEsc)
     hint:SetTextColor(0.5, 0.5, 0.5)
     hint:SetText(ns.L["copy_hint_window"])
 
-    local selectBtn = CreateFrame("Button", nil, frame)
-    selectBtn:SetSize(90, 16)
+    local selectBtn = ns.CreateAccentLink(frame, 90, ns.L["export_select_all"],
+        function() frame.box:SetFocus(); frame.box:HighlightText() end)
     selectBtn:SetPoint("TOPRIGHT", -ns.PAD, -(HDR_H + 6))
-    local selectText = selectBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    selectText:SetAllPoints(); selectText:SetJustifyH("RIGHT")
-    selectText:SetTextColor(unpack(ns.COL_ACCENT))
-    selectText:SetText(ns.L["export_select_all"])
-    selectBtn:SetScript("OnEnter", function() selectText:SetTextColor(1, 1, 1) end)
-    selectBtn:SetScript("OnLeave", function() selectText:SetTextColor(unpack(ns.COL_ACCENT)) end)
-    selectBtn:SetScript("OnClick", function() frame.box:SetFocus(); frame.box:HighlightText() end)
 
     local scrollFrame = CreateFrame("ScrollFrame", nil, frame)
     scrollFrame:SetPoint("TOPLEFT", ns.PAD, -(HDR_H + 26))
@@ -789,19 +797,14 @@ function ns.CreateCopyTextWindow(name, title, noEsc)
 end
 
 -- Fills a window built by ns.CreateCopyTextWindow with `text` and shows
--- it (docked next to Settings if open, else centered), pre-selected for
--- an immediate Ctrl+C. `live` (the debug log): no focus/selection grab, so
--- the window can keep refreshing; the caller handles scrolling.
+-- it (the left docking chain places it), pre-selected for an immediate
+-- Ctrl+C. The caller registers the window as ns.<Key>Frame in that chain.
+-- `live` (the debug log): no focus/selection grab, so the window can keep
+-- refreshing; the caller handles scrolling.
 function ns.ShowCopyText(frame, text, live)
     frame.box:SetText(text)
     frame.scrollFrame:UpdateScrollChildRect()
     if not live then frame.scrollFrame:SetVerticalScroll(0) end
-    frame:ClearAllPoints()
-    if ns.SettingsFrame and ns.SettingsFrame:IsShown() then
-        ns.DockFrame(frame, ns.SettingsFrame, "left")
-    else
-        frame:SetPoint("CENTER")
-    end
     frame:Show()
     if not live then
         frame.box:SetFocus()
