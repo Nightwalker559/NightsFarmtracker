@@ -490,13 +490,11 @@ watcher:SetScript("OnEvent", function(_, event, arg1)
         ns.ReapplyBaitPosition()   -- MainFrame may have been dragged during combat
     end
     if not NightsFarmtrackerDB or NightsFarmtrackerDB.baitFrameEnabled ~= true then return end
-    if event == "UNIT_INVENTORY_CHANGED" then
-        QueueRefresh()
-    elseif event == "TOOLTIP_DATA_UPDATE" then
+    if event == "TOOLTIP_DATA_UPDATE" then
         -- fires for every tooltip lookup in the game; only our pole's matters
         if poleTooltipID and arg1 == poleTooltipID then QueueRefresh() end
     else
-        RefreshBaitFrame()
+        QueueRefresh()   -- bag and equipment events come in bursts (looting, selling)
     end
 end)
 

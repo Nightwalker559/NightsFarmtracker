@@ -27,6 +27,8 @@
 - Gear below the Gear AH Threshold that has no vendor price counts nothing, like its (empty) row; before, the category total counted its AH value
 - Merged sessions (same day, compact months): a reagent whose tier breakdown does not add up after the merge (one session had tiers, the other not) stays one plain entry with the summed values instead of being priced with live AH values
 - Item goals: the general goal is shown on the bar of every item, Vendor-Only items included, but only items with an AH price can reach a goal (general or own), turn the bar green and pause the session; rows without any goal get no value bar while goal bars are shown, so the list has one scale
+- Item list: gear groups of the same item level and quality always use the same variant for their AH price (it depended on the table order before)
+- Performance: the collapsed main window builds no rows (they are built when it opens); the Fishing Lure Bar merges bag and equipment events into one refresh per frame; the Venom Tracker scans once per cast burst and leaves the currency to its own event; the Sell List is rebuilt once after a sale run instead of after every sold item
 - Minimap HUD: the restored zoom level is within the valid range
 - Item tooltips: an error while the item tooltip is built no longer disables the Auctionator line refresh; the tooltip of drop list rows follows the screen side
 - Repairs: a failing repair is reported as an error instead of being lost silently; failing deferred combat calls no longer drop the rest of the queue

@@ -26,6 +26,7 @@ local FRAME_NAME = "NightsFarmtrackerVendorSellWnd"
 local frame, scrollFrame, listFrame
 local items, trash, rows = {}, {}, {}   -- bag items to sell (most gold first), to delete, and their active rows
 local selling                -- ticker of the running sale
+local Rebuild                -- defined below the rows; the sale run calls it when it ends
 
 -- Both options (Settings, Windows & Buttons) are on until switched off.
 local function IsOn(dbKey)
@@ -231,7 +232,7 @@ local function SellClick()
         end
         if i >= n then
             selling = nil
-            UpdateSellButton()
+            Rebuild()   -- the bag events of the run were skipped (see the OnEvent handler)
         end
     end, n)
     UpdateSellButton()
@@ -282,7 +283,7 @@ local function AddRow(yOff, e, valueText)
     return yOff + ns.ROW_H
 end
 
-local function Rebuild()
+function Rebuild()
     rowPool.releaseAll(rows)
     items, trash = CollectItems(), CollectTrash()
 
@@ -360,7 +361,8 @@ local function EnsureFrame()
     frame.deleteBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Registered only while the window is open
-    frame:SetScript("OnEvent", Rebuild)
+    -- A sale run changes the bags once per item; the list is rebuilt once at its end
+    frame:SetScript("OnEvent", function() if not selling then Rebuild() end end)
     frame:HookScript("OnShow", function(self) self:RegisterEvent("BAG_UPDATE_DELAYED") end)
     frame:HookScript("OnHide", function(self) self:UnregisterEvent("BAG_UPDATE_DELAYED") end)
 end

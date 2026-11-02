@@ -411,10 +411,14 @@ local function UpdateFooterLine()
 end
 ScrollFrame:SetScript("OnVerticalScroll", UpdateFooterLine)
 
+local BuildHUD      -- defined below; builds the whole list
+local rowsBuilt = false   -- the rows of the current list exist (only while expanded)
+
 function ns.SetExpanded(expand)
     NightsFarmtrackerDB.expanded = expand
     if expand then
         btnToggle.tex:SetTexture(ART.."btn_collapse.png")
+        if not rowsBuilt then BuildHUD() end
         UpdateFrameHeight()
     else
         emptyHint:Hide(); ScrollFrame:Hide()
@@ -997,7 +1001,7 @@ local function RenderFlatRow(fi, yOffset)
     end
 end
 
-local function BuildHUD()
+function BuildHUD()
     local savedScroll = ScrollFrame:GetVerticalScroll()
     ClearRows()
 
@@ -1009,13 +1013,19 @@ local function BuildHUD()
     local hasAH = ns.HasAnyAH() and db.ahSource ~= "none"
     PlayGearThresholdSound(db, hasAH)
 
+    -- The rows only exist while the window is expanded; ns.SetExpanded builds
+    -- them when it opens. Totals, goals and the sound above never need them.
+    rowsBuilt = db.expanded and true or false
+
     -- Categories by total gold (the sum of ns.ItemValue, matching the overall
     -- total), ties by item class priority.
     local sorted = {}
-    for catName, cat in pairs(cats) do sorted[#sorted + 1] = {name = catName, cat = cat} end
-    table.sort(sorted, function(a, b)
-        return ns.CategoryBefore(a.cat.totalGold, a.cat.classID, b.cat.totalGold, b.cat.classID)
-    end)
+    if rowsBuilt then
+        for catName, cat in pairs(cats) do sorted[#sorted + 1] = {name = catName, cat = cat} end
+        table.sort(sorted, function(a, b)
+            return ns.CategoryBefore(a.cat.totalGold, a.cat.classID, b.cat.totalGold, b.cat.classID)
+        end)
+    end
 
     local yOffset = 0
     local flow = ns.NewHeaderFlow()
@@ -1055,13 +1065,15 @@ local function BuildHUD()
     end
     if goalReached ~= wasReached then ns.ApplyPauseVisuals() end
 
-    totalH = yOffset
-    local maxScroll = math.max(0, totalH - ScrollFrame:GetHeight())
-    ScrollFrame:SetVerticalScroll(math.min(savedScroll, maxScroll))
-    UpdateFrameHeight()
-    listFlow = flow
-    listScrolls = ns.VisibleListHeight(totalH, SCROLL_TOP + 1, FOOTER_H) < totalH
-    UpdateFooterLine()
+    if rowsBuilt then
+        totalH = yOffset
+        local maxScroll = math.max(0, totalH - ScrollFrame:GetHeight())
+        ScrollFrame:SetVerticalScroll(math.min(savedScroll, maxScroll))
+        UpdateFrameHeight()
+        listFlow = flow
+        listScrolls = ns.VisibleListHeight(totalH, SCROLL_TOP + 1, FOOTER_H) < totalH
+        UpdateFooterLine()
+    end
     UpdateSummary(grandTotal)
 
     if ns.RebuildFilterList then ns.RebuildFilterList() end

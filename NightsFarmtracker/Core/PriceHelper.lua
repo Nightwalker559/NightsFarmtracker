@@ -257,15 +257,24 @@ function ns.GroupGearVariantsForDisplay(gearVariants)
     -- variant of the SAME item that quality already dropped at tells us
     -- which item level this one almost certainly was too - infer it instead
     -- of grouping it into its own separate "no ilvl" row.
+    --
+    -- The variants are walked in key order: a group keeps the link (and so the
+    -- AH price) of its first variant, which must not depend on pairs() order.
+    local keys = {}
+    for key in pairs(gearVariants) do keys[#keys + 1] = key end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+
     local ilvlByQuality = {}
-    for _, gv in pairs(gearVariants) do
+    for _, key in ipairs(keys) do
+        local gv = gearVariants[key]
         if gv.itemLevel and gv.quality and not ilvlByQuality[gv.quality] then
             ilvlByQuality[gv.quality] = gv.itemLevel
         end
     end
 
     local groups = {}
-    for _, gv in pairs(gearVariants) do
+    for _, key in ipairs(keys) do
+        local gv = gearVariants[key]
         if gv.amount > 0 then
             local itemLevel = gv.itemLevel or (gv.quality and ilvlByQuality[gv.quality])
             local gKey = tostring(itemLevel or "?") .. "|" .. tostring(gv.quality or "?")
