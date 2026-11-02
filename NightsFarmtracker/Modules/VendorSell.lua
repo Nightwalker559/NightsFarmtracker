@@ -250,6 +250,11 @@ local function UpdateDeleteButton()
     if #trash > 0 then
         btn.lbl:SetText(string.format(ns.L["vendor_sell_delete_btn"], #trash))
     end
+    -- side by side while there is something to delete, otherwise the sell button takes the whole row
+    frame.sellBtn:ClearAllPoints()
+    frame.sellBtn:SetPoint("BOTTOMRIGHT", -pad, 8)
+    if #trash > 0 then frame.sellBtn:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 2, 8)
+    else frame.sellBtn:SetPoint("BOTTOMLEFT", pad, 8) end
 end
 
 local function DeleteClick()
@@ -292,14 +297,9 @@ function Rebuild()
     local deleteTag = "|cffff5050" .. ns.L["vendor_sell_delete_tag"] .. "|r"
     for _, e in ipairs(trash) do yOff = AddRow(yOff, e, deleteTag) end
 
-    -- The delete button sits above the sell button, so the footer grows with it
-    local ftrH = FTR_H + (#trash > 0 and BTN_H + 4 or 0)
-    frame.ftrLine:ClearAllPoints()
-    frame.ftrLine:SetPoint("BOTTOMLEFT", pad, ftrH - 2)
-    frame.ftrLine:SetPoint("BOTTOMRIGHT", -pad, ftrH - 2)
     ns.FitScrollWindow({
         window = frame, scroll = scrollFrame, list = listFrame,
-        hdrH = hdrH, ftrH = ftrH, contentH = yOff, minH = MIN_VIS_H,
+        hdrH = hdrH, ftrH = FTR_H, contentH = yOff, minH = MIN_VIS_H,
     })
     frame.emptyLabel:SetShown(#items == 0 and #trash == 0)
     UpdateSellButton()
@@ -315,7 +315,9 @@ local function CreateFooterButton(parent, onClick)
     btn:SetHeight(BTN_H)
     ns.StyleBackdropBox(btn, {0.05, 0.08, 0.09, 1})
     btn.lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    btn.lbl:SetPoint("CENTER")
+    btn.lbl:SetPoint("LEFT", 4, 0)
+    btn.lbl:SetPoint("RIGHT", -4, 0)
+    btn.lbl:SetWordWrap(false)   -- the buttons share a row, a long label is cut instead of spilling out
     btn.lbl:SetFontHeight(ns.FONT_NORMAL)
     btn:SetScript("OnEnter", function(self)
         if self:IsEnabled() then self:SetBackdropBorderColor(unpack(ns.COL_ACCENT)) end
@@ -333,7 +335,7 @@ local function EnsureFrame()
     ns.VendorSellFrame = frame
 
     ns.AddHLine(frame, "TOP", pad, -(hdrH - 1))
-    frame.ftrLine = ns.AddHLine(frame, "BOTTOM", pad, FTR_H - 2)   -- Rebuild moves it above the delete button
+    ns.AddHLine(frame, "BOTTOM", pad, FTR_H - 2)
 
     scrollFrame, listFrame = ns.CreateScrollList(frame, ns.CONTENT_W, ns.ROW_H)
     scrollFrame:SetPoint("TOPLEFT", pad, -hdrH)
@@ -354,8 +356,8 @@ local function EnsureFrame()
     frame.sellBtn:SetPoint("BOTTOMRIGHT", -pad, 8)
 
     frame.deleteBtn = CreateFooterButton(frame, DeleteClick)
-    frame.deleteBtn:SetPoint("BOTTOMLEFT", pad, 8 + BTN_H + 4)
-    frame.deleteBtn:SetPoint("BOTTOMRIGHT", -pad, 8 + BTN_H + 4)
+    frame.deleteBtn:SetPoint("BOTTOMLEFT", pad, 8)
+    frame.deleteBtn:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -2, 8)
     frame.deleteBtn.lbl:SetTextColor(1, 0.4, 0.4)
     frame.deleteBtn:HookScript("OnEnter", function(self) ns.ShowGrayTip(self, ns.L["vendor_sell_delete_tip"]) end)
     frame.deleteBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
