@@ -25,53 +25,76 @@ local helpSections = {
     { title = ns.L["help_fishing"],    lines = { ns.L["help_fishing_hint"] } },
     { title = ns.L["help_export"],     lines = { ns.L["help_export_hint"] } },
     { title = ns.L["help_commands"],   lines = { ns.L["help_cmd_nft"], ns.L["help_cmd_filter"], ns.L["help_cmd_hud"], ns.L["help_cmd_export"], ns.L["help_cmd_fishing"] } },
+    -- Explanations the settings window leaves out; its "?" buttons open them (ns.OpenHelpTopic)
+    { key = "limit",  title = ns.L["help_set_limit"], lines = { ns.L["help_set_limit_length"], ns.L["help_set_limit_goals"],
+                                                                ns.L["help_set_limit_general"], ns.L["help_set_limit_vendor"] } },
+    { key = "gearah", title = ns.L["help_set_gear"],  lines = { ns.L["help_set_gear_text"] } },
 }
 table.sort(helpSections, function(a,b) return a.title < b.title end)
 
-local HelpFrame
-local function BuildHelpText()
-    local out = {}
-    for _, section in ipairs(helpSections) do
-        out[#out+1] = "|cffffffff" .. section.title .. "|r"
-        for _, line in ipairs(section.lines) do out[#out+1] = "|cffb3b3b3" .. line .. "|r" end
-        out[#out+1] = " "
-    end
+local function SectionText(section)
+    local out = { "|cffffffff" .. section.title .. "|r" }
+    for _, line in ipairs(section.lines) do out[#out+1] = "|cffb3b3b3" .. line .. "|r" end
+    out[#out+1] = " "
     return table.concat(out, "\n")
+end
+
+local HelpFrame, helpScroll
+local topicY = {}   -- section key -> offset of the section in the scrolled text
+
+local function EnsureHelpFrame()
+    if HelpFrame then return end
+    local W = 420
+    HelpFrame = ns.CreateWindowFrame("NightsFarmtrackerHelpWnd", ns.L["help_detail_title"], {width = W})
+    HelpFrame:SetPoint("CENTER")
+    -- Above the main window, Venom Tracker and Lure Bar (all MEDIUM) which it can overlap.
+    HelpFrame:SetFrameStrata("HIGH")
+    HelpFrame:SetToplevel(true)
+    local hdrH = ns.WINDOW_HDR_H
+    ns.AddHLine(HelpFrame, "TOP", ns.PAD, -(hdrH - 1))
+    -- The text scrolls once the window reaches ns.GetMaxHelpH()
+    local textW  = W - 2 * ns.PAD
+    local scroll, child = ns.CreateScrollList(HelpFrame, textW, 24)
+    helpScroll = scroll
+    scroll:SetPoint("TOPLEFT", ns.PAD, -(hdrH + 8))
+    scroll:SetWidth(textW)
+    -- One text per section, stacked, so a topic's offset is known
+    local textH = 0
+    for _, section in ipairs(helpSections) do
+        local fs = child:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("TOPLEFT", 0, -textH)
+        fs:SetWidth(textW)
+        fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
+        fs:SetSpacing(2)
+        fs:SetText(SectionText(section))
+        if section.key then topicY[section.key] = textH end
+        textH = textH + math.ceil(fs:GetStringHeight()) + 2
+    end
+    HelpFrame.fit = function()
+        ns.FitScrollWindow({
+            window = HelpFrame, scroll = scroll, list = child,
+            hdrH = hdrH + 8, ftrH = 8, contentH = textH,
+            maxTotal = ns.GetMaxHelpH(),
+        })
+    end
+    HelpFrame.fit()
 end
 
 function ns.ToggleHelpWindow()
     if ns.DeferInCombat(ns.ToggleHelpWindow) then return end
-    if not HelpFrame then
-        local W = 420
-        HelpFrame = ns.CreateWindowFrame("NightsFarmtrackerHelpWnd", ns.L["help_detail_title"], {width = W})
-        HelpFrame:SetPoint("CENTER")
-        -- Above the main window, Venom Tracker and Lure Bar (all MEDIUM) which it can overlap.
-        HelpFrame:SetFrameStrata("HIGH")
-        HelpFrame:SetToplevel(true)
-        local hdrH = ns.WINDOW_HDR_H
-        ns.AddHLine(HelpFrame, "TOP", ns.PAD, -(hdrH - 1))
-        -- The text scrolls once the window reaches ns.GetMaxHelpH()
-        local textW  = W - 2 * ns.PAD
-        local scroll, child = ns.CreateScrollList(HelpFrame, textW, 24)
-        scroll:SetPoint("TOPLEFT", ns.PAD, -(hdrH + 8))
-        scroll:SetWidth(textW)
-        local fs = child:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        fs:SetPoint("TOPLEFT")
-        fs:SetWidth(textW)
-        fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
-        fs:SetSpacing(2)
-        fs:SetText(BuildHelpText())
-        local textH = math.ceil(fs:GetStringHeight())
-        HelpFrame.fit = function()
-            ns.FitScrollWindow({
-                window = HelpFrame, scroll = scroll, list = child,
-                hdrH = hdrH + 8, ftrH = 8, contentH = textH,
-                maxTotal = ns.GetMaxHelpH(),
-            })
-        end
-        HelpFrame.fit()
-    end
+    EnsureHelpFrame()
     HelpFrame:SetShown(not HelpFrame:IsShown())
+end
+
+-- Opens the window scrolled to one section (the "?" buttons of the settings).
+function ns.OpenHelpTopic(key)
+    if ns.DeferInCombat(function() ns.OpenHelpTopic(key) end) then return end
+    EnsureHelpFrame()
+    HelpFrame:Show()
+    -- the scroll range is only known once the window has been laid out
+    RunNextFrame(function()
+        helpScroll:SetVerticalScroll(math.min(topicY[key] or 0, helpScroll:GetVerticalScrollRange()))
+    end)
 end
 
 -- Re-fit the (already built) Help window after the max window height changed

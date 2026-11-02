@@ -4,7 +4,8 @@
 
 ### Changed
 
-- Sell List: the Delete button deletes all listed Delete List items with one click instead of one per click; it shows the number of items, not the name of the first one
+- Sell List: the Delete button shows the number of listed items instead of the name of the first one (one click still deletes one item: the game allows one deletion per click)
+- Settings: long explanations moved out of the window. Session length, Item goals, target amount and the Gear AH Threshold have short labels; a "?" button next to the Session Limit title and the Gear AH Threshold opens the Details window at the matching section
 - Sessions tab: a header row on top shows the running month with its total (items plus looted gold) and play time, in the look of the History tab's month rows; hovering it shows items, looted gold, total and the average per day, a click opens the month summary
 
 ### Fixed
@@ -25,7 +26,7 @@
 - Item goals: a goal is reached by the whole amount of the item (all rolls and tiers together) and also counts while its category is collapsed; before, collapsing a category could keep a goal from pausing the session or lift the pause again
 - Gear below the Gear AH Threshold that has no vendor price counts nothing, like its (empty) row; before, the category total counted its AH value
 - Merged sessions (same day, compact months): a reagent whose tier breakdown does not add up after the merge (one session had tiers, the other not) stays one plain entry with the summed values instead of being priced with live AH values
-- Item goals: the general goal is shown on the bar of every item, Vendor-Only items included, but only items with an AH price (and items with an own goal) can reach it and pause the session; rows without any goal get no value bar while goal bars are shown, so the list has one scale
+- Item goals: the general goal is shown on the bar of every item, Vendor-Only items included, but only items with an AH price (and items with an own goal) can reach it, turn the bar green and pause the session; rows without any goal get no value bar while goal bars are shown, so the list has one scale
 - Minimap HUD: the restored zoom level is within the valid range
 - Item tooltips: an error while the item tooltip is built no longer disables the Auctionator line refresh; the tooltip of drop list rows follows the screen side
 - Repairs: a failing repair is reported as an error instead of being lost silently; failing deferred combat calls no longer drop the rest of the queue

@@ -129,10 +129,13 @@ local function MakeGearThresholdEB(parent, yOff)
     cfgBtn:SetPoint("LEFT", frame.unitLbl, "RIGHT", 8, 0)
     cfgBtn:SetScript("OnClick", function() ns.ToggleGearThresholdConfig() end)
 
+    local helpBtn = ns.CreateHelpButton(parent, "gearah")
+    helpBtn:SetPoint("LEFT", cfgBtn, "RIGHT", 6, 0)
+
     -- Same sync as the unit label (see MakeNumberBox)
     local baseShow, baseHide = frame.Show, frame.Hide
-    frame.Show = function(self) baseShow(self); cfgBtn:Show() end
-    frame.Hide = function(self) baseHide(self); cfgBtn:Hide() end
+    frame.Show = function(self) baseShow(self); cfgBtn:Show(); helpBtn:Show() end
+    frame.Hide = function(self) baseHide(self); cfgBtn:Hide(); helpBtn:Hide() end
     return frame
 end
 

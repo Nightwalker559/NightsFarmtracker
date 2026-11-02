@@ -627,7 +627,7 @@ local rowPool = ns.NewPool(function(parent)
     ResetRowLayout(row)
     return row
 end, function(row)
-    row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false; row.barGoal = nil
+    row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false; row.barGoal = nil; row.barVendorOnly = nil
     row.itemName=nil; row.itemLink=nil; row.itemID=nil; row.baseItemID=nil
     row.isCategoryHeader=nil; row.categoryName=nil; row.isJunkMerged=nil
     ns.ShowHeaderBand(row, false)
@@ -700,8 +700,16 @@ local function DrawBar(row, frac, r, g, b)
     row.barBg:Show(); row.bar:Show()
 end
 
+-- Items valued at vendor price only (Vendor-Only Filter, BoP) count towards
+-- their bar, but only a goal of their own can be reached by them, not the
+-- general one: that is left to items with an AH price.
+local function GoalCanTrigger(vendorOnly, own)
+    return own or not vendorOnly
+end
+
 -- Rows of an item with a goal (db.itemGoals / db.itemGoal) show their count relative to the
--- goal instead and turn green once it is reached. The merged junk row is a sum
+-- goal instead and turn green once it is reached (GoalCanTrigger; a Vendor-Only
+-- item's bar stays in the accent color). The merged junk row is a sum
 -- of many items, so it has no goal. Without any goal on the list every row keeps
 -- the value bar, scaled among them; while some rows show goal progress, the
 -- others get no bar (a value bar would mix a second scale into the list, and
@@ -712,15 +720,16 @@ local function ApplyValueBars()
 
     local maxValue, maxMerged, anyGoal = 0, 0, false
     for _, row in pairs(itemRows) do
-        local goal = not row.isJunkMerged and row.barCount and ns.GetItemGoal(row.itemID)
+        local goal, own
+        if row.barCount and not row.isJunkMerged then goal, own = ns.GetItemGoal(row.itemID) end
         if goal then
             anyGoal = true
             local c = row.barCount
             row.barGoal = goal
-            if c >= goal then
+            if c >= goal and GoalCanTrigger(row.barVendorOnly, own) then
                 DrawBar(row, 1, unpack(GOAL_COL))
             else
-                DrawBar(row, c / goal, unpack(ns.COL_ACCENT))
+                DrawBar(row, c / goal, unpack(ns.COL_ACCENT))   -- also past the goal for Vendor-Only
             end
         else
             row.barGoal = nil
@@ -746,15 +755,13 @@ function ns.GoalReached() return goalReached end
 
 -- True if any item reached its goal with its whole amount (all rolls and tiers
 -- together). BuildHUD pauses the session on it, also with the bars switched off.
--- Items valued at vendor price only (Vendor-Only Filter, BoP) count towards
--- their bar but only trigger a goal of their own, not the general one.
 local function GoalReachedIn(cats)
     for _, cat in pairs(cats) do
         for _, it in ipairs(cat.items) do
             local d = it.data
             if not d.isJunkMerged then
                 local goal, own = ns.GetItemGoal(it.itemID)
-                if goal and (own or not ns.IsVendorOnly(d)) and (d.amount or 0) >= goal then return true end
+                if goal and GoalCanTrigger(ns.IsVendorOnly(d), own) and (d.amount or 0) >= goal then return true end
             end
         end
     end
@@ -949,6 +956,7 @@ end
 local function RenderFlatRow(fi, yOffset)
     local row = rowPool.acquire(ListFrame)
     local d = fi.d
+    row.barVendorOnly = not d.isJunkMerged and ns.IsVendorOnly(d)
     row.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); row.icon:Show()
     row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", ICON_X, 0)

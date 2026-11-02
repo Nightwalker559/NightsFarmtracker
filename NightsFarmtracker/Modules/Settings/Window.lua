@@ -124,12 +124,12 @@ local function NewBuildContext(db)
     end
     local track = ui.track
 
-    -- Section title label at y; returns the y below it.
+    -- Section title label at y; returns the y below it and the label.
     function ui.sectionTitle(y, key, step)
         local lbl = track(sectionLabelPool.acquire(SListFrame), "section")
         lbl:SetPoint("TOPLEFT", S_PAD, y)
         lbl:SetText(ns.L[key])
-        return y - step
+        return y - step, lbl
     end
 
     -- Grey wrapped hint text at y (full width); returns the FontString so the

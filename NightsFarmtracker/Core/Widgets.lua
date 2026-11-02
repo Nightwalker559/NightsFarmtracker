@@ -530,6 +530,16 @@ function ns.CreateConfigButton(parent, title, tip)
     return btn
 end
 
+-- Small "?" button that opens the Details window at one section (ns.OpenHelpTopic).
+-- The settings use it instead of long explanations; the caller anchors it.
+function ns.CreateHelpButton(parent, topic)
+    local btn = ns.MakeBtn(parent, 14, "btn_help.png")
+    btn:HookScript("OnEnter", function(self) ns.ShowGrayTip(self, ns.L["help_link_tip"]) end)
+    btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    btn:SetScript("OnClick", function() ns.OpenHelpTopic(topic) end)
+    return btn
+end
+
 -- Hover tooltip for a pooled row that keeps its item's link in row.itemLink
 -- (nothing is shown while it is nil). Used by the Loot Log and the Sell List.
 function ns.HookRowLinkTooltip(row)

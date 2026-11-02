@@ -238,10 +238,10 @@ local function SellClick()
 end
 
 ------------------------------------------------------------------------
--- Deleting: one click deletes every Delete List item in the list. DeleteCursorItem
--- needs a hardware event, so it all happens inside the click handler, each item
--- checked against its slot first. Should the game refuse, the cursor is cleared
--- again (no item stays "in the hand") and the run stops; the next click goes on.
+-- Deleting: one click deletes one Delete List item (its whole stack). DeleteCursorItem
+-- is restricted to a hardware event, and a click provides exactly one; a second
+-- call in the same click is blocked (ADDON_ACTION_BLOCKED). The item is checked
+-- against its slot first; should the game refuse, the cursor is cleared again.
 ------------------------------------------------------------------------
 local function UpdateDeleteButton()
     local btn = frame.deleteBtn
@@ -260,7 +260,8 @@ local function DeleteClick()
            and ns.IsOnDeleteList(e.itemID) and not InEquipmentSet(e.bag, e.slot) then
             C_Container.PickupContainerItem(e.bag, e.slot)
             DeleteCursorItem()
-            if CursorHasItem() then ClearCursor(); return end   -- refused: the next one would be too
+            if CursorHasItem() then ClearCursor() end
+            return
         end
     end
 end
