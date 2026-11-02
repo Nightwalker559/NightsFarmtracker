@@ -51,7 +51,9 @@ end
 
 -- Safety net for the SetHyperlink path: if Auctionator is loaded but its
 -- lines did not get added, add them ourselves (never twice).
-local function HasAuctionatorLines()
+-- Index of the first tooltip line that starts with one of Auctionator's
+-- Vendor/Auction labels, or nil.
+local function FirstAuctionatorLine()
     local labels = {}
     for _, key in ipairs({ "VENDOR", "AUCTION" }) do
         local ok, label = pcall(Auctionator.Locales.Apply, key)
@@ -62,18 +64,62 @@ local function HasAuctionatorLines()
         local text = fs and fs:GetText()
         if text then
             for _, label in ipairs(labels) do
-                if text:find(label, 1, true) == 1 then return true end
+                if text:find(label, 1, true) == 1 then return i end
             end
         end
     end
-    return false
+end
+
+local function HasAuctionatorLines()
+    return FirstAuctionatorLine() ~= nil
+end
+
+local function SnapshotLine(i)
+    local l, r = _G["GameTooltipTextLeft" .. i], _G["GameTooltipTextRight" .. i]
+    local snap = { lt = l:GetText(), r = r:IsShown() and r:GetText() or nil }
+    snap.lr, snap.lg, snap.lb = l:GetTextColor()
+    snap.rr, snap.rg, snap.rb = r:GetTextColor()
+    return snap
+end
+
+local function RestoreLine(i, snap)
+    local l, r = _G["GameTooltipTextLeft" .. i], _G["GameTooltipTextRight" .. i]
+    l:SetText(snap.lt); l:SetTextColor(snap.lr, snap.lg, snap.lb)
+    if snap.r then
+        r:SetText(snap.r); r:SetTextColor(snap.rr, snap.rg, snap.rb); r:Show()
+    else
+        r:SetText(""); r:Hide()
+    end
+end
+
+-- Auctionator appends its lines at the very end, after every other addon's. They
+-- belong under Blizzard's sell price line, so the block (from its first line to
+-- the end) is moved up behind that line by rewriting the line texts in place.
+local function MoveAuctionatorLinesUp()
+    if not (Auctionator and Auctionator.Locales and Auctionator.Locales.Apply) then return end
+    local first = FirstAuctionatorLine()
+    if not first then return end
+    local sell
+    for i = 2, first - 1 do
+        local text = _G["GameTooltipTextLeft" .. i]:GetText()
+        if text and text:find(SELL_PRICE, 1, true) then sell = i; break end
+    end
+    if not sell or first == sell + 1 then return end
+    local n = GameTooltip:NumLines()
+    local block, others = {}, {}
+    for i = first, n do block[#block + 1] = SnapshotLine(i) end
+    for i = sell + 1, first - 1 do others[#others + 1] = SnapshotLine(i) end
+    local at = sell
+    for _, snap in ipairs(block) do at = at + 1; RestoreLine(at, snap) end
+    for _, snap in ipairs(others) do at = at + 1; RestoreLine(at, snap) end
+    GameTooltip:Show()
 end
 
 local function EnsureAuctionatorLines(link)
     local A = Auctionator
     if not (A and A.Tooltip and A.Tooltip.ShowTipWithPricing and A.Locales and A.Locales.Apply) then return end
-    if HasAuctionatorLines() then return end
-    A.Tooltip.ShowTipWithPricing(GameTooltip, link, 1)
+    if not HasAuctionatorLines() then A.Tooltip.ShowTipWithPricing(GameTooltip, link, 1) end
+    MoveAuctionatorLinesUp()
 end
 
 -- Auctionator's own call can stay without lines (it waits for item data and
@@ -82,7 +128,8 @@ end
 local function AddAuctionatorLinesDirect(link)
     local A = Auctionator
     if not (A and A.Tooltip and A.Tooltip.AddVendorTip and A.Tooltip.AddAuctionTip and A.Utilities
-            and A.Constants and A.Locales and A.Locales.Apply) or HasAuctionatorLines() then return end
+            and A.Constants and A.Locales and A.Locales.Apply) then return end
+    if HasAuctionatorLines() then MoveAuctionatorLinesUp(); return end
     local info = { C_Item.GetItemInfo(link) }
     if #info == 0 then return end
     if A.Utilities.IsVendorable(info) then
@@ -90,6 +137,7 @@ local function AddAuctionatorLinesDirect(link)
     end
     A.Tooltip.AddAuctionTip(GameTooltip, ns.GetAuctionatorPrice((C_Item.GetItemInfoInstant(link)), link),
         "", A.Utilities.IsBound(info))
+    MoveAuctionatorLinesUp()
     GameTooltip:Show()
 end
 

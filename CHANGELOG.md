@@ -31,6 +31,7 @@
 - Item list: gear groups of the same item level and quality always use the same variant for their AH price (it depended on the table order before)
 - Performance: the collapsed main window builds no rows (they are built when it opens); the Fishing Lure Bar merges bag and equipment events into one refresh per frame; the Venom Tracker scans once per cast burst and leaves the currency to its own event; the Sell List is rebuilt once after a sale run instead of after every sold item
 - Minimap HUD: the restored zoom level is within the valid range
+- Item tooltips of gear in the item list and History: Auctionator's lines (vendor and auction price) are placed directly under the sell price line instead of after every other addon's lines
 - Item tooltips: an error while the item tooltip is built no longer disables the Auctionator line refresh; the tooltip of drop list rows follows the screen side
 - Repairs: a failing repair is reported as an error instead of being lost silently; failing deferred combat calls no longer drop the rest of the queue
 
