@@ -455,7 +455,6 @@ local SLASH_COMMANDS = {
     itemdb       = function() ns.DebugItemDB() end,
     monthdump    = function(args) ns.DebugMonthDump(tonumber(args)) end,
     sessionsdump = function() ns.DebugSessionsDump() end,
-    repairprices = function() ns.RepairLastSessionPrices() end,
 }
 
 SLASH_FARMTRACK1 = "/nft"
@@ -467,7 +466,7 @@ SlashCmdList["FARMTRACK"] = function(msg)
     elseif SLASH_COMMANDS[cmd] then
         SLASH_COMMANDS[cmd](args)
     else
-        ns.Print("/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump · /nft repairprices")
+        ns.Print("/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump")
     end
 end
 
@@ -661,7 +660,7 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
         -- isMe: sender GUID = own GUID (language-independent) OR prefix check
         -- ("Ihr "/"You ") OR sender = own player name
         local guidMatch   = guid and not issecretvalue(guid) and guid == UnitGUID("player")
-        local prefixMatch = SELF_LOOT_PREFIX and msg:find(SELF_LOOT_PREFIX, 1, true)
+        local prefixMatch = SELF_LOOT_PREFIX and msg:sub(1, #SELF_LOOT_PREFIX) == SELF_LOOT_PREFIX
         local senderShort = (sender and not issecretvalue(sender)) and sender:match("^([^%-]+)") or ""
         local senderMatch = senderShort ~= "" and senderShort == UnitName("player")
         if not guidMatch and not prefixMatch and not senderMatch then return end

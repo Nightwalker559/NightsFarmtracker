@@ -147,11 +147,12 @@ end
 -- Equipment whose AH price is below the configured gold threshold (or missing)
 -- shows its vendor price. Groups switched off in the threshold config are
 -- skipped. ItemValue() and the HUD row both use it, so a row always agrees
--- with its category header.
-function ns.IsGearThresholdVendorOnly(data, ahTotal)
+-- with its category header. The threshold is per item: ahTotal is the AH value
+-- of `count` copies (default 1), so a stack of cheap pieces never reaches it.
+function ns.IsGearThresholdVendorOnly(data, ahTotal, count)
     local threshold = NightsFarmtrackerDB.gearAHThreshold or 0
     if threshold <= 0 or not ns.IsGearThresholdApplicable(data) then return false end
-    return not (ahTotal and ahTotal >= threshold)
+    return not (ahTotal and ahTotal / math.max(count or 1, 1) >= threshold)
 end
 
 -- True if an item must always be valued at vendor price, never AH
@@ -166,10 +167,10 @@ end
 -- be nil): the higher of the two, but vendor where the Gear AH Threshold
 -- says so - Equipment only uses its AH price once that price reaches the
 -- configured gold threshold; below it (or with no AH price at all) vendor
--- price is used. Shared by the live value, the frozen session value and the
+-- price is used, and nothing when there is none. Shared by the live value, the frozen session value and the
 -- per-variant sums so a row always agrees with its category header.
-function ns.PickValue(data, vendor, ah)
-    if ns.IsGearThresholdVendorOnly(data, ah) then return vendor or ah end
+function ns.PickValue(data, vendor, ah, count)
+    if ns.IsGearThresholdVendorOnly(data, ah, count) then return vendor end
     if ah and vendor then return math.max(ah, vendor) end
     return ah or vendor
 end
@@ -188,7 +189,7 @@ function ns.GearVariantItemValue(data)
         local v = (sp and sp > 0) and (sp * gv.amount) or nil
         local ap = ns.GetAHPriceForID(data.itemID, gv.itemLink)
         local a = ap and (ap * gv.amount) or nil
-        local value = ns.PickValue(data, v, a)
+        local value = ns.PickValue(data, v, a, gv.amount)
         if value then total = total + value; any = true end
     end
     return any and total or nil
@@ -203,7 +204,7 @@ function ns.ItemValue(data, vendor, ah)
     -- data.variants (see GetVariants in PriceHelper.lua) but are valued as one
     -- item below.
     if data.variants and ns.IsGear(data) then return ns.GearVariantItemValue(data) end
-    return ns.PickValue(data, vendor or ns.VendorTotal(data), ah or ns.AHTotal(data))
+    return ns.PickValue(data, vendor or ns.VendorTotal(data), ah or ns.AHTotal(data), data.amount)
 end
 
 -- Sort rule of every category list (HUD and History): most gold first, ties

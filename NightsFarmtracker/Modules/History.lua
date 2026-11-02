@@ -138,7 +138,7 @@ local monthPool = ns.NewPool(function(parent)
     return r
 end, function(r)
     r:SetScript("OnMouseUp",nil)
-    r.delBtn:SetScript("OnClick",nil)
+    r.delBtn:SetScript("OnClick",nil); r.delBtn:Show()
     r.nameText:SetTextColor(unpack(ns.COL_ACCENT))
 end)
 
@@ -300,15 +300,10 @@ local function EnsureDetailFrame()
     DScrollFrame:SetPoint("TOPLEFT",PAD,-DET_HDR_H); DScrollFrame:SetWidth(DET_CONT_W)
 end
 
--- Row gold text. Plain rows and rows with a frozen AH/vendor split show
--- entry.gold (the exact value the list was sorted by - BuildSessionCategories
--- takes the LARGER of AH and vendor); older variant/tier rows show their AH
--- total, else their vendor total.
+-- Row gold text: entry.gold, the exact value the list was sorted by
+-- (BuildSessionCategories takes the LARGER of AH and vendor).
 local function SetDetailGold(ir, entry)
     local value = entry.gold
-    if (entry.isRank or entry.isGearVariant) and not entry.breakdown then
-        value = (entry.tAH and entry.tAH > 0) and entry.tAH or entry.tV
-    end
     ir.goldText:SetText(value and value > 0 and ns.FormatGold(value) or "")
 end
 
@@ -316,7 +311,7 @@ end
 local function FillDetailRow(ir, entry)
     local d = entry.d
     ir.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
-    ns.ApplyQualityColor(ir.nameText, ir.iconBorder, d.quality, {1,1,1})
+    ns.ApplyQualityColor(ir.nameText, ir.iconBorder, d.quality)
     ir.goldText:SetTextColor(unpack(ns.COL_GOLD))  -- always gold, like the main window
     ir.classID = d.classID
     ir.itemName = entry.name
@@ -328,7 +323,7 @@ local function FillDetailRow(ir, entry)
         ir.countText:SetText(tostring(entry.tc))
     elseif entry.isGearVariant then
         local gv = entry.gv
-        ns.ApplyQualityColor(ir.nameText, ir.iconBorder, gv.quality, {1,1,1})
+        ns.ApplyQualityColor(ir.nameText, ir.iconBorder, gv.quality)
         ir.itemID = d.itemID
         ir.itemLink = gv.itemLink
         ir.itemLevel = gv.itemLevel
@@ -362,7 +357,7 @@ local function RebuildDetailContent(session)
     for _, catName in ipairs(catOrder) do
         for _, entry in ipairs(cats[catName].items) do
             kinds = kinds + 1
-            qty = qty + (tonumber(entry.isRank and entry.tc or entry.isGearVariant and entry.gv.amount or entry.d.amount) or 0)
+            qty = qty + ns.EntryAmount(entry)
         end
     end
     detailStats = { kinds = kinds, qty = qty }
@@ -455,6 +450,26 @@ local function AveragePerDay(gold, days)
     return math.floor(gold / days)
 end
 
+-- Tooltip of a month row: items, looted gold, total and the average per day.
+-- withHint adds the click hint of the History tab's month rows above.
+local function ShowMonthTooltip(row, month, mKey, combined, withHint)
+    GameTooltip:SetOwner(row,"ANCHOR_TOP")
+    if withHint then
+        GameTooltip:AddLine(ns.L["month_summary_tooltip"])
+        GameTooltip:AddLine(" ")
+    end
+    if combined>0 then
+        GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(month.totalGold or 0), 0.75,0.75,0.75, 1,1,1)
+        GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(month.lootedGold or 0), 0.75,0.75,0.75, 1,1,1)
+        GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(combined), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+        local avg = AveragePerDay(combined, MonthDays(mKey, month.isCurrent))
+        if avg then
+            GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
+        end
+    end
+    if withHint or combined>0 then GameTooltip:Show() end
+end
+
 -- Day header (with the Merge button) and session rows of one day; returns the
 -- new y offset. Shared by the Sessions tab and the expanded months of the
 -- History tab.
@@ -491,7 +506,7 @@ local function AddDayRows(day, dStr, month, flow, yOffset)
         row:SetScript("OnMouseUp",function(self,btn)
             if btn=="LeftButton" and not self.delBtn:IsMouseOver() then
                 if DetailFrame and DetailFrame:IsShown() and currentDetailSession == sess then
-                    if not ns.DeferInCombat(function() DetailFrame:Hide() end) then DetailFrame:Hide() end
+                    ns.HideOutOfCombat(DetailFrame)
                 else
                     ShowDetail(sess)
                 end
@@ -545,7 +560,7 @@ function ns.RebuildHistory()
                 }
                 dayOrder[#dayOrder+1]=dStr
             end
-            days[dStr].totalGold=days[dStr].totalGold+session.totalGold
+            days[dStr].totalGold=days[dStr].totalGold+(session.totalGold or 0)
             days[dStr].lootedGold=(days[dStr].lootedGold or 0)+(session.lootedGold or 0)
             days[dStr].sessions[#days[dStr].sessions+1]={session=session,dayKey=dayKey,sessIdx=sessIdx}
         end
@@ -596,6 +611,28 @@ function ns.RebuildHistory()
         local month=currentMonth
         nShown=nCurrent
         if month then
+            -- month total on top, in the look of the History tab's month rows (a click opens the month)
+            local mrow=monthPool.acquire(HListFrame); mrow:SetSize(ns.CONTENT_W, MONTH_H); mrow:SetPoint("TOPLEFT",0,-yOffset)
+            flow.header(mrow)
+            ns.SetHeaderArrow(mrow, false); mrow.headerArrow:Hide()
+            mrow.delBtn:Hide()
+            mrow.nameText:ClearAllPoints(); mrow.nameText:SetPoint("LEFT",4,0)
+            mrow.nameText:SetText(month.label)
+            mrow.infoText:SetText(month.duration>0 and ns.FormatTime(month.duration) or "")
+            local monthCombined = (month.totalGold or 0) + (month.lootedGold or 0)
+            mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
+            mrow:SetScript("OnEnter",function(self)
+                self.nameText:SetTextColor(1,1,1)
+                ShowMonthTooltip(self, month, currentMonthKey, monthCombined, false)
+            end)
+            mrow:SetScript("OnMouseUp",function()
+                if DetailFrame and DetailFrame:IsShown() and currentDetailSession and currentDetailSession.monthKey == currentMonthKey then
+                    ns.HideOutOfCombat(DetailFrame)
+                else
+                    ShowDetail(BuildMonthAggregate(currentMonthKey, month))
+                end
+            end)
+            activeMonthRows[#activeMonthRows+1]=mrow; yOffset=yOffset+MONTH_H
             for _,dStr in ipairs(month.dayList) do
                 yOffset=AddDayRows(days[dStr], dStr, month, flow, yOffset)
             end
@@ -623,27 +660,13 @@ function ns.RebuildHistory()
             mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
             mrow:SetScript("OnEnter",function(self)
                 self.nameText:SetTextColor(1,1,1)
-                GameTooltip:SetOwner(self,"ANCHOR_TOP")
-                if not flat then
-                    GameTooltip:AddLine(ns.L["month_summary_tooltip"])
-                    GameTooltip:AddLine(" ")
-                end
-                if monthCombined>0 then
-                    GameTooltip:AddDoubleLine(ns.L["gold_items"], ns.FormatGold(month.totalGold or 0), 0.75,0.75,0.75, 1,1,1)
-                    GameTooltip:AddDoubleLine(ns.L["looted_gold"], ns.FormatGold(month.lootedGold or 0), 0.75,0.75,0.75, 1,1,1)
-                    GameTooltip:AddDoubleLine(ns.L["gold_total"], ns.FormatGold(monthCombined), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
-                    local avg = AveragePerDay(monthCombined, MonthDays(mKey, month.isCurrent))
-                    if avg then
-                        GameTooltip:AddDoubleLine(ns.L["avg_per_day"], ns.FormatGold(avg), 0.75,0.75,0.75, unpack(ns.COL_GOLD))
-                    end
-                end
-                if not flat or monthCombined>0 then GameTooltip:Show() end
+                ShowMonthTooltip(self, month, mKey, monthCombined, not flat)
             end)
             mrow:SetScript("OnMouseUp",function(self)
                 if self.delBtn:IsMouseOver() then return end
                 if flat or IsShiftKeyDown() then
                     if DetailFrame and DetailFrame:IsShown() and currentDetailSession and currentDetailSession.monthKey == mKey then
-                        if not ns.DeferInCombat(function() DetailFrame:Hide() end) then DetailFrame:Hide() end
+                        ns.HideOutOfCombat(DetailFrame)
                     elseif #month.sessionsList > 0 then
                         ShowDetail(BuildMonthAggregate(mKey, month))
                     end

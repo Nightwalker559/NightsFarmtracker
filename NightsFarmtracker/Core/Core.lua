@@ -22,7 +22,7 @@ combatWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
 combatWatcher:SetScript("OnEvent", function()
     local queued = pendingCombatCalls
     pendingCombatCalls = {}
-    for _, fn in ipairs(queued) do fn() end
+    for _, fn in ipairs(queued) do xpcall(fn, geterrorhandler()) end   -- one error must not drop the rest
 end)
 
 function ns.DeferInCombat(fn)
@@ -31,6 +31,11 @@ function ns.DeferInCombat(fn)
         return true
     end
     return false
+end
+
+-- Hides `frame` now, or right after combat ends.
+function ns.HideOutOfCombat(frame)
+    if not ns.DeferInCombat(function() frame:Hide() end) then frame:Hide() end
 end
 
 ns.TRADE_GOODS    = Enum.ItemClass.Tradegoods

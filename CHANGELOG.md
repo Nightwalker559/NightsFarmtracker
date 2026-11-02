@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.8.6
+
+### Changed
+
+- Sell List: the Delete and Sell buttons sit side by side (Sell takes the whole row while there is nothing to delete); the Sell button no longer shows the gold sum
+- Sell List: the Delete button shows the number of listed items instead of the name of the first one (one click still deletes one item: the game allows one deletion per click)
+- Settings: long explanations moved out of the window. Session length, Item goals, target amount and the Gear AH Threshold have short labels; a "?" button next to the Session Limit title and the Gear AH Threshold opens the Details window at the matching section
+- Sessions tab: a header row on top shows the running month with its total (items plus looted gold) and play time, in the look of the History tab's month rows; hovering it shows items, looted gold, total and the average per day, a click opens the month summary
+
+### Fixed
+
+- Gear AH Threshold: the threshold is checked per item, not against the whole stack. Two rings worth 799g each no longer count as AH-priced at a 1000g threshold (the stack of 2 reached it)
+- Sessions & History: gear below the Gear AH Threshold (per item) is saved at its vendor price, so History shows the values the list showed while farming instead of the plain AH values. Sessions saved earlier are corrected once on the next login with the threshold of the active profile
+- Item tooltips of gear in the item list and History: the Auctionator lines (vendor and auction price) are added from Auctionator's own helpers when its own call leaves them out (seen with gear shown through its item key)
+- AH source "No AH": gear totals and History no longer include live AH prices (the rows showed vendor prices, the totals did not)
+- History: gear worth more at the vendor than at the AH is saved and shown at its vendor price, so its rows add up to the item value the list showed; saved sessions are corrected once on the next login
+- History: rows of Warband/BoP gear that had an AH price when saved no longer disappear; the Plunder count no longer counts an item once per row; sessions of a day or month are never lost if merging a month fails
+- Reagent tier rows use the same vendor price as the category total (a category could vanish from the list while its value was still counted)
+- Main window: collapsing it during combat now applies the collapsed height after combat; Reset refreshes the footer line
+- Loot from chat: only lines that start with the self-loot text count as own loot
+- Gear threshold sound: a drop whose AH price is not known yet is checked again later instead of being skipped for good
+- Sell List: the Delete button re-checks the Delete List and equipment sets of each item before deleting
+- Fishing Lure Bar: right-clicking a lure in combat no longer shifts the saved list against the shown bar
+- Settings: a number box that applies its value while the page rebuilds no longer garbles the page; the session length is applied when the box loses focus (typing "60" no longer ends a longer session at "6"); the Default profile cannot be renamed
+- Item goals: a goal is reached by the whole amount of the item (all rolls and tiers together) and also counts while its category is collapsed; before, collapsing a category could keep a goal from pausing the session or lift the pause again
+- Gear below the Gear AH Threshold that has no vendor price counts nothing, like its (empty) row; before, the category total counted its AH value
+- Merged sessions (same day, compact months): a reagent whose tier breakdown does not add up after the merge (one session had tiers, the other not) stays one plain entry with the summed values instead of being priced with live AH values
+- Item goals: the general goal is shown on the bar of every item, Vendor-Only items included, but only items with an AH price can reach a goal (general or own), turn the bar green and pause the session; rows without any goal get no value bar while goal bars are shown, so the list has one scale
+- Item list: gear groups of the same item level and quality always use the same variant for their AH price (it depended on the table order before)
+- Performance: the collapsed main window builds no rows (they are built when it opens); the Fishing Lure Bar merges bag and equipment events into one refresh per frame; the Venom Tracker scans once per cast burst and leaves the currency to its own event; the Sell List is rebuilt once after a sale run instead of after every sold item
+- Minimap HUD: the restored zoom level is within the valid range
+- Item tooltips of gear in the item list and History: Auctionator's lines (vendor and auction price) are placed directly under the sell price line instead of after every other addon's lines
+- Item tooltips: an error while the item tooltip is built no longer disables the Auctionator line refresh; the tooltip of drop list rows follows the screen side
+- Repairs: a failing repair is reported as an error instead of being lost silently; failing deferred combat calls no longer drop the rest of the queue
+
+### Removed
+
+- `/nft repairprices` (re-priced the newest saved session with live AH prices): no command changes saved values anymore
+
+### Internal
+
+- All repairs of saved sessions live in `Core/Repairs.lua`; dead code removed (item pre-sort, unused row fields, session totals re-pricing branch), shared helpers for the gray hint tooltip, hiding a window after combat, the amount of a Detail row, the freeze of gear prices and saved vendor-only items; stale comments corrected
+
 ## 1.8.5
 
 ### Fixed

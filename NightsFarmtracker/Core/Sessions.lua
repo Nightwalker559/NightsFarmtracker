@@ -1,8 +1,8 @@
 ------------------------------------------------------------------------
 -- Night's Farmtracker - Sessions
 -- Saved-session data model: saving the live session, merging and compacting
--- sessions, re-pricing, deleting, and the category builder behind the
--- Detail window. The windows themselves live in Modules/History.lua.
+-- sessions, deleting, and the category builder behind the Detail window.
+-- (Repairs of saved sessions live in Repairs.lua.) The windows themselves live in Modules/History.lua.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -70,7 +70,7 @@ end
 local function CopyItemFields(d)
     return {
         amount=d.amount, icon=d.icon, quality=d.quality, itemSubType=d.itemSubType, sellPrice=d.sellPrice,
-        isVendorTrash=d.isVendorTrash, isBoE=d.isBoE, isBoP=d.isBoP, isBoA=d.isBoA, canAH=d.canAH,
+        isVendorTrash=d.isVendorTrash, isBoE=d.isBoE, isBoP=d.isBoP, isBoA=d.isBoA, isWarbound=d.isWarbound, canAH=d.canAH,
         isCosmetic=d.isCosmetic, name=d.name,
         classID=d.classID, subClassID=d.subClassID, itemID=d.itemID, itemLink=d.itemLink,
     }
@@ -142,8 +142,8 @@ local function MergeSessionInto(target, src, keepTimestamp)
                         -- ei already holds amount/value from an earlier source without a breakdown:
                         -- seed a placeholder bucket for that part first, so the variant sum keeps
                         -- matching ei.amount (a mismatch would be read as corruption and wiped).
-                        -- Reagent tiers get no placeholder; an inconsistent tier breakdown is left
-                        -- to RepairCorruptedTierBreakdowns.
+                        -- Reagent tiers get no placeholder; a tier breakdown that does not
+                        -- add up is dropped below.
                         ei.variants = { [NoVariantKey(ei.quality)] = {
                             amount = priorAmount, sellPrice = ei.sellPrice, ahTotal = priorAhTotal,
                             quality = ei.quality,
@@ -190,6 +190,14 @@ local function MergeSessionInto(target, src, keepTimestamp)
                 end
             end
         end
+        -- A reagent tier breakdown that does not add up to the amount (one side
+        -- had none, or an inconsistent one) is dropped: the entry stays a plain
+        -- item with the summed frozen values. Rendering would otherwise price
+        -- it with live AH values.
+        local merged = target.items[itemID]
+        if merged.variants and not ns.IsGear(merged) and VariantsSum(merged.variants) ~= (merged.amount or 0) then
+            merged.variants = nil
+        end
     end
 end
 ns.MergeSessionInto = MergeSessionInto
@@ -205,30 +213,36 @@ local function MergeSessionList(list)
     return merged
 end
 
--- Sessions saved before the timestamp became the real start time carry the
--- save (Reset) time, so a session farmed on day A and reset on day B sits
--- under key A but shows up under day B in the History window, which groups
--- by timestamp. Pull such timestamps back onto their storage day (noon;
--- the time of day isn't known). Returns how many were fixed.
-function ns.RepairSessionTimestampsToDayKey(sessions)
-    if not sessions then return 0 end
-    local fixed = 0
-    for dayKey, list in pairs(sessions) do
-        local y, m, d
-        if type(dayKey) == "string" and type(list) == "table" then
-            y, m, d = dayKey:match("^(%d+)-(%d+)-(%d+)$")
-        end
-        if y then
-            local noon = time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 })
-            for _, session in ipairs(list) do
-                if session.timestamp and date("%Y-%m-%d", session.timestamp) ~= dayKey then
-                    session.timestamp = noon
-                    fixed = fixed + 1
-                end
+-- True for a saved item that always counts at vendor price. Entries saved with
+-- filterFrozen already had the Vendor-Only filters applied (forced-vendor items
+-- carry no AH value), so only the item's own flags count; older entries still
+-- follow the live filters.
+function ns.IsSavedVendorOnly(d)
+    if d.filterFrozen then return d.isBoP or d.canAH == false end
+    return ns.IsVendorOnly(d)
+end
+
+-- Freezes what the list showed into the AH value of each variant of scaling
+-- gear: a variant the list priced at vendor - below the Gear AH Threshold (per
+-- item) or worth more at vendor - keeps no AH value, so History shows the same
+-- value as the list. useLive: a missing vendor price may be looked up from the
+-- item (when saving); otherwise only the stored one counts. Returns true if a
+-- variant changed.
+function ns.FreezeVariantPrices(d, variants, useLive)
+    if not ns.IsGear(d) then return false end
+    local changed = false
+    for _, gv in pairs(variants) do
+        local ah = gv.ahTotal or 0
+        if ah > 0 then
+            local sp = useLive and ns.VariantSellPrice(gv, d) or gv.sellPrice
+            local atVendor = sp and sp > 0 and sp * (gv.amount or 0) > ah
+            if atVendor or ns.IsGearThresholdVendorOnly(d, ah, gv.amount) then
+                gv.ahTotal, gv.ahAmount = 0, 0
+                changed = true
             end
         end
     end
-    return fixed
+    return changed
 end
 
 function ns.SaveCurrentSession()
@@ -267,6 +281,8 @@ function ns.SaveCurrentSession()
             or ns.IsForceVendorExpansion(data)   -- not ns.IsVendorOnly: BoP/canAH are decided separately below
         if forceVendor and variantsCopy then
             for _, gv in pairs(variantsCopy) do gv.ahTotal = 0; gv.ahAmount = 0 end
+        elseif variantsCopy then
+            ns.FreezeVariantPrices(data, variantsCopy, true)
         end
         local ah
         if forceVendor then
@@ -279,17 +295,20 @@ function ns.SaveCurrentSession()
             ah = any and sum or nil
         else
             ah = ns.AHTotal(data)
+            if ah and ns.IsGearThresholdVendorOnly(data, ah, data.amount) then ah = nil end
         end
         local val    = ns.ItemValue(data, vendor, ah) or 0
-        -- Item value as History shows it (same rule as BuildSessionCategories:
-        -- vendor-only items vendor, else max(AH, vendor); no Gear AH
-        -- Threshold) frozen per item, so merging sessions priced differently
-        -- (e.g. filters changed in between) adds up instead of re-pricing
-        -- the combined amount at one price.
+        -- Item value as History shows it, frozen per item, so merging sessions
+        -- priced differently (e.g. filters changed in between) adds up instead of
+        -- re-pricing the combined amount at one price. It is the value the list
+        -- showed while farming: vendor-only items vendor, below the Gear AH
+        -- Threshold vendor, else max(AH, vendor) - for scaling gear per variant
+        -- (the variants above were frozen the same way).
         local histAH = (not (forceVendor or data.isBoP or data.canAH == false))
             and ns.HasAnyAH() and db.ahSource ~= "none" and (ah or 0) > 0 and ah or nil
         local histVendor = (vendor or 0) > 0 and vendor or nil
         local histValue  = (histAH and histVendor) and math.max(histAH, histVendor) or histAH or histVendor or 0
+        if variantsCopy and ns.IsGear(data) then histValue = val end
         -- Which part of histValue came from the AH price (the whole item
         -- when AH wins, nothing otherwise) - shown in the Detail tooltip.
         local histAHWins = histAH ~= nil and (histVendor == nil or histAH >= histVendor)
@@ -341,123 +360,6 @@ function ns.MergeDaySessions(dayKey)
     ns.RebuildHistory()
 end
 
-local function LinkCached(link)
-    return link == nil or C_Item.GetItemInfo(link) ~= nil
-end
-
--- Session-total value of one saved item, the way SaveCurrentSession's
--- ns.ItemValue call saw it: vendor-only items at vendor price, gear per
--- variant with the Gear AH Threshold (below it = vendor price), the rest
--- max(AH, vendor). Same rules as ns.ItemValue, but on the frozen AH values
--- instead of live lookups. (The per-item histValue deliberately ignores
--- the threshold, see BuildSessionCategories - only session.totalGold uses it.)
-local function FrozenItemValue(d)
-    local vendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
-    if ns.IsVendorOnly(d) then
-        return vendor or ns.VendorTotal(d) or 0
-    end
-    if d.variants and ns.IsGear(d) then
-        local total = 0
-        for _, gv in pairs(d.variants) do
-            local sp = ns.VariantSellPrice(gv, d)
-            local v  = (sp and sp > 0 and gv.amount) and sp * gv.amount or nil
-            local a  = (gv.ahTotal or 0) > 0 and gv.ahTotal or nil
-            total = total + (ns.PickValue(d, v, a) or 0)
-        end
-        return total
-    end
-    local a = (d.ahTotal or 0) > 0 and d.ahTotal or nil
-    return ns.PickValue(d, vendor, a) or 0
-end
-
-------------------------------------------------------------------------
--- Re-prices a saved session whose AH prices are wrong or missing (the relog
--- save can run before the AH addon answers or the item cache is warm). Every
--- AH-priced item/variant gets the current price for its exact link. Vendor-only
--- items and items whose data is not loaded yet are skipped; a second run picks
--- those up. Idempotent while the AH data stays the same. Returns: re-priced
--- items, items still without AH price, skipped items, gold change.
-------------------------------------------------------------------------
-function ns.RepairSessionAHPrices(session)
-    local db = NightsFarmtrackerDB
-    if not session or not session.items or db.ahSource == "none" or not ns.HasAnyAH() then
-        return 0, 0, 0, 0
-    end
-    local fixed, missing, skipped = 0, 0, 0
-    for _, d in pairs(session.items) do
-        if not ns.IsVendorOnly(d) then
-            local oldAH, newAH, changed, skip, cut = d.ahTotal or 0, 0, false, false, false
-            local gear = ns.IsGearThresholdApplicable(d)
-            if d.variants then
-                for _, gv in pairs(d.variants) do
-                    if (gv.amount or 0) > 0 then
-                        if not LinkCached(gv.itemLink) then
-                            skip = true
-                        else
-                            local ap = ns.GetAHPriceForID(gv.priceItemID or d.itemID, gv.itemLink)
-                            local total = ap and ap * gv.amount or (gv.ahTotal or 0)
-                            -- Gear AH Threshold: a variant below it is vendor-priced
-                            -- (frozen like a Vendor-Only item), per variant as in ns.GearVariantItemValue
-                            if gear and total > 0 and ns.IsGearThresholdVendorOnly(d, total) then
-                                total, cut = 0, true
-                            end
-                            if total ~= (gv.ahTotal or 0) then changed = true end
-                            gv.ahTotal  = total
-                            gv.ahAmount = total > 0 and gv.amount or 0
-                        end
-                    end
-                    newAH = newAH + (gv.ahTotal or 0)
-                end
-            elseif (d.amount or 0) > 0 then
-                if not LinkCached(d.itemLink) then
-                    skip = true
-                else
-                    local ap = ns.GetAHPriceForID(d.itemID, d.itemLink)
-                    newAH = ap and ap * d.amount or oldAH
-                    if gear and newAH > 0 and ns.IsGearThresholdVendorOnly(d, newAH) then
-                        newAH, cut = 0, true
-                    end
-                end
-            end
-            if skip then skipped = skipped + 1 end
-            if newAH ~= oldAH then changed = true end
-            if changed then
-                d.ahTotal = newAH > 0 and newAH or nil
-                if d.variants then
-                    local n, v = 0, 0
-                    for _, gv in pairs(d.variants) do
-                        n = n + (gv.ahAmount or 0)
-                        v = v + (gv.ahTotal or 0)
-                    end
-                    if d.ahAmount ~= nil then d.ahAmount = n end
-                    if d.ahValue  ~= nil then d.ahValue  = v end
-                else
-                    local vendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
-                    local ahWins = newAH > 0 and (vendor == nil or newAH >= vendor)
-                    if d.ahAmount ~= nil then d.ahAmount = ahWins and (d.amount or 0) or 0 end
-                    if d.ahValue  ~= nil then d.ahValue  = ahWins and newAH or 0 end
-                end
-                -- History value rule: max(AH, vendor), vendor where the threshold cut the AH price
-                if d.histValue ~= nil then d.histValue = FrozenItemValue(d) end
-                fixed = fixed + 1
-            elseif newAH == 0 and not skip and not cut then
-                missing = missing + 1
-            end
-        end
-    end
-    -- Session totals from the (now corrected) items. Done as a full sum, not
-    -- as deltas, so the Gear AH Threshold stays in (see FrozenItemValue) and
-    -- an earlier partial repair can't leave the total out of step.
-    local oldTotal = session.totalGold or 0
-    local totalGold, totalAH = 0, 0
-    for _, d in pairs(session.items) do
-        totalGold = totalGold + FrozenItemValue(d)
-        totalAH   = totalAH + ((d.ahTotal or 0) > 0 and d.ahTotal or 0)
-    end
-    session.totalGold, session.totalAH = totalGold, totalAH
-    return fixed, missing, skipped, totalGold - oldTotal
-end
-
 -- Most recently saved session = the first (newest) entry of the newest day
 -- key. ISO-format day keys ("YYYY-MM-DD") sort correctly as plain strings.
 -- Returns session, dayKey (nothing if there is no saved session).
@@ -469,24 +371,6 @@ function ns.GetNewestSession()
     end
     local session = latestKey and sessions[latestKey] and sessions[latestKey][1]
     if session then return session, latestKey end
-end
-
--- Re-prices the newest saved session (ns.GetNewestSession). Run via /nft repairprices.
-function ns.RepairLastSessionPrices()
-    local L = ns.L
-    local session, dayKey = ns.GetNewestSession()
-    if not session then
-        ns.Print(L["repair_prices_nosession"])
-        return
-    end
-    if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then
-        ns.Print(L["repair_prices_noah"])
-        return
-    end
-    local fixed, missing, skipped, gained = ns.RepairSessionAHPrices(session)
-    ns.Print(L["repair_prices_done"]:format(
-        dayKey, fixed, (gained < 0 and "-" or "+") .. ns.FormatGold(math.abs(gained)), missing, skipped))
-    if ns.RebuildHistory then ns.RebuildHistory() end
 end
 
 ------------------------------------------------------------------------
@@ -515,7 +399,7 @@ function ns.CompactOldMonths()
     if not sessions or not next(sessions) then return end
 
     local currentKey = date("%Y-%m")
-    local byMonth = {}
+    local byMonth, oldDays = {}, {}
     for dayKey, dayList in pairs(sessions) do
         local sample = dayList[1]
         if sample and date("%Y-%m", sample.timestamp) ~= currentKey then
@@ -524,17 +408,22 @@ function ns.CompactOldMonths()
             for _, session in ipairs(dayList) do
                 table.insert(byMonth[mKey], session)
             end
-            sessions[dayKey] = nil
+            oldDays[#oldDays + 1] = dayKey
         end
     end
     if not next(byMonth) then return end
 
+    -- Merge first, drop the old days only when every month is merged: an error
+    -- in a merge must not lose the sessions.
+    local compacted = {}
     for mKey, list in pairs(byMonth) do
         local merged = MergeSessionList(list)
         merged.timestamp = ns.EndOfMonthTimestamp(mKey)
         merged.isMonthCompact = true
-        sessions[date("%Y-%m-%d", merged.timestamp)] = { merged }
+        compacted[date("%Y-%m-%d", merged.timestamp)] = { merged }
     end
+    for _, dayKey in ipairs(oldDays) do sessions[dayKey] = nil end
+    for dayKey, list in pairs(compacted) do sessions[dayKey] = list end
 end
 
 ns.RegisterConfirmDialog("NFT_CONFIRM_MERGE_DAY", "%s", function(_, data) ns.MergeDaySessions(data) end)
@@ -573,9 +462,9 @@ ns.RegisterConfirmDialog("NFT_CONFIRM_CLEAR_ALL_HISTORY", ns.L["clear_all_histor
     function() ns.ClearAllSessionHistory() end)
 
 ------------------------------------------------------------------------
--- One-time, account-wide prompt (see ns.MaybePromptSessionResetMigration
--- in Main.lua) offering to clear session history saved before the itemLink
--- fix, since those old sessions can't show an accurate tooltip
+-- One-time, account-wide prompt (shown by ns.MaybePromptSessionResetMigration
+-- below, called from Main.lua) offering to clear session history saved before
+-- the itemLink fix, since those old sessions can't show an accurate tooltip
 -- for scaling gear and never will be able to.
 ------------------------------------------------------------------------
 -- hideOnEscape off: explicit choice only, avoid it silently vanishing on login
@@ -616,7 +505,7 @@ local function VariantRowValue(gv, amount, sellPrice, useAH, priceID, link, hasA
     if sp then tV = sp * amount end
     local tGold = (tAH and tAH > 0) and tAH or tV or 0
     local breakdown
-    if gv.ahAmount ~= nil then
+    if useAH and gv.ahAmount ~= nil then
         -- Amount split is known: AH-priced units at their frozen AH total,
         -- the rest at vendor price (mixed sessions).
         local vN = math.max(0, amount - gv.ahAmount)
@@ -625,6 +514,14 @@ local function VariantRowValue(gv, amount, sellPrice, useAH, priceID, link, hasA
         breakdown = { ahN = gv.ahAmount, ahV = tAH or 0, vN = vN, vV = vV }
     end
     return tAH, tV, tGold, breakdown
+end
+
+-- Amount one Detail row stands for: a reagent tier, an item-level group of
+-- scaling gear, or the whole item.
+function ns.EntryAmount(entry)
+    if entry.isRank then return tonumber(entry.tc) or 0 end
+    if entry.isGearVariant then return tonumber(entry.gv.amount) or 0 end
+    return tonumber(entry.d.amount) or 0
 end
 
 -- Category/item builder used by the Detail window.
@@ -646,12 +543,7 @@ local function BuildSessionCategories(session)
         -- filters applied at save time (forced-vendor items carry no AH
         -- value), so only the item's own flags count here. Older entries
         -- still follow the live filters.
-        local isVendorOnly
-        if d.filterFrozen then
-            isVendorOnly = d.isBoP or d.canAH == false
-        else
-            isVendorOnly = ns.IsVendorOnly(d)
-        end
+        local isVendorOnly = ns.IsSavedVendorOnly(d)
         -- A reagent-tier breakdown (item is not Equipment - see ns.IsGear)
         -- that doesn't sum to the item's own amount means GetReagentQualityInfo
         -- mis-tagged a tier at tracking time (see ProcessLoot's guard) - this
@@ -669,11 +561,9 @@ local function BuildSessionCategories(session)
         end
 
         -- Category total: max(AH,Vendor) per item — vendor-only items (junk, BoP, forceVendor/category, canAH=false) always vendor only.
-        -- Note: the Gear AH Threshold setting is deliberately NOT applied here.
-        -- It's a live-session decision aid ("is this worth listing on the AH
-        -- right now") for the main frame only (see ItemHelper.lua/UI.lua) -
-        -- History is a record of what was actually tracked, so it always
-        -- shows the item's real AH/vendor value regardless of that setting.
+        -- The Gear AH Threshold is not applied here: SaveCurrentSession froze it
+        -- into the saved AH values (variants below it carry no AH value), so
+        -- History shows what the list showed while farming.
         local itemAH     = (not isVendorOnly) and hasAH and (ahTotal or 0) > 0 and ahTotal or nil
         local itemVendor = (d.vendorTotal or 0) > 0 and d.vendorTotal or nil
         local itemGold   = (itemAH and itemVendor) and math.max(itemAH, itemVendor) or itemAH or itemVendor or 0
@@ -694,13 +584,13 @@ local function BuildSessionCategories(session)
                 local tc  = gv and gv.amount or 0
                 local tid = gv and gv.priceItemID
                 if tc > 0 then
-                    local tAH, tV, tGold, breakdown = VariantRowValue(gv, tc, gv.sellPrice,
+                    local _, _, tGold, breakdown = VariantRowValue(gv, tc, gv.sellPrice,
                         tid and not isVendorOnly, tid, nil, hasAH)
                     if tGold > 0 then
                         local rankIcon = ns.RankBadgeMarkup(qAtlas[tier], tier)
                         cats[cat].items[#cats[cat].items+1] = {
                             name=d.name, d=d, gold=tGold, isRank=true,
-                            tier=tier, tc=tc, tid=tid, tAH=tAH, tV=tV, rankIcon=rankIcon,
+                            tier=tier, tc=tc, tid=tid, rankIcon=rankIcon,
                             breakdown=breakdown,
                         }
                     end
@@ -713,14 +603,14 @@ local function BuildSessionCategories(session)
             -- Grouped by displayed (itemLevel, quality) first so two drops that
             -- only differ in a hidden bonus-ID component still show as one
             -- summed row (see GroupGearVariantsForDisplay).
-            for ilvl, gv in pairs(ns.GroupGearVariantsForDisplay(d.variants)) do
+            for _, gv in pairs(ns.GroupGearVariantsForDisplay(d.variants)) do
                 if gv.amount > 0 then
-                    local tAH, tV, tGold, breakdown = VariantRowValue(gv, gv.amount, ns.VariantSellPrice(gv, d),
+                    local _, _, tGold, breakdown = VariantRowValue(gv, gv.amount, ns.VariantSellPrice(gv, d),
                         not isVendorOnly, d.itemID, gv.itemLink, hasAH)
                     if tGold > 0 then
                         cats[cat].items[#cats[cat].items+1] = {
                             name=d.name, d=d, gold=tGold, isGearVariant=true,
-                            ilvl=ilvl, gv=gv, tAH=tAH, tV=tV, breakdown=breakdown,
+                            gv=gv, breakdown=breakdown,
                         }
                     end
                 end
@@ -746,8 +636,7 @@ local function BuildSessionCategories(session)
             if ns.IsJunkCategory(catName) and #cat.items >= 1 then
                 local totalAmount = 0
                 for _, entry in ipairs(cat.items) do
-                    local ed = entry.d
-                    totalAmount = totalAmount + (ed.amount or (entry.gv and entry.gv.amount) or 0)
+                    totalAmount = totalAmount + ns.EntryAmount(entry)
                 end
                 local merged = ns.JunkMergedRecord(totalAmount, cat.gold)
                 cat.items = { { name = merged.name, d = merged, gold = cat.gold, isRank = false } }

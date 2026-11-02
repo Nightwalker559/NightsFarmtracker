@@ -309,15 +309,15 @@ end)
 -- which one is active ("goal" | "session" | "off"), the other keeps its value.
 -- The goal of one item (pieces) or nil: its own amount from db.itemGoals (only
 -- while db.itemGoalsEnabled, so the list can stay without being emptied), else
--- the general db.itemGoal that covers every other item (0 = none), except
--- items in the Vendor-Only Filter: they only get a goal of their own. See
--- ApplyValueBars. Goals run the normal count-up timer.
+-- the general db.itemGoal that covers every other item (0 = none), Vendor-Only
+-- items included: their bar shows the progress too. What triggers the goal is
+-- decided in GoalReachedIn. See ApplyValueBars. Goals run the normal count-up timer.
 function ns.GetItemGoal(itemID)
     local db = NightsFarmtrackerDB
     if db.limitMode ~= "goal" or not itemID then return nil end
     local entry = db.itemGoalsEnabled ~= false and db.itemGoals and db.itemGoals[itemID]
     local amount = entry and tonumber(entry.amount) or 0
-    if amount <= 0 and not ns.IsForceVendor(itemID) then amount = tonumber(db.itemGoal) or 0 end
+    if amount <= 0 then amount = tonumber(db.itemGoal) or 0 end
     return amount > 0 and amount or nil
 end
 
@@ -411,10 +411,14 @@ local function UpdateFooterLine()
 end
 ScrollFrame:SetScript("OnVerticalScroll", UpdateFooterLine)
 
+local BuildHUD      -- defined below; builds the whole list
+local rowsBuilt = false   -- the rows of the current list exist (only while expanded)
+
 function ns.SetExpanded(expand)
     NightsFarmtrackerDB.expanded = expand
     if expand then
         btnToggle.tex:SetTexture(ART.."btn_collapse.png")
+        if not rowsBuilt then BuildHUD() end
         UpdateFrameHeight()
     else
         emptyHint:Hide(); ScrollFrame:Hide()
@@ -458,7 +462,7 @@ heightWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
 heightWatcher:SetScript("OnEvent", function()
     if pendingHeightUpdate then
         pendingHeightUpdate = false
-        UpdateFrameHeight()
+        if NightsFarmtrackerDB.expanded then UpdateFrameHeight() else SafeSetMainHeight(COLLAPSED_H) end
     end
 end)
 
@@ -625,7 +629,7 @@ local rowPool = ns.NewPool(function(parent)
     ResetRowLayout(row)
     return row
 end, function(row)
-    row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false; row.barGoal = nil
+    row.barBg:Hide(); row.bar:Hide(); row.barValue = false; row.barCount = false; row.barGoal = nil; row.barVendorOnly = nil
     row.itemName=nil; row.itemLink=nil; row.itemID=nil; row.baseItemID=nil
     row.isCategoryHeader=nil; row.categoryName=nil; row.isJunkMerged=nil
     ns.ShowHeaderBand(row, false)
@@ -650,7 +654,7 @@ local function PlaceRow(row, yOff, name, icon, nameColor, quality)
     if nameColor then
         row.nameText:SetTextColor(unpack(nameColor)); row.iconBorder:Hide()
     else
-        ns.ApplyQualityColor(row.nameText, row.iconBorder, quality, {1,1,1})
+        ns.ApplyQualityColor(row.nameText, row.iconBorder, quality)
     end
     itemOrder[#itemOrder+1] = name
     itemRows[name] = row
@@ -698,26 +702,35 @@ local function DrawBar(row, frac, r, g, b)
     row.barBg:Show(); row.bar:Show()
 end
 
+-- Items valued at vendor price only (Vendor-Only Filter, BoP) count towards
+-- their bar, but never reach a goal (general or own): that is left to items
+-- with an AH price.
+local function GoalCanTrigger(vendorOnly)
+    return not vendorOnly
+end
+
 -- Rows of an item with a goal (db.itemGoals / db.itemGoal) show their count relative to the
--- goal instead, and turn green once it is reached; goalReached then tells
--- BuildHUD to pause the session (also with the bars switched off). The merged
--- junk row is a sum of many items, so it has no goal. Every other row keeps
--- the value bar, scaled among the rows without a goal.
+-- goal instead and turn green once it is reached (GoalCanTrigger; a Vendor-Only
+-- item's bar stays in the accent color). The merged junk row is a sum
+-- of many items, so it has no goal. Without any goal on the list every row keeps
+-- the value bar, scaled among them; while some rows show goal progress, the
+-- others get no bar (a value bar would mix a second scale into the list, and
+-- be full length whenever it is the only one). Whether a goal is reached is decided from the
+-- items, not the rows (GoalReachedIn), so collapsed categories count too.
 local function ApplyValueBars()
-    goalReached = false
     barsShown = NightsFarmtrackerDB.showValueBar ~= false
 
-    local maxValue, maxMerged = 0, 0
+    local maxValue, maxMerged, anyGoal = 0, 0, false
     for _, row in pairs(itemRows) do
-        local goal = not row.isJunkMerged and row.barCount and ns.GetItemGoal(row.itemID)
+        local goal = row.barCount and not row.isJunkMerged and ns.GetItemGoal(row.itemID)
         if goal then
+            anyGoal = true
             local c = row.barCount
             row.barGoal = goal
-            if c >= goal then
-                goalReached = true
+            if c >= goal and GoalCanTrigger(row.barVendorOnly) then
                 DrawBar(row, 1, unpack(GOAL_COL))
             else
-                DrawBar(row, c / goal, unpack(ns.COL_ACCENT))
+                DrawBar(row, c / goal, unpack(ns.COL_ACCENT))   -- also past the goal for Vendor-Only
             end
         else
             row.barGoal = nil
@@ -728,7 +741,7 @@ local function ApplyValueBars()
             end
         end
     end
-    if not barsShown then return end
+    if not barsShown or anyGoal then return end
 
     if maxValue == 0 then maxValue = maxMerged end
     for _, row in pairs(itemRows) do
@@ -741,6 +754,21 @@ end
 
 function ns.GoalReached() return goalReached end
 
+-- True if any item reached its goal with its whole amount (all rolls and tiers
+-- together). BuildHUD pauses the session on it, also with the bars switched off.
+local function GoalReachedIn(cats)
+    for _, cat in pairs(cats) do
+        for _, it in ipairs(cat.items) do
+            local d = it.data
+            if not d.isJunkMerged then
+                local goal = ns.GetItemGoal(it.itemID)
+                if goal and GoalCanTrigger(ns.IsVendorOnly(d)) and (d.amount or 0) >= goal then return true end
+            end
+        end
+    end
+    return false
+end
+
 ------------------------------------------------------------------------
 -- RefreshHUD
 -- BuildHUD rebuilds the whole item list (every row, price lookup and sort).
@@ -748,12 +776,6 @@ function ns.GoalReached() return goalReached end
 -- after each drop, so ns.RefreshHUD only queues one rebuild for the next frame
 -- and any number of requests within a frame collapse into it.
 ------------------------------------------------------------------------
-local function ItemSort(a, b)
-    if a.gold ~= b.gold then return a.gold > b.gold end
-    if a.data.amount ~= b.data.amount then return a.data.amount > b.data.amount end
-    return a.name < b.name
-end
-
 -- Groups db.count into categories ({ items, totalGold, classID }) and returns
 -- them with the grand total. Quest items (never sellable) and items
 -- blacklisted after they were looted are dropped from the live count too.
@@ -784,7 +806,7 @@ end
 -- per-item list at once.
 local function MergeJunkCategories(cats)
     for catName, cat in pairs(cats) do
-        if ns.IsJunkCategory(catName) and #cat.items >= 1 then
+        if ns.IsJunkCategory(catName) then
             local totalAmount = 0
             for _, it in ipairs(cat.items) do
                 totalAmount = totalAmount + (it.data.amount or 0)
@@ -817,10 +839,10 @@ local function PlayGearThresholdSound(db, hasAH)
                 local prevCount = data.thresholdNotifiedCounts[gKey] or 0
                 if gv.amount > prevCount then
                     local ap = ns.GetAHPriceForID(data.itemID, gv.itemLink)
-                    if ap and ap >= threshold then
-                        ns.PlayThresholdAlertSound()
+                    if ap then
+                        if ap >= threshold then ns.PlayThresholdAlertSound() end
+                        data.thresholdNotifiedCounts[gKey] = gv.amount
                     end
-                    data.thresholdNotifiedCounts[gKey] = gv.amount
                 end
             end
         end
@@ -866,7 +888,8 @@ local function AddTierEntries(flat, item, fv, qAtlas)
                 local ap = ns.GetAHPriceForID(tid)
                 if ap then tAH = ap * tc end
             end
-            if gv.sellPrice and gv.sellPrice > 0 then tV = gv.sellPrice * tc end
+            local sp = ns.VariantSellPrice(gv, d)
+            if sp and sp > 0 then tV = sp * tc end
             local tGold = fv and (tV or 0) or math.max(tAH or 0, tV or 0)
             if tGold > 0 then
                 flat[#flat + 1] = {
@@ -893,7 +916,7 @@ local function AddGearEntries(flat, item, hasAH)
             -- Decided per variant, not from the item's combined AH total: one
             -- variant crossing the Gear AH Threshold must not force AH pricing
             -- onto a cheaper sibling below it.
-            local vfv   = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, tAH)
+            local vfv   = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, tAH, gv.amount)
             local tGold = vfv and (tV or 0) or math.max(tAH or 0, tV or 0)
             if tGold > 0 then
                 flat[#flat + 1] = {
@@ -910,14 +933,16 @@ local function BuildFlatList(cat, hasAH, qAtlas)
     local flat = {}
     for _, item in ipairs(cat.items) do
         local d = item.data
-        local fv = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, item.ah)
-        if d.variants and not ns.IsGear(d) then
-            AddTierEntries(flat, item, fv, qAtlas)
-        elseif d.variants then
+        if d.variants and ns.IsGear(d) then
             AddGearEntries(flat, item, hasAH)
         else
-            local gold = fv and (item.vendor or 0) or math.max(item.ah or 0, item.vendor or 0)
-            flat[#flat + 1] = {isRank = false, name = item.name, d = d, item = item, gold = gold, fv = fv}
+            local fv = not hasAH or ns.IsVendorOnly(d) or ns.IsGearThresholdVendorOnly(d, item.ah, d.amount)
+            if d.variants then
+                AddTierEntries(flat, item, fv, qAtlas)
+            else
+                local gold = fv and (item.vendor or 0) or math.max(item.ah or 0, item.vendor or 0)
+                flat[#flat + 1] = {isRank = false, name = item.name, d = d, item = item, gold = gold, fv = fv}
+            end
         end
     end
     table.sort(flat, function(a, b)
@@ -932,11 +957,12 @@ end
 local function RenderFlatRow(fi, yOffset)
     local row = rowPool.acquire(ListFrame)
     local d = fi.d
+    row.barVendorOnly = not d.isJunkMerged and ns.IsVendorOnly(d)
     row.icon:SetTexture(d.icon or ns.FALLBACK_ICON)
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); row.icon:Show()
     row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", ICON_X, 0)
     row:SetPoint("TOPLEFT", 0, -yOffset)
-    ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality, {1, 1, 1})
+    ns.ApplyQualityColor(row.nameText, row.iconBorder, fi.isGearVariant and fi.gv.quality or d.quality)
     row.nameText:ClearAllPoints()
     row.nameText:SetPoint("LEFT",  row.icon, "RIGHT", NAME_GAP, 0)
     row.nameText:SetPoint("RIGHT", row,      "RIGHT", -108, 0)
@@ -975,26 +1001,31 @@ local function RenderFlatRow(fi, yOffset)
     end
 end
 
-local function BuildHUD()
+function BuildHUD()
     local savedScroll = ScrollFrame:GetVerticalScroll()
     ClearRows()
 
     local db = NightsFarmtrackerDB
     local cats, grandTotal = CollectCategories(db)
     if db.mergeJunkEntries then MergeJunkCategories(cats) end
-    for _, cat in pairs(cats) do table.sort(cat.items, ItemSort) end
 
     -- With no AH source (or "none" selected) every item is valued at vendor price
     local hasAH = ns.HasAnyAH() and db.ahSource ~= "none"
     PlayGearThresholdSound(db, hasAH)
 
+    -- The rows only exist while the window is expanded; ns.SetExpanded builds
+    -- them when it opens. Totals, goals and the sound above never need them.
+    rowsBuilt = db.expanded and true or false
+
     -- Categories by total gold (the sum of ns.ItemValue, matching the overall
     -- total), ties by item class priority.
     local sorted = {}
-    for catName, cat in pairs(cats) do sorted[#sorted + 1] = {name = catName, cat = cat} end
-    table.sort(sorted, function(a, b)
-        return ns.CategoryBefore(a.cat.totalGold, a.cat.classID, b.cat.totalGold, b.cat.classID)
-    end)
+    if rowsBuilt then
+        for catName, cat in pairs(cats) do sorted[#sorted + 1] = {name = catName, cat = cat} end
+        table.sort(sorted, function(a, b)
+            return ns.CategoryBefore(a.cat.totalGold, a.cat.classID, b.cat.totalGold, b.cat.classID)
+        end)
+    end
 
     local yOffset = 0
     local flow = ns.NewHeaderFlow()
@@ -1006,7 +1037,7 @@ local function BuildHUD()
         yOffset = yOffset + CAT_ROW_H
 
         if not isCollapsed then
-            local flat = BuildFlatList(cat, hasAH, db.qAtlas or {})
+            local flat = BuildFlatList(cat, hasAH, db.qAtlas)
             if #flat == 0 then
                 -- nothing displayable: skip the category entirely
                 DropLastHeader(hdr, catName)
@@ -1025,6 +1056,7 @@ local function BuildHUD()
     end
 
     local wasReached = goalReached
+    goalReached = GoalReachedIn(cats)
     ApplyValueBars()
     if goalReached and not db.paused then
         db.paused = true
@@ -1033,13 +1065,15 @@ local function BuildHUD()
     end
     if goalReached ~= wasReached then ns.ApplyPauseVisuals() end
 
-    totalH = yOffset
-    local maxScroll = math.max(0, totalH - ScrollFrame:GetHeight())
-    ScrollFrame:SetVerticalScroll(math.min(savedScroll, maxScroll))
-    UpdateFrameHeight()
-    listFlow = flow
-    listScrolls = ns.VisibleListHeight(totalH, SCROLL_TOP + 1, FOOTER_H) < totalH
-    UpdateFooterLine()
+    if rowsBuilt then
+        totalH = yOffset
+        local maxScroll = math.max(0, totalH - ScrollFrame:GetHeight())
+        ScrollFrame:SetVerticalScroll(math.min(savedScroll, maxScroll))
+        UpdateFrameHeight()
+        listFlow = flow
+        listScrolls = ns.VisibleListHeight(totalH, SCROLL_TOP + 1, FOOTER_H) < totalH
+        UpdateFooterLine()
+    end
     UpdateSummary(grandTotal)
 
     if ns.RebuildFilterList then ns.RebuildFilterList() end
@@ -1081,6 +1115,8 @@ function ns.Reset(skipSave)
     btnRate.text:SetText("")
     ScrollFrame:SetVerticalScroll(0)
     UpdateFrameHeight()
+    listFlow, listScrolls = ns.NewHeaderFlow(), false
+    UpdateFooterLine()
     ns.ApplyPauseVisuals()
 end
 

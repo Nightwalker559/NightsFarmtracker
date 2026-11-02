@@ -75,9 +75,7 @@ local function MakeWarbandTrackDropdown(parent)
     end)
     frame:SetScript("OnEnter", function(self)
         if not self:IsMouseEnabled() then return end
-        GameTooltip:SetOwner(self, ns.SmartAnchor(self, "RIGHT"))
-        GameTooltip:AddLine(ns.L["vendor_sell_track_tip"], 0.5, 0.5, 0.5, true)
-        GameTooltip:Show()
+        ns.ShowGrayTip(self, ns.L["vendor_sell_track_tip"])
     end)
     frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
 

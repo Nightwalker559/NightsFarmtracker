@@ -46,7 +46,7 @@ Rows show icon, name, amount and value, colored by item quality. Hover an item f
 - Gold dropped directly by mobs is tracked separately.
 - Every item row has a thin value bar showing its share of the most valuable item, in the theme color (can be switched off in the settings).
 - The session timer can run for a fixed length: it counts down and pauses itself at 0 (Settings → Session Limit).
-- Alternatively set **item goals**: one amount for every item, plus own amounts for single items in the Item Goals window. The bars then show the progress, turn green when an item reaches its goal, and the session pauses. The timer counts up in that case, so the fixed length is not available.
+- Alternatively set **item goals**: one amount for every item, plus own amounts for single items in the Item Goals window. The bars then show the progress, turn green when an item reaches its goal, and the session pauses. Items in the Vendor-Only Filter (or Warband/BoP) show their progress but never reach a goal, only items with an AH price do. The timer counts up in that case, so the fixed length is not available.
 - `/reload` pauses the session; a relog saves it to the history and starts fresh.
 - Gold per hour or per minute, shown in classic (coin icons) or modern (colored text) format.
 
@@ -56,20 +56,20 @@ Every item is valued at the higher of its AH and vendor price. Vendor-only items
 
 - **Price sources:** Auctionator, Oribos Exchange or TradeSkillMaster, with an *Auto* mode that prefers them in that order. TSM can use one of its price sources or a custom expression. Without an AH addon the vendor price is used.
 - **AH Price by Expansion:** limit AH pricing to the expansions you pick; everything else uses the vendor price.
-- **Gear AH Threshold:** equipment uses its AH price only once it reaches a gold amount you set, otherwise the vendor price. A gear icon next to the field chooses which equipment groups it applies to (Equipment, BoE, BoA, Cosmetic). An optional sound plays when a drop reaches the threshold.
+- **Gear AH Threshold:** equipment uses its AH price only once one item reaches a gold amount you set, otherwise the vendor price. A gear icon next to the field chooses which equipment groups it applies to (Equipment, BoE, BoA, Cosmetic). An optional sound plays when a drop reaches the threshold.
 
 ## Filters
 
 - **Vendor-Only Filter:** drop items from your bags onto it, or tick whole categories, to value them at vendor price. Account-wide.
 - **Blacklist:** items and categories on it are never tracked. Account-wide, and it wins over everything else.
-- **Delete List:** items that can be neither sold nor auctioned (e.g. Warband-bound potions). At a vendor the Sell List offers them for deletion, one item per click. Items only, no categories. Account-wide.
+- **Delete List:** items that can be neither sold nor auctioned (e.g. Warband-bound potions). At a vendor the Sell List offers them for deletion, one item per click (the game allows one deletion per click). Items only, no categories. Account-wide.
 - The three lists are the tabs of one Filter window. They group their items by expansion, can be cleared per expansion or completely, and can each be switched off in the settings (a tab whose list is off is not shown).
 - **Sell List:** at a vendor, a window next to the merchant window lists the bag items the Vendor-Only Filter and the Gear AH Threshold mark as vendor goods (most gold first) and sells them with one button. Equipment-set items and Warband items are left out (the latter can be switched off, or limited to the upgrade tracks you tick), and a protection limits one click to 12 items, the size of the vendor's buyback list. Options: the gear icon in the Sell List window or in Settings, Windows & Buttons.
 - **Ctrl+left-click** an item adds it to the Vendor-Only Filter, **Ctrl+right-click** blacklists it, **Shift+right-click** stops tracking it. On a category header, Shift+right-click excludes the whole category.
 
 ## History, Loot Log and export
 
-- **Sessions & History** is account-wide and has no session limit. It has two tabs: *Sessions* shows the running month day by day, *History* lists the past months with their farm time. Same-day sessions are merged automatically (can be switched off, or merged by hand per day). Click a session for its detail window (title: date and farm time), Shift+click a month for a month summary. Hover a month for its gold, and optionally the average per day.
+- **Sessions & History** is account-wide and has no session limit. It has two tabs: *Sessions* shows the running month day by day under a header with the month's total, *History* lists the past months with their farm time. Same-day sessions are merged automatically (can be switched off, or merged by hand per day). Click a session for its detail window (title: date and farm time), Shift+click a month for a month summary. Hover a month for its gold, and optionally the average per day.
 - **Full mode** (default) keeps every session: a past month opens up to its days and sessions, and single sessions or whole months can be deleted.
 - **Compact mode** folds all past months into one entry each to keep the saved data small. A month is then a plain row, a click opens its summary, and only whole months can be deleted. The data export still contains what was saved.
 - **Loot Log:** a chronological, quality-colored list of the last 100 drops, kept per character across reloads (off by default).
@@ -133,7 +133,6 @@ A small frame below the main window with the resets in the last hour (x/9), the 
 | `/nft hud rotate` | Toggle minimap rotation of the HUD |
 | `/nft venom` | Show or hide the Venom Tracker (if enabled) |
 | `/nft bait` | Show or hide the Fishing Lure Bar (if enabled) |
-| `/nft repairprices` | Re-price the newest saved session with the current AH prices |
 
 Debug commands for bug reports: `/nft debug` opens a live debug log window (copyable, no chat output). `/nft venomdump`, `/nft test`, `/nft itemdb`, `/nft monthdump [itemID]` and `/nft sessionsdump` write their output into the same window.
 

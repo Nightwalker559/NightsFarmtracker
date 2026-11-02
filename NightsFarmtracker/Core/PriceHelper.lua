@@ -147,8 +147,8 @@ end
 -- Price cache (session only, 1 h TTL). AH prices rarely change mid-session, so
 -- RefreshHUD should not query the AH addon again for every item. Only hits are
 -- cached: a miss (e.g. AH scan not ready after a fresh drop) is retried on the
--- next refresh. Cleared on logout and whenever a setting that changes the
--- price itself (AH source, TSM source) changes.
+-- next refresh. Cleared whenever a setting that changes the price itself
+-- (AH source, TSM source) changes.
 ------------------------------------------------------------------------
 ns.priceCache = ns.priceCache or {}
 local PRICE_CACHE_TTL = 3600
@@ -191,19 +191,19 @@ end
 -- Combined AH lookup / totals
 ------------------------------------------------------------------------
 function ns.GetAHPriceForID(itemID, itemLink)
-    if not itemID then return nil end
+    local db  = NightsFarmtrackerDB
+    local src = db.ahSource or "auto"
+    if not itemID or src == "none" then return nil end
     local key = (itemLink and ns.CleanItemLink(itemLink)) or ("id:" .. itemID)
     local cached = CachedPrice(key)
     if cached then return cached end
 
-    local db  = NightsFarmtrackerDB
-    local src = db.ahSource or "auto"
     -- Item data not loaded yet (cold cache right after login): the link is
     -- not canonical and Auctionator can only answer with a rougher item-ID
     -- price. Prefer the exact price remembered from before, if there is one.
     local exact = not itemLink or C_Item.GetItemInfo(itemLink) ~= nil
     local pkey  = StablePriceKey(itemID, itemLink)
-    if not exact and pkey and src ~= "none" and db.ahLast and db.ahLast[pkey] then
+    if not exact and pkey and db.ahLast and db.ahLast[pkey] then
         return db.ahLast[pkey]
     end
 
@@ -219,12 +219,12 @@ function ns.GetAHPriceForID(itemID, itemLink)
         -- An inexact answer is neither cached nor remembered
         if exact then
             ns.priceCache[key] = { price = p, time = GetTime() }
-            if pkey and src ~= "none" then
+            if pkey then
                 db.ahLast = db.ahLast or {}
                 db.ahLast[pkey] = p
             end
         end
-    elseif pkey and src ~= "none" and db.ahLast then
+    elseif pkey and db.ahLast then
         -- Source has no answer right now (not loaded yet after login):
         -- use the last known price. Not cached, so live lookups keep retrying.
         p = db.ahLast[pkey]
@@ -257,15 +257,24 @@ function ns.GroupGearVariantsForDisplay(gearVariants)
     -- variant of the SAME item that quality already dropped at tells us
     -- which item level this one almost certainly was too - infer it instead
     -- of grouping it into its own separate "no ilvl" row.
+    --
+    -- The variants are walked in key order: a group keeps the link (and so the
+    -- AH price) of its first variant, which must not depend on pairs() order.
+    local keys = {}
+    for key in pairs(gearVariants) do keys[#keys + 1] = key end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+
     local ilvlByQuality = {}
-    for _, gv in pairs(gearVariants) do
+    for _, key in ipairs(keys) do
+        local gv = gearVariants[key]
         if gv.itemLevel and gv.quality and not ilvlByQuality[gv.quality] then
             ilvlByQuality[gv.quality] = gv.itemLevel
         end
     end
 
     local groups = {}
-    for _, gv in pairs(gearVariants) do
+    for _, key in ipairs(keys) do
+        local gv = gearVariants[key]
         if gv.amount > 0 then
             local itemLevel = gv.itemLevel or (gv.quality and ilvlByQuality[gv.quality])
             local gKey = tostring(itemLevel or "?") .. "|" .. tostring(gv.quality or "?")
@@ -370,9 +379,10 @@ function ns.AHTotal(data)
             if p then total = total + p * gv.amount; any = true end
         end
     end
-    if not any and data.itemID and not (data.variants and ns.IsGear(data)) then
+    if not any and data.itemID and data.variants and not ns.IsGear(data) then
         -- Fallback for reagents whose tier IDs had no AH price at all:
-        -- try the combined item once (matches the legacy per-tier path).
+        -- try the combined item once. (A plain item's only variant is that
+        -- lookup already.)
         local p = ns.GetAHPriceForID(data.itemID, data.itemLink)
         if p then total = p * data.amount; any = true end
     end

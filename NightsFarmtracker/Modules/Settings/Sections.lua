@@ -10,7 +10,7 @@ local CHECK_RUN_TAIL, TITLE_STEP, TITLE_STEP_CTRL, CTRL_SIZE = K.CHECK_RUN_TAIL,
 local S_PAD, MakeNumberBox = K.S_PAD, K.MakeNumberBox
 
 local sessionLengthEB, itemGoalEB, maxHeightEB
-local goalsBtn, goalsCheck, exportBtn, sellConfigBtn
+local goalsBtn, goalsCheck, exportBtn, sellConfigBtn, limitHelpBtn
 
 ns.RegisterConfirmDialog("NFT_CONFIRM_HISTORY_COMPACT", ns.L["compact_history_confirm"], function()
     NightsFarmtrackerDB.sessionHistoryMode = "compact"
@@ -19,11 +19,12 @@ ns.RegisterConfirmDialog("NFT_CONFIRM_HISTORY_COMPACT", ns.L["compact_history_co
     ns.RebuildSettingsContent()
 end)
 
--- Fixed session length in minutes
+-- Fixed session length in minutes. Applied when the field loses focus / Enter
+-- is pressed, not per keystroke - typing "6" on the way to "60" would otherwise
+-- end a session that ran longer than 6 minutes on the first digit.
 local function MakeSessionLengthEB(parent, yOff)
     local frame, eb = MakeNumberBox(parent, yOff, 4, ns.L["minutes_suffix"])
-    eb:SetScript("OnTextChanged", function(self, userInput)
-        if not userInput then return end
+    eb:HookScript("OnEditFocusLost", function(self)
         NightsFarmtrackerDB.sessionLength = tonumber(self:GetText()) or 0
         ns.UpdateTimerDisplay()
         ns.ApplyPauseVisuals()
@@ -92,6 +93,8 @@ end
 local MakeExportButton = MakeWindowButton("export_open_btn", function() ns.ToggleExportWindow() end)
 local MakeGoalsButton  = MakeWindowButton("goals_open_btn",  function() ns.ToggleGoalsWindow() end)
 
+local function MakeLimitHelpButton(parent) return ns.CreateHelpButton(parent, "limit") end
+
 -- Label-less checkbox for db.itemGoalsEnabled; it also greys out the Item
 -- Goals button next to it. Single persistent instance like the button.
 local function MakeGoalsCheck(parent)
@@ -144,7 +147,14 @@ end)
 ------------------------------------------------------------------------
 K.AddSection("sec_session_limit", function(y, ui)
     local track, sectionTitle, wrappedHint, checkbox, place, db = ui.track, ui.sectionTitle, ui.wrappedHint, ui.checkbox, ui.place, ui.db
-    y = sectionTitle(y, "sec_session_limit", TITLE_STEP_CTRL)
+    local title
+    y, title = sectionTitle(y, "sec_session_limit", TITLE_STEP_CTRL)
+
+    -- "?" behind the title: what session length and item goals do
+    limitHelpBtn = place(limitHelpBtn, MakeLimitHelpButton, y)
+    limitHelpBtn:ClearAllPoints()
+    limitHelpBtn:SetPoint("LEFT", title, "RIGHT", 6, 0)
+    track(limitHelpBtn, "other")
 
     -- Session length and item goal exclude each other (db.limitMode);
     -- the checkbox picks the active one, the other keeps its value.

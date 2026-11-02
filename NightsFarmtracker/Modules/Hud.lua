@@ -395,7 +395,7 @@ local function Close()
         Minimap:EnableMouse(s.mouse)
         Minimap:EnableMouseWheel(s.mousewheel)
         local maxZoom = Minimap:GetZoomLevels()
-        Minimap:SetZoom(maxZoom and math.min(s.zoom, maxZoom) or s.zoom)
+        Minimap:SetZoom(maxZoom and math.min(s.zoom, maxZoom - 1) or s.zoom)   -- GetZoomLevels is a count
         if not s.shown then Minimap:Hide() end
     end)
 

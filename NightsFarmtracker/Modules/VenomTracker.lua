@@ -268,13 +268,15 @@ watcher:SetScript("OnEvent", function(_, event, unit)
         ScanCurrency()
         return
     end
-    if event == "UNIT_SPELLCAST_SUCCEEDED" then
-        -- every spell the player casts lands here; only a catch with the
-        -- rod equipped can change the venom value
-        if unit ~= "player" or not FindItemSlot() then return end
-    end
     if event == "CURRENCY_DISPLAY_UPDATE" then
         ScanCurrency()
+        return
+    end
+    if event == "UNIT_SPELLCAST_SUCCEEDED" then
+        -- every spell the player casts lands here; only a catch with the rod
+        -- equipped can change the venom value. One scan next frame (casts come
+        -- in bursts); the currency has its own event.
+        if FindItemSlot() then QueueScan() end
         return
     end
     ScanVenomDelayed()
@@ -304,7 +306,7 @@ function ns.SetVenomTrackerEnabled(enabled)
         ScanVenom()
         ScanCurrency()
     elseif VenomFrame then
-        if not ns.DeferInCombat(function() VenomFrame:Hide() end) then VenomFrame:Hide() end
+        ns.HideOutOfCombat(VenomFrame)
     end
 end
 

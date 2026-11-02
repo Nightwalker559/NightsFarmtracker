@@ -114,6 +114,9 @@ end
 -- Shared by all item rows (main HUD, history detail, filter list, log)
 -- so the "look" lives in one place instead of being duplicated per file.
 ------------------------------------------------------------------------
+ns.COL_ITEM_WHITE = {1, 1, 1}        -- name color of an item without quality (shared, rows rebuild often)
+ns.COL_ITEM_GRAY  = {0.85, 0.85, 0.85}
+
 function ns.ApplyQualityColor(nameText, iconBorder, quality, fallbackColor)
     if quality then
         local r, g, b = C_Item.GetItemQualityColor(quality)
@@ -121,7 +124,7 @@ function ns.ApplyQualityColor(nameText, iconBorder, quality, fallbackColor)
         iconBorder:SetColorTexture(r, g, b, 0.9)
         iconBorder:Show()
     else
-        local fr, fg, fb = unpack(fallbackColor or {1, 1, 1})
+        local fr, fg, fb = unpack(fallbackColor or ns.COL_ITEM_WHITE)
         nameText:SetTextColor(fr, fg, fb)
         iconBorder:Hide()
     end
@@ -505,6 +508,13 @@ function ns.HideTooltipOf(frame)
     end
 end
 
+-- Tooltip with one gray hint line next to `owner`.
+function ns.ShowGrayTip(owner, text)
+    GameTooltip:SetOwner(owner, ns.SmartAnchor(owner, "RIGHT"))
+    GameTooltip:AddLine(text, 0.5, 0.5, 0.5, true)
+    GameTooltip:Show()
+end
+
 -- Small gear icon button with a tooltip (white title, optional grey text): the
 -- "configure" icon of the Gear AH Threshold and the Sell List. The caller
 -- anchors it and sets OnClick.
@@ -517,6 +527,16 @@ function ns.CreateConfigButton(parent, title, tip)
         GameTooltip:Show()
     end)
     btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    return btn
+end
+
+-- Small "?" button that opens the Details window at one section (ns.OpenHelpTopic).
+-- The settings use it instead of long explanations; the caller anchors it.
+function ns.CreateHelpButton(parent, topic)
+    local btn = ns.MakeBtn(parent, 14, "btn_help.png")
+    btn:HookScript("OnEnter", function(self) ns.ShowGrayTip(self, ns.L["help_link_tip"]) end)
+    btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    btn:SetScript("OnClick", function() ns.OpenHelpTopic(topic) end)
     return btn
 end
 
@@ -576,7 +596,7 @@ function ns.CreateWindowFrame(name, title, opts)
     local xBtn = ns.CreateCloseButton(frame, 18, 0.8)
     xBtn:SetPoint("TOPRIGHT", -pad, opts.titleY or -10)
     xBtn:SetScript("OnClick", function()
-        if not ns.DeferInCombat(function() frame:Hide() end) then frame:Hide() end
+        ns.HideOutOfCombat(frame)
     end)
     frame.closeBtn = xBtn
 
