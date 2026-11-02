@@ -310,17 +310,15 @@ end)
 -- The goal of one item (pieces) or nil: its own amount from db.itemGoals (only
 -- while db.itemGoalsEnabled, so the list can stay without being emptied), else
 -- the general db.itemGoal that covers every other item (0 = none), Vendor-Only
--- items included: their bar shows the progress too. The second result tells
--- whether the goal is the item's own. What triggers the goal is decided in
--- GoalReachedIn. See ApplyValueBars. Goals run the normal count-up timer.
+-- items included: their bar shows the progress too. What triggers the goal is
+-- decided in GoalReachedIn. See ApplyValueBars. Goals run the normal count-up timer.
 function ns.GetItemGoal(itemID)
     local db = NightsFarmtrackerDB
     if db.limitMode ~= "goal" or not itemID then return nil end
     local entry = db.itemGoalsEnabled ~= false and db.itemGoals and db.itemGoals[itemID]
     local amount = entry and tonumber(entry.amount) or 0
-    local own = amount > 0
-    if not own then amount = tonumber(db.itemGoal) or 0 end
-    return amount > 0 and amount or nil, own
+    if amount <= 0 then amount = tonumber(db.itemGoal) or 0 end
+    return amount > 0 and amount or nil
 end
 
 -- Optional fixed session length (db.sessionLength minutes): the timer then
@@ -701,10 +699,10 @@ local function DrawBar(row, frac, r, g, b)
 end
 
 -- Items valued at vendor price only (Vendor-Only Filter, BoP) count towards
--- their bar, but only a goal of their own can be reached by them, not the
--- general one: that is left to items with an AH price.
-local function GoalCanTrigger(vendorOnly, own)
-    return own or not vendorOnly
+-- their bar, but never reach a goal (general or own): that is left to items
+-- with an AH price.
+local function GoalCanTrigger(vendorOnly)
+    return not vendorOnly
 end
 
 -- Rows of an item with a goal (db.itemGoals / db.itemGoal) show their count relative to the
@@ -720,13 +718,12 @@ local function ApplyValueBars()
 
     local maxValue, maxMerged, anyGoal = 0, 0, false
     for _, row in pairs(itemRows) do
-        local goal, own
-        if row.barCount and not row.isJunkMerged then goal, own = ns.GetItemGoal(row.itemID) end
+        local goal = row.barCount and not row.isJunkMerged and ns.GetItemGoal(row.itemID)
         if goal then
             anyGoal = true
             local c = row.barCount
             row.barGoal = goal
-            if c >= goal and GoalCanTrigger(row.barVendorOnly, own) then
+            if c >= goal and GoalCanTrigger(row.barVendorOnly) then
                 DrawBar(row, 1, unpack(GOAL_COL))
             else
                 DrawBar(row, c / goal, unpack(ns.COL_ACCENT))   -- also past the goal for Vendor-Only
@@ -760,8 +757,8 @@ local function GoalReachedIn(cats)
         for _, it in ipairs(cat.items) do
             local d = it.data
             if not d.isJunkMerged then
-                local goal, own = ns.GetItemGoal(it.itemID)
-                if goal and GoalCanTrigger(ns.IsVendorOnly(d), own) and (d.amount or 0) >= goal then return true end
+                local goal = ns.GetItemGoal(it.itemID)
+                if goal and GoalCanTrigger(ns.IsVendorOnly(d)) and (d.amount or 0) >= goal then return true end
             end
         end
     end

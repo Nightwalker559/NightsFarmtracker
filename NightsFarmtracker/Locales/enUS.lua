@@ -208,7 +208,7 @@ L["help_set_limit"]        = "Session limit:"
 L["help_set_limit_length"] = "  Session length: the timer counts down and the session pauses at 0. Cannot be combined with item goals."
 L["help_set_limit_goals"]  = "  Item goals: the bar of each item shows its progress to its target amount and turns green once it is reached. The first goal reached pauses the session; the timer then counts up. Cannot be combined with the session length."
 L["help_set_limit_general"] = "  Target amount per item: applies to every item without its own goal (0 = none), e.g. 1000 of anything. Own goals are set in the Item Goals window."
-L["help_set_limit_vendor"] = "  Vendor-Only items show their progress too but never reach the general target, only items with an AH price do."
+L["help_set_limit_vendor"] = "  Vendor-Only items show their progress too but never reach a target (general or own), only items with an AH price do."
 L["help_set_gear"]         = "Gear AH Threshold:"
 L["help_set_gear_text"]    = "  Equipment only uses its AH price once the price of one item reaches this amount; below it the vendor price counts (0 = off). The gear icon picks the Equipment categories it applies to."
 -- Minimap

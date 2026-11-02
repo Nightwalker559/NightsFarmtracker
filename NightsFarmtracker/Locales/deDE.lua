@@ -200,7 +200,7 @@ L["help_set_limit"]        = "Session-Limit:"
 L["help_set_limit_length"] = "  Session-Länge: Der Timer zählt runter und die Session pausiert bei 0. Nicht kombinierbar mit Gegenstandszielen."
 L["help_set_limit_goals"]  = "  Gegenstandsziele: Der Balken jedes Gegenstands zeigt den Fortschritt zu seiner Zielmenge und wird bei Erreichen grün. Das erste erreichte Ziel pausiert die Session, der Timer zählt dann hoch. Nicht kombinierbar mit der Session-Länge."
 L["help_set_limit_general"] = "  Zielmenge pro Gegenstand: gilt für jeden Gegenstand ohne eigenes Ziel (0 = keins), z.B. 1000 von irgendwas. Eigene Ziele stellst du im Fenster Gegenstandsziele ein."
-L["help_set_limit_vendor"] = "  Vendor-Only-Gegenstände zeigen ihren Fortschritt auch, erreichen die allgemeine Zielmenge aber nie, das tun nur Gegenstände mit AH-Preis."
+L["help_set_limit_vendor"] = "  Vendor-Only-Gegenstände zeigen ihren Fortschritt auch, erreichen aber nie eine Zielmenge (allgemein oder eigen), das tun nur Gegenstände mit AH-Preis."
 L["help_set_gear"]         = "Ausrüstungs-AH-Schwelle:"
 L["help_set_gear_text"]    = "  Ausrüstung nutzt den AH-Preis erst, wenn der Preis eines Gegenstands diesen Betrag erreicht, darunter zählt der Händlerpreis (0 = aus). Über das Zahnrad-Icon wählst du die Ausrüstungs-Kategorien, für die das gilt."
 -- Minimap
