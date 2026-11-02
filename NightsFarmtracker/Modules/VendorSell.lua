@@ -156,13 +156,11 @@ local function CollectTrash()
     return list
 end
 
--- How many items one click sells, and what they bring.
-local function BatchInfo()
+-- How many items one click sells.
+local function BatchCount()
     local n = #items
     if IsOn("vendorSellProtect") then n = math.min(n, PROTECT_MAX) end
-    local total = 0
-    for i = 1, n do total = total + items[i].value end
-    return n, total
+    return n
 end
 
 ------------------------------------------------------------------------
@@ -200,7 +198,7 @@ local function StopSelling()
 end
 
 local function UpdateSellButton()
-    local n, total = BatchInfo()
+    local n = BatchCount()
     local btn = frame.sellBtn
     local canSell = n > 0 and not selling
     local text
@@ -209,7 +207,6 @@ local function UpdateSellButton()
     else
         text = string.format(ns.L["vendor_sell_btn"], n)
     end
-    if n > 0 then text = text .. "  " .. ns.FormatGold(total) end
     btn.lbl:SetText(text)
     btn:SetEnabled(canSell)
     btn.lbl:SetTextColor(canSell and 0.85 or 0.4, canSell and 0.85 or 0.4, canSell and 0.85 or 0.4)
@@ -217,7 +214,7 @@ end
 
 local function SellClick()
     if selling or not MerchantFrame:IsShown() then return end
-    local n = BatchInfo()
+    local n = BatchCount()
     if n == 0 then return end
     local queue = {}
     for i = 1, n do queue[i] = items[i] end

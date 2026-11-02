@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Sell List: the Delete and Sell buttons sit side by side (Sell takes the whole row while there is nothing to delete)
+- Sell List: the Delete and Sell buttons sit side by side (Sell takes the whole row while there is nothing to delete); the Sell button no longer shows the gold sum
 - Sell List: the Delete button shows the number of listed items instead of the name of the first one (one click still deletes one item: the game allows one deletion per click)
 - Settings: long explanations moved out of the window. Session length, Item goals, target amount and the Gear AH Threshold have short labels; a "?" button next to the Session Limit title and the Gear AH Threshold opens the Details window at the matching section
 - Sessions tab: a header row on top shows the running month with its total (items plus looted gold) and play time, in the look of the History tab's month rows; hovering it shows items, looted gold, total and the average per day, a click opens the month summary
