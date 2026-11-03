@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.7
+
+### New
+
+- Sell List: option "Keep soulbound items" (off by default); the upgrade track selection applies to Warband and soulbound gear
+
+### Fixed
+
+- Sell List: soulbound gear is judged without its AH price (it cannot be auctioned)
+
 ## 1.8.6
 
 ### Changed

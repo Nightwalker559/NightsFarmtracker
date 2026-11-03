@@ -6,9 +6,11 @@
 -- as many as the merchant's buyback list holds, so a wrong click can still be
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
--- ticked there. The options live in a window (ns.ToggleVendorSellConfig, Settings\SellConfig.lua)
--- that the gear icon of this window and the one in Settings open. Below the sale
--- list come the bag items of the Delete List, all deleted by a second button.
+-- ticked there; soulbound items stay too once "Keep soulbound items" is on, with
+-- the same track exception. The options live in a window
+-- (ns.ToggleVendorSellConfig, Settings\SellConfig.lua) that the gear icon of this
+-- window and the one in Settings open. Below the sale list come the bag items of
+-- the Delete List, deleted one per click by a second button.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -49,19 +51,9 @@ local function BagItemData(itemID, link)
     }, sellPrice
 end
 
--- Vendor-Only Filter (items, categories, AH-by-expansion), or Equipment under
--- the Gear AH Threshold. Only real weapons/armor take the threshold path:
--- ns.IsGear also counts every soulbound item, which must not be sold on a
--- missing AH price. Without a price source every piece would count as below
--- the threshold, so that path is off then.
-local function IsVendorGood(data, count)
-    if ns.IsForceVendor(data.itemID) or ns.IsForceVendorCategory(data) or ns.IsForceVendorExpansion(data) then
-        return true
-    end
-    if not ns.IsGearClass(data.classID) then return false end
-    if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then return false end
-    local ahPrice = ns.GetAHPriceForID(data.itemID, data.itemLink)
-    return ns.IsGearThresholdVendorOnly(data, ahPrice and ahPrice * count, count)
+local function BagLocation(bag, slot)
+    local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
+    return loc ~= nil and loc:IsValid() and loc or nil
 end
 
 -- Bound to the Warband, or until equipped (older clients report the latter as
@@ -69,13 +61,39 @@ end
 local function IsWarband(data, bag, slot)
     if data.isBoA then return true end
     if not C_Item.IsBoundToAccountUntilEquip then return false end
-    local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
-    return loc ~= nil and loc:IsValid() and C_Item.IsBoundToAccountUntilEquip(loc) == true
+    local loc = BagLocation(bag, slot)
+    return loc ~= nil and C_Item.IsBoundToAccountUntilEquip(loc) == true
 end
 
--- Upgrade tracks of Warband gear that may be sold although Warband items are
--- kept (db.vendorSellWarbandTracks[key] = true). Matched by the track name the
--- game shows, in the client language or in English.
+-- Soulbound to this character: Bind on Pickup, or bound by equipping (the bag
+-- slot knows). Items bound to the Warband are not meant, the Warband option
+-- decides about those.
+local function IsSoulbound(data, bag, slot)
+    if IsWarband(data, bag, slot) then return false end
+    if data.isBoP then return true end
+    local loc = BagLocation(bag, slot)
+    return loc ~= nil and C_Item.IsBound(loc) == true
+end
+
+-- Vendor-Only Filter (items, categories, AH-by-expansion), or Equipment under
+-- the Gear AH Threshold. Only real weapons/armor take the threshold path:
+-- ns.IsGear also counts every soulbound item, which must not be sold on a
+-- missing AH price. Without a price source every piece would count as below
+-- the threshold, so that path is off then. Gear bound to this character cannot
+-- be auctioned, so a price the AH addon knows for its item ID does not count.
+local function IsVendorGood(data, count, bag, slot)
+    if ns.IsForceVendor(data.itemID) or ns.IsForceVendorCategory(data) or ns.IsForceVendorExpansion(data) then
+        return true
+    end
+    if not ns.IsGearClass(data.classID) then return false end
+    if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then return false end
+    local ahPrice = not IsSoulbound(data, bag, slot) and ns.GetAHPriceForID(data.itemID, data.itemLink) or nil
+    return ns.IsGearThresholdVendorOnly(data, ahPrice and ahPrice * count, count)
+end
+
+-- Upgrade tracks of gear that may be sold although Warband or soulbound items
+-- are kept (db.vendorSellWarbandTracks[key] = true, one list for both). Matched
+-- by the track name the game shows, in the client language or in English.
 ns.WARBAND_SELL_TRACKS = {
     { key = "explorer",   locKey = "track_explorer",   en = "Explorer"   },
     { key = "adventurer", locKey = "track_adventurer", en = "Adventurer" },
@@ -94,7 +112,7 @@ local function BuildTrackNames()
     end
 end
 
--- Warband gear whose upgrade track is ticked in Settings. Gear without a
+-- Gear whose upgrade track is ticked in Settings. Gear without a
 -- track, or with a name we do not know, stays in the bags.
 local function IsSellableTrack(link)
     local tracks = NightsFarmtrackerDB.vendorSellWarbandTracks
@@ -106,6 +124,12 @@ local function IsSellableTrack(link)
     return key ~= nil and tracks[key] == true
 end
 
+-- Warband or soulbound item the options say to keep (before the track exception).
+local function IsKeptBound(data, bag, slot)
+    return (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot))
+        or (NightsFarmtrackerDB.vendorSellKeepSoulbound == true and IsSoulbound(data, bag, slot))
+end
+
 local function InEquipmentSet(bag, slot)
     return C_Container.GetContainerItemEquipmentSetInfo(bag, slot) == true
 end
@@ -115,10 +139,9 @@ local function CollectItems()
     ns.ForEachBagItem(function(bag, slot, info)
         if info.hyperlink and not info.isLocked and not info.hasNoValue then
             local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
-            if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot)
+            if data and IsVendorGood(data, info.stackCount, bag, slot) and not InEquipmentSet(bag, slot)
                and not ns.IsOnDeleteList(info.itemID)
-               and not (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot)
-                        and not IsSellableTrack(info.hyperlink)) then
+               and not (IsKeptBound(data, bag, slot) and not IsSellableTrack(info.hyperlink)) then
                 list[#list + 1] = {
                     bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink, name = data.name,
                     count = info.stackCount, value = sellPrice * info.stackCount,
