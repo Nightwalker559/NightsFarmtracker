@@ -50,28 +50,13 @@ local function BagItemData(itemID, link)
     }, sellPrice
 end
 
--- Vendor-Only Filter (items, categories, AH-by-expansion), or Equipment under
--- the Gear AH Threshold. Only real weapons/armor take the threshold path:
--- ns.IsGear also counts every soulbound item, which must not be sold on a
--- missing AH price. Without a price source every piece would count as below
--- the threshold, so that path is off then.
-local function IsVendorGood(data, count)
-    if ns.IsForceVendor(data.itemID) or ns.IsForceVendorCategory(data) or ns.IsForceVendorExpansion(data) then
-        return true
-    end
-    if not ns.IsGearClass(data.classID) then return false end
-    if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then return false end
-    local ahPrice = ns.GetAHPriceForID(data.itemID, data.itemLink)
-    return ns.IsGearThresholdVendorOnly(data, ahPrice and ahPrice * count, count)
-end
-
--- Bound to the Warband, or until equipped (older clients report the latter as
--- plain BoE, so the bag slot is asked as well, like ApplyBagItemInfo does).
 local function BagLocation(bag, slot)
     local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
     return loc ~= nil and loc:IsValid() and loc or nil
 end
 
+-- Bound to the Warband, or until equipped (older clients report the latter as
+-- plain BoE, so the bag slot is asked as well, like ApplyBagItemInfo does).
 local function IsWarband(data, bag, slot)
     if data.isBoA then return true end
     if not C_Item.IsBoundToAccountUntilEquip then return false end
@@ -87,6 +72,22 @@ local function IsSoulbound(data, bag, slot)
     if data.isBoP then return true end
     local loc = BagLocation(bag, slot)
     return loc ~= nil and C_Item.IsBound(loc) == true
+end
+
+-- Vendor-Only Filter (items, categories, AH-by-expansion), or Equipment under
+-- the Gear AH Threshold. Only real weapons/armor take the threshold path:
+-- ns.IsGear also counts every soulbound item, which must not be sold on a
+-- missing AH price. Without a price source every piece would count as below
+-- the threshold, so that path is off then. Gear bound to this character cannot
+-- be auctioned, so a price the AH addon knows for its item ID does not count.
+local function IsVendorGood(data, count, bag, slot)
+    if ns.IsForceVendor(data.itemID) or ns.IsForceVendorCategory(data) or ns.IsForceVendorExpansion(data) then
+        return true
+    end
+    if not ns.IsGearClass(data.classID) then return false end
+    if not ns.HasAnyAH() or NightsFarmtrackerDB.ahSource == "none" then return false end
+    local ahPrice = not IsSoulbound(data, bag, slot) and ns.GetAHPriceForID(data.itemID, data.itemLink) or nil
+    return ns.IsGearThresholdVendorOnly(data, ahPrice and ahPrice * count, count)
 end
 
 -- Upgrade tracks of gear that may be sold although Warband or soulbound items
@@ -137,7 +138,7 @@ local function CollectItems()
     ns.ForEachBagItem(function(bag, slot, info)
         if info.hyperlink and not info.isLocked and not info.hasNoValue then
             local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
-            if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot)
+            if data and IsVendorGood(data, info.stackCount, bag, slot) and not InEquipmentSet(bag, slot)
                and not ns.IsOnDeleteList(info.itemID)
                and not (IsKeptBound(data, bag, slot) and not IsSellableTrack(info.hyperlink)) then
                 list[#list + 1] = {
