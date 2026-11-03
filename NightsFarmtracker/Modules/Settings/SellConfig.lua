@@ -99,7 +99,7 @@ end
 ------------------------------------------------------------------------
 -- Sell List config window: the gear icon next to "Show the sell list at
 -- vendors" (Settings) and the one in the Sell List window open it. Warband
--- items, upgrade tracks and the sale protection, the same widgets as the
+-- items, upgrade tracks, soulbound items and the sale protection, the same widgets as the
 -- settings page; rebuilt on open and after every change, so it always shows
 -- the active profile. New Sell List options belong here. Opened from Settings
 -- it joins the left docking chain behind Settings, opened from the Sell List
@@ -141,6 +141,7 @@ local function BuildSellConfig()
     pop.trackDropdown:Refresh()
     y = y - 32
 
+    y = option(y, ns.L["vendor_sell_soulbound"], "vendorSellKeepSoulbound", ns.L["vendor_sell_soulbound_tip"])
     y = option(y, string.format(ns.L["vendor_sell_protect"], ns.VENDOR_SELL_PROTECT_MAX), "vendorSellProtect",
         string.format(ns.L["vendor_sell_protect_tip"], ns.VENDOR_SELL_PROTECT_MAX))
     pop:SetHeight(-y + 4)

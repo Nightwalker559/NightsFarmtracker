@@ -6,7 +6,7 @@
 -- as many as the merchant's buyback list holds, so a wrong click can still be
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
--- ticked there. The options live in a window (ns.ToggleVendorSellConfig, Settings\SellConfig.lua)
+-- ticked there; soulbound items stay too once "Keep soulbound items" is on. The options live in a window (ns.ToggleVendorSellConfig, Settings\SellConfig.lua)
 -- that the gear icon of this window and the one in Settings open. Below the sale
 -- list come the bag items of the Delete List, all deleted by a second button.
 ------------------------------------------------------------------------
@@ -66,11 +66,26 @@ end
 
 -- Bound to the Warband, or until equipped (older clients report the latter as
 -- plain BoE, so the bag slot is asked as well, like ApplyBagItemInfo does).
+local function BagLocation(bag, slot)
+    local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
+    return loc ~= nil and loc:IsValid() and loc or nil
+end
+
 local function IsWarband(data, bag, slot)
     if data.isBoA then return true end
     if not C_Item.IsBoundToAccountUntilEquip then return false end
-    local loc = ItemLocation:CreateFromBagAndSlot(bag, slot)
-    return loc ~= nil and loc:IsValid() and C_Item.IsBoundToAccountUntilEquip(loc) == true
+    local loc = BagLocation(bag, slot)
+    return loc ~= nil and C_Item.IsBoundToAccountUntilEquip(loc) == true
+end
+
+-- Soulbound to this character: Bind on Pickup, or bound by equipping (the bag
+-- slot knows). Items bound to the Warband are not meant, the Warband option
+-- decides about those.
+local function IsSoulbound(data, bag, slot)
+    if IsWarband(data, bag, slot) then return false end
+    if data.isBoP then return true end
+    local loc = BagLocation(bag, slot)
+    return loc ~= nil and C_Item.IsBound(loc) == true
 end
 
 -- Upgrade tracks of Warband gear that may be sold although Warband items are
@@ -118,7 +133,8 @@ local function CollectItems()
             if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot)
                and not ns.IsOnDeleteList(info.itemID)
                and not (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot)
-                        and not IsSellableTrack(info.hyperlink)) then
+                        and not IsSellableTrack(info.hyperlink))
+               and not (NightsFarmtrackerDB.vendorSellKeepSoulbound == true and IsSoulbound(data, bag, slot)) then
                 list[#list + 1] = {
                     bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink, name = data.name,
                     count = info.stackCount, value = sellPrice * info.stackCount,

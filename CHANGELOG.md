@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.7
+
+### Added
+
+- Sell List: new option "Keep soulbound items" (off by default) in the Sell List settings; items bound to this character (Bind on Pickup, or bound by equipping) are no longer offered. Warband items stay with their own option
+
 ## 1.8.6
 
 ### Changed
