@@ -7,9 +7,10 @@
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
 -- ticked there; soulbound items stay too once "Keep soulbound items" is on, with
--- the same track exception. The options live in a window (ns.ToggleVendorSellConfig, Settings\SellConfig.lua)
--- that the gear icon of this window and the one in Settings open. Below the sale
--- list come the bag items of the Delete List, all deleted by a second button.
+-- the same track exception. The options live in a window
+-- (ns.ToggleVendorSellConfig, Settings\SellConfig.lua) that the gear icon of this
+-- window and the one in Settings open. Below the sale list come the bag items of
+-- the Delete List, deleted one per click by a second button.
 ------------------------------------------------------------------------
 local _, ns = ...
 
@@ -91,8 +92,8 @@ local function IsVendorGood(data, count, bag, slot)
 end
 
 -- Upgrade tracks of gear that may be sold although Warband or soulbound items
--- are kept (db.vendorSellWarbandTracks[key] = true, one list for both). Matched by the track name the
--- game shows, in the client language or in English.
+-- are kept (db.vendorSellWarbandTracks[key] = true, one list for both). Matched
+-- by the track name the game shows, in the client language or in English.
 ns.WARBAND_SELL_TRACKS = {
     { key = "explorer",   locKey = "track_explorer",   en = "Explorer"   },
     { key = "adventurer", locKey = "track_adventurer", en = "Adventurer" },
