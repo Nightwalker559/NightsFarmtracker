@@ -2,13 +2,13 @@
 
 ## 1.8.7
 
-### Added
+### New
 
-- Sell List: new option "Keep soulbound items" (off by default) in the Sell List settings; items bound to this character (Bind on Pickup, or bound by equipping) are no longer offered. The upgrade track selection (Explorer, Adventurer, ...) now applies to Warband and soulbound gear alike and sits below both options
+- Sell List: option "Keep soulbound items" (off by default); the upgrade track selection applies to Warband and soulbound gear
 
 ### Fixed
 
-- Sell List: gear bound to this character is judged without its AH price (it cannot be auctioned), so a soulbound piece is no longer kept off the list by an AH price known for its item ID
+- Sell List: soulbound gear is judged without its AH price (it cannot be auctioned)
 
 ## 1.8.6
 
