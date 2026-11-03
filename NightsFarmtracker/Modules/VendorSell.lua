@@ -6,7 +6,8 @@
 -- as many as the merchant's buyback list holds, so a wrong click can still be
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
--- ticked there; soulbound items stay too once "Keep soulbound items" is on. The options live in a window (ns.ToggleVendorSellConfig, Settings\SellConfig.lua)
+-- ticked there; soulbound items stay too once "Keep soulbound items" is on, with
+-- the same track exception. The options live in a window (ns.ToggleVendorSellConfig, Settings\SellConfig.lua)
 -- that the gear icon of this window and the one in Settings open. Below the sale
 -- list come the bag items of the Delete List, all deleted by a second button.
 ------------------------------------------------------------------------
@@ -88,8 +89,8 @@ local function IsSoulbound(data, bag, slot)
     return loc ~= nil and C_Item.IsBound(loc) == true
 end
 
--- Upgrade tracks of Warband gear that may be sold although Warband items are
--- kept (db.vendorSellWarbandTracks[key] = true). Matched by the track name the
+-- Upgrade tracks of gear that may be sold although Warband or soulbound items
+-- are kept (db.vendorSellWarbandTracks[key] = true, one list for both). Matched by the track name the
 -- game shows, in the client language or in English.
 ns.WARBAND_SELL_TRACKS = {
     { key = "explorer",   locKey = "track_explorer",   en = "Explorer"   },
@@ -109,7 +110,7 @@ local function BuildTrackNames()
     end
 end
 
--- Warband gear whose upgrade track is ticked in Settings. Gear without a
+-- Gear whose upgrade track is ticked in Settings. Gear without a
 -- track, or with a name we do not know, stays in the bags.
 local function IsSellableTrack(link)
     local tracks = NightsFarmtrackerDB.vendorSellWarbandTracks
@@ -119,6 +120,12 @@ local function IsSellableTrack(link)
     if not trackByName then BuildTrackNames() end
     local key = trackByName[info.trackString:lower()]
     return key ~= nil and tracks[key] == true
+end
+
+-- Warband or soulbound item the options say to keep (before the track exception).
+local function IsKeptBound(data, bag, slot)
+    return (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot))
+        or (NightsFarmtrackerDB.vendorSellKeepSoulbound == true and IsSoulbound(data, bag, slot))
 end
 
 local function InEquipmentSet(bag, slot)
@@ -132,9 +139,7 @@ local function CollectItems()
             local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
             if data and IsVendorGood(data, info.stackCount) and not InEquipmentSet(bag, slot)
                and not ns.IsOnDeleteList(info.itemID)
-               and not (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot)
-                        and not IsSellableTrack(info.hyperlink))
-               and not (NightsFarmtrackerDB.vendorSellKeepSoulbound == true and IsSoulbound(data, bag, slot)) then
+               and not (IsKeptBound(data, bag, slot) and not IsSellableTrack(info.hyperlink)) then
                 list[#list + 1] = {
                     bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink, name = data.name,
                     count = info.stackCount, value = sellPrice * info.stackCount,

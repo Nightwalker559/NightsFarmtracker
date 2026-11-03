@@ -14,9 +14,9 @@ local trackMenuList
 local sellCfgPop   -- the options window (see ns.ToggleVendorSellConfig)
 
 ------------------------------------------------------------------------
--- Sell List: upgrade tracks of Warband gear that is sold anyway. A dropdown
--- whose rows are check boxes; the list stays open while several are ticked.
--- Greyed out while Warband items are not kept or the Sell List is off.
+-- Sell List: upgrade tracks of Warband or soulbound gear that is sold anyway. A
+-- dropdown whose rows are check boxes; the list stays open while several are
+-- ticked. Greyed out while neither kind is kept or the Sell List is off.
 ------------------------------------------------------------------------
 local TRACK_ROW_H = 20
 
@@ -86,7 +86,7 @@ local function MakeWarbandTrackDropdown(parent)
         for _, t in ipairs(ns.WARBAND_SELL_TRACKS) do
             if Ticked(t.key) then names[#names + 1] = ns.L[t.locKey] end
         end
-        local off = db.vendorSellEnabled == false or db.vendorSellKeepWarband == false
+        local off = db.vendorSellEnabled == false or not (db.vendorSellKeepWarband ~= false or db.vendorSellKeepSoulbound == true)
         self.lbl:SetText(#names > 0 and table.concat(names, ", ") or ns.L["vendor_sell_tracks_none"])
         self.lbl:SetTextColor(off and 0.4 or 0.85, off and 0.4 or 0.85, off and 0.4 or 0.85)
         self:EnableMouse(not off)
@@ -99,7 +99,7 @@ end
 ------------------------------------------------------------------------
 -- Sell List config window: the gear icon next to "Show the sell list at
 -- vendors" (Settings) and the one in the Sell List window open it. Warband
--- items, upgrade tracks, soulbound items and the sale protection, the same widgets as the
+-- items, soulbound items, upgrade tracks and the sale protection, the same widgets as the
 -- settings page; rebuilt on open and after every change, so it always shows
 -- the active profile. New Sell List options belong here. Opened from Settings
 -- it joins the left docking chain behind Settings, opened from the Sell List
@@ -130,18 +130,18 @@ local function BuildSellConfig()
     local y = -(S_HDR_H + 6)
     y = option(y, ns.L["vendor_sell_warband"], "vendorSellKeepWarband", ns.L["vendor_sell_warband_tip"])
 
-    local indent = CTRL_SIZE + 8
-    local gray = (off or db.vendorSellKeepWarband == false) and 0.3 or 0.5
+    y = option(y, ns.L["vendor_sell_soulbound"], "vendorSellKeepSoulbound", ns.L["vendor_sell_soulbound_tip"])
+
+    local gray = (off or not (db.vendorSellKeepWarband ~= false or db.vendorSellKeepSoulbound == true)) and 0.3 or 0.5
     pop.hint:ClearAllPoints()
-    pop.hint:SetPoint("TOPLEFT", S_PAD + indent, y)
+    pop.hint:SetPoint("TOPLEFT", S_PAD, y)
     pop.hint:SetTextColor(gray, gray, gray)
     y = y - 18
     pop.trackDropdown:ClearAllPoints()
-    pop.trackDropdown:SetPoint("TOPLEFT", S_PAD + indent, y)
+    pop.trackDropdown:SetPoint("TOPLEFT", S_PAD, y)
     pop.trackDropdown:Refresh()
     y = y - 32
 
-    y = option(y, ns.L["vendor_sell_soulbound"], "vendorSellKeepSoulbound", ns.L["vendor_sell_soulbound_tip"])
     y = option(y, string.format(ns.L["vendor_sell_protect"], ns.VENDOR_SELL_PROTECT_MAX), "vendorSellProtect",
         string.format(ns.L["vendor_sell_protect_tip"], ns.VENDOR_SELL_PROTECT_MAX))
     pop:SetHeight(-y + 4)
