@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.8
+
+### Changed
+
+- TOC: added interface version 16001 (WoW Forever)
+
 ## 1.8.7
 
 ### New
