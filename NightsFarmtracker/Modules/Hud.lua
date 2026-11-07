@@ -31,15 +31,22 @@ local moved        = {}         -- { {obj=, parent=, strata=, level=, layer=, su
 local redirected   = {}         -- obj -> true while its Minimap anchors point at Dummy
 local hooked       = {}         -- obj -> true once the SetPoint hook is installed
 local hooksReady   = false
-local minimapMask                   -- last mask another addon set (ElvUI: square); Minimap has no getter
+local minimapMask                -- mask in place before the first open; Minimap has no getter
+local maskFrozen    = false     -- set on first open: later calls are the client's own resets
 
 local Msg = ns.Print
 
--- Recorded from addon load on, because ElvUI sets the mask once at login,
--- long before the HUD is first opened. Only a passive recorder.
+-- Recorded from addon load on, because another addon may set the mask long
+-- before the HUD is first opened. Frozen on the first open, since the client
+-- itself resets the mask (to its round default) while the HUD opens/closes.
 if Minimap and Minimap.SetMaskTexture then
     hooksecurefunc(Minimap, "SetMaskTexture", function(_, texture)
-        if not active then minimapMask = texture end
+        if ns.debugMode then
+            ns.Log(string.format("HUD: SetMaskTexture(%s) active=%s frozen=%s from %s",
+                tostring(texture), tostring(active), tostring(maskFrozen),
+                (debugstack(2, 1, 0) or ""):match("^[^\n]*") or "?"))
+        end
+        if not active and not maskFrozen then minimapMask = texture end
     end)
 end
 
@@ -321,35 +328,33 @@ end
 ------------------------------------------------------------------------
 -- Open / close
 ------------------------------------------------------------------------
--- Puts back the minimap mask another addon had set and nudges the zoom so
--- the canvas redraws (the same trick ElvUI uses after a resize).
+-- Puts back the minimap mask and nudges the zoom so the canvas redraws (the
+-- same trick ElvUI uses after a resize). ElvUI is asked directly because it
+-- knows the right shape; otherwise the mask recorded before the first open.
 local function RestoreMinimapShape()
-    local mask = minimapMask
-    if not mask then
-        -- nothing recorded: ask ElvUI directly (square unless "circle" is set)
-        local E = _G.ElvUI and _G.ElvUI[1]
-        local M = E and E.GetModule and E:GetModule("Minimap", true)
-        if M and M.SetMinimapMask and M.db then
-            pcall(M.SetMinimapMask, M, not M.db.circle)
-            ns.Log("HUD: minimap mask set by ElvUI module (circle=" .. tostring(M.db.circle) .. ")")
-            return
-        end
+    local E = _G.ElvUI and _G.ElvUI[1]
+    local M = E and E.GetModule and E:GetModule("Minimap", true)
+    if M and M.SetMinimapMask and M.db then
+        pcall(M.SetMinimapMask, M, not M.db.circle)
+        ns.Log("HUD: minimap mask set by ElvUI (circle=" .. tostring(M.db.circle) .. ")")
+    elseif minimapMask then
+        pcall(Minimap.SetMaskTexture, Minimap, minimapMask)
+        ns.Log("HUD: minimap mask restored: " .. tostring(minimapMask))
+    else
+        return
     end
-    if mask then
-        pcall(Minimap.SetMaskTexture, Minimap, mask)
-        local zoom = Minimap:GetZoom()
-        if type(zoom) == "number" then
-            pcall(Minimap.SetZoom, Minimap, zoom > 0 and 0 or 1)
-            pcall(Minimap.SetZoom, Minimap, zoom)
-        end
+    local zoom = Minimap:GetZoom()
+    if type(zoom) == "number" then
+        pcall(Minimap.SetZoom, Minimap, zoom > 0 and 0 or 1)
+        pcall(Minimap.SetZoom, Minimap, zoom)
     end
-    ns.Log("HUD: minimap mask restored: " .. tostring(mask or "none recorded"))
 end
 
 
 local function OpenImpl()
     EnsureFrames()
     InstallHooks()
+    maskFrozen = true
 
     local width, height = Minimap:GetSize()
     saved = {
