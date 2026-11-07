@@ -14,8 +14,10 @@
 --   * Minimap pins (HereBeDragons / GatherMate2 / HandyNotes / Routes) are
 --     handed to a separate "cluster" frame, so the map background can be made
 --     transparent without hiding the pins.
---   * Closing the HUD puts everything back. Nothing is touched while the
---     feature is disabled or the HUD was never opened.
+--   * Closing the HUD puts everything back, the minimap mask included.
+--     Nothing is touched while the feature is disabled or the HUD was never
+--     opened; the only thing running from load on is a passive recorder of
+--     the minimap mask.
 ------------------------------------------------------------------------
 local _, ns = ...
 local L = ns.L
@@ -31,7 +33,7 @@ local moved        = {}         -- { {obj=, parent=, strata=, level=, layer=, su
 local redirected   = {}         -- obj -> true while its Minimap anchors point at Dummy
 local hooked       = {}         -- obj -> true once the SetPoint hook is installed
 local hooksReady   = false
-local minimapMask                -- mask in place before the first open; Minimap has no getter
+local minimapMask               -- mask in place before the first open; Minimap has no getter
 local maskFrozen    = false     -- set on first open: later calls are the client's own resets
 
 local Msg = ns.Print
@@ -344,7 +346,6 @@ local function RestoreMinimapShape()
         pcall(Minimap.SetZoom, Minimap, zoom)
     end
 end
-
 
 local function OpenImpl()
     EnsureFrames()
