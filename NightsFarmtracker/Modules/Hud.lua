@@ -41,11 +41,6 @@ local Msg = ns.Print
 -- itself resets the mask (to its round default) while the HUD opens/closes.
 if Minimap and Minimap.SetMaskTexture then
     hooksecurefunc(Minimap, "SetMaskTexture", function(_, texture)
-        if ns.debugMode then
-            ns.Log(string.format("HUD: SetMaskTexture(%s) active=%s frozen=%s from %s",
-                tostring(texture), tostring(active), tostring(maskFrozen),
-                (debugstack(2, 1, 0) or ""):match("^[^\n]*") or "?"))
-        end
         if not active and not maskFrozen then minimapMask = texture end
     end)
 end
