@@ -31,8 +31,17 @@ local moved        = {}         -- { {obj=, parent=, strata=, level=, layer=, su
 local redirected   = {}         -- obj -> true while its Minimap anchors point at Dummy
 local hooked       = {}         -- obj -> true once the SetPoint hook is installed
 local hooksReady   = false
+local minimapMask                   -- last mask another addon set (ElvUI: square); Minimap has no getter
 
 local Msg = ns.Print
+
+-- Recorded from addon load on, because ElvUI sets the mask once at login,
+-- long before the HUD is first opened. Only a passive recorder.
+if Minimap and Minimap.SetMaskTexture then
+    hooksecurefunc(Minimap, "SetMaskTexture", function(_, texture)
+        if not active then minimapMask = texture end
+    end)
+end
 
 local function Enabled()
     return NightsFarmtrackerDB and NightsFarmtrackerDB.hudEnabled == true
@@ -397,6 +406,8 @@ local function Close()
         local maxZoom = Minimap:GetZoomLevels()
         Minimap:SetZoom(maxZoom and math.min(s.zoom, maxZoom - 1) or s.zoom)   -- GetZoomLevels is a count
         if not s.shown then Minimap:Hide() end
+        -- the custom (square) mask can be lost over the resize/reparent: put it back
+        if minimapMask then Minimap:SetMaskTexture(minimapMask) end
     end)
 
     RestoreSurroundings()
