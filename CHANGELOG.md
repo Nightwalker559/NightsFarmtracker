@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.8
+
+### Changed
+
+- TOC: added interface version 16001 (WoW Forever)
+
+### Fixed
+
+- Minimap HUD: closing the HUD restores a square minimap mask (ElvUI) instead of leaving the map round
+
 ## 1.8.7
 
 ### New

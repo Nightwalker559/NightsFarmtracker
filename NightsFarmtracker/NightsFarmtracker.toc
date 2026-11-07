@@ -1,9 +1,9 @@
-## Interface: 120100, 120105, 120107
+## Interface: 120100, 120105, 120107, 16001
 ## Title: Night's Farmtracker
 ## Notes: Tracks items gathered while farming
 ## Author: Nightwalker559
 ## X-Curse-Project-ID: 1576135
-## Version: 1.8.7
+## Version: 1.8.8
 ## SavedVariables: NightsFarmtrackerAccountDB
 ## SavedVariablesPerCharacter: NightsFarmtrackerDB
 ## IconTexture: Interface\AddOns\NightsFarmtracker\Media\Icon

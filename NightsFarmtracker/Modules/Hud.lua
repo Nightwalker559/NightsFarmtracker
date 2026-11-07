@@ -14,8 +14,10 @@
 --   * Minimap pins (HereBeDragons / GatherMate2 / HandyNotes / Routes) are
 --     handed to a separate "cluster" frame, so the map background can be made
 --     transparent without hiding the pins.
---   * Closing the HUD puts everything back. Nothing is touched while the
---     feature is disabled or the HUD was never opened.
+--   * Closing the HUD puts everything back, the minimap mask included.
+--     Nothing is touched while the feature is disabled or the HUD was never
+--     opened; the only thing running from load on is a passive recorder of
+--     the minimap mask.
 ------------------------------------------------------------------------
 local _, ns = ...
 local L = ns.L
@@ -31,8 +33,19 @@ local moved        = {}         -- { {obj=, parent=, strata=, level=, layer=, su
 local redirected   = {}         -- obj -> true while its Minimap anchors point at Dummy
 local hooked       = {}         -- obj -> true once the SetPoint hook is installed
 local hooksReady   = false
+local minimapMask               -- mask in place before the first open; Minimap has no getter
+local maskFrozen    = false     -- set on first open: later calls are the client's own resets
 
 local Msg = ns.Print
+
+-- Recorded from addon load on, because another addon may set the mask long
+-- before the HUD is first opened. Frozen on the first open, since the client
+-- itself resets the mask (to its round default) while the HUD opens/closes.
+if Minimap and Minimap.SetMaskTexture then
+    hooksecurefunc(Minimap, "SetMaskTexture", function(_, texture)
+        if not active and not maskFrozen then minimapMask = texture end
+    end)
+end
 
 local function Enabled()
     return NightsFarmtrackerDB and NightsFarmtrackerDB.hudEnabled == true
@@ -312,9 +325,32 @@ end
 ------------------------------------------------------------------------
 -- Open / close
 ------------------------------------------------------------------------
+-- Puts back the minimap mask and nudges the zoom so the canvas redraws (the
+-- same trick ElvUI uses after a resize). ElvUI is asked directly because it
+-- knows the right shape; otherwise the mask recorded before the first open.
+local function RestoreMinimapShape()
+    local E = _G.ElvUI and _G.ElvUI[1]
+    local M = E and E.GetModule and E:GetModule("Minimap", true)
+    if M and M.SetMinimapMask and M.db then
+        pcall(M.SetMinimapMask, M, not M.db.circle)
+        ns.Log("HUD: minimap mask set by ElvUI (circle=" .. tostring(M.db.circle) .. ")")
+    elseif minimapMask then
+        pcall(Minimap.SetMaskTexture, Minimap, minimapMask)
+        ns.Log("HUD: minimap mask restored: " .. tostring(minimapMask))
+    else
+        return
+    end
+    local zoom = Minimap:GetZoom()
+    if type(zoom) == "number" then
+        pcall(Minimap.SetZoom, Minimap, zoom > 0 and 0 or 1)
+        pcall(Minimap.SetZoom, Minimap, zoom)
+    end
+end
+
 local function OpenImpl()
     EnsureFrames()
     InstallHooks()
+    maskFrozen = true
 
     local width, height = Minimap:GetSize()
     saved = {
@@ -413,6 +449,11 @@ local function Close()
     saved = nil
     pendingClose = false
     busy = false
+
+    -- last, and once more next frame: the resize/reparent/rotation change
+    -- above can drop the custom (square) mask or leave the canvas stale
+    RestoreMinimapShape()
+    RunNextFrame(function() if not active then RestoreMinimapShape() end end)
 end
 
 local function Open()
