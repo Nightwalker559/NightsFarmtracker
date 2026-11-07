@@ -321,6 +321,32 @@ end
 ------------------------------------------------------------------------
 -- Open / close
 ------------------------------------------------------------------------
+-- Puts back the minimap mask another addon had set and nudges the zoom so
+-- the canvas redraws (the same trick ElvUI uses after a resize).
+local function RestoreMinimapShape()
+    local mask = minimapMask
+    if not mask then
+        -- nothing recorded: ask ElvUI directly (square unless "circle" is set)
+        local E = _G.ElvUI and _G.ElvUI[1]
+        local M = E and E.GetModule and E:GetModule("Minimap", true)
+        if M and M.SetMinimapMask and M.db then
+            pcall(M.SetMinimapMask, M, not M.db.circle)
+            ns.Log("HUD: minimap mask set by ElvUI module (circle=" .. tostring(M.db.circle) .. ")")
+            return
+        end
+    end
+    if mask then
+        pcall(Minimap.SetMaskTexture, Minimap, mask)
+        local zoom = Minimap:GetZoom()
+        if type(zoom) == "number" then
+            pcall(Minimap.SetZoom, Minimap, zoom > 0 and 0 or 1)
+            pcall(Minimap.SetZoom, Minimap, zoom)
+        end
+    end
+    ns.Log("HUD: minimap mask restored: " .. tostring(mask or "none recorded"))
+end
+
+
 local function OpenImpl()
     EnsureFrames()
     InstallHooks()
@@ -406,8 +432,6 @@ local function Close()
         local maxZoom = Minimap:GetZoomLevels()
         Minimap:SetZoom(maxZoom and math.min(s.zoom, maxZoom - 1) or s.zoom)   -- GetZoomLevels is a count
         if not s.shown then Minimap:Hide() end
-        -- the custom (square) mask can be lost over the resize/reparent: put it back
-        if minimapMask then Minimap:SetMaskTexture(minimapMask) end
     end)
 
     RestoreSurroundings()
@@ -424,6 +448,11 @@ local function Close()
     saved = nil
     pendingClose = false
     busy = false
+
+    -- last, and once more next frame: the resize/reparent/rotation change
+    -- above can drop the custom (square) mask or leave the canvas stale
+    RestoreMinimapShape()
+    RunNextFrame(function() if not active then RestoreMinimapShape() end end)
 end
 
 local function Open()
