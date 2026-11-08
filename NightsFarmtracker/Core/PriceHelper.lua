@@ -29,21 +29,37 @@ end
 -- Expansion lookup (for the AH Price by Expansion filter)
 -- Enum.ExpansionLevel values, per Blizzard's C_Item.GetItemInfo expacID.
 ------------------------------------------------------------------------
-ns.EXPANSION_NAMES = {
-    [0]  = "Classic",
-    [1]  = "The Burning Crusade",
-    [2]  = "Wrath of the Lich King",
-    [3]  = "Cataclysm",
-    [4]  = "Mists of Pandaria",
-    [5]  = "Warlords of Draenor",
-    [6]  = "Legion",
-    [7]  = "Battle for Azeroth",
-    [8]  = "Shadowlands",
-    [9]  = "Dragonflight",
-    [10] = "The War Within",
-    [11] = "Midnight",
-}
-ns.EXPANSION_ORDER = {0,1,2,3,4,5,6,7,8,9,10,11}
+-- WoW Forever (TOC 16xxx) has no expansions: every item, old or newly added,
+-- belongs to the single group 0, whatever expacID the client reports.
+local build = select(4, GetBuildInfo())
+ns.IS_FOREVER = type(build) == "number" and build >= 16000 and build < 20000
+
+if ns.IS_FOREVER then
+    ns.EXPANSION_NAMES = { [0] = "Forever" }
+    ns.EXPANSION_ORDER = { 0 }
+else
+    ns.EXPANSION_NAMES = {
+        [0]  = "Classic",
+        [1]  = "The Burning Crusade",
+        [2]  = "Wrath of the Lich King",
+        [3]  = "Cataclysm",
+        [4]  = "Mists of Pandaria",
+        [5]  = "Warlords of Draenor",
+        [6]  = "Legion",
+        [7]  = "Battle for Azeroth",
+        [8]  = "Shadowlands",
+        [9]  = "Dragonflight",
+        [10] = "The War Within",
+        [11] = "Midnight",
+    }
+    ns.EXPANSION_ORDER = {0,1,2,3,4,5,6,7,8,9,10,11}
+end
+
+-- Maps a client expacID (nil = not cached yet) to the group the addon uses.
+function ns.NormalizeExpansionID(expID)
+    if expID ~= nil and ns.IS_FOREVER then return 0 end
+    return expID
+end
 
 ------------------------------------------------------------------------
 -- Item link normalization
@@ -82,7 +98,7 @@ function ns.GetItemExpansionID(data)
     if not src then return nil end
     local expID = expansionMemo[src]
     if expID ~= nil then return expID end
-    expID = select(15, C_Item.GetItemInfo(src))
+    expID = ns.NormalizeExpansionID(select(15, C_Item.GetItemInfo(src)))
     if expID ~= nil then
         if expansionCount >= MEMO_LIMIT then
             wipe(expansionMemo); expansionCount = 0

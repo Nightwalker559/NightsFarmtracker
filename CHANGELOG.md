@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.9
+
+### Changed
+
+- WoW Forever: the AH price by expansion filter lists a single group "Forever" (Forever has no expansions); every item, old or new, belongs to it, also in the Drop List groups
+
+### Fixed
+
+- AH price by expansion: expansions no longer listed (Forever shows one) can no longer keep the filter active
+
 ## 1.8.8
 
 ### Changed

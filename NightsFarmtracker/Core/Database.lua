@@ -399,7 +399,7 @@ local function CreateFilterStore(itemsKey, catsKey, enabledKey)
     function store.add(itemID, name, icon, quality)
         if not itemID then return end
         NightsFarmtrackerAccountDB[itemsKey][itemID] = {
-            name = name, icon = icon, quality = quality, expansionID = select(15, C_Item.GetItemInfo(itemID)),
+            name = name, icon = icon, quality = quality, expansionID = ns.NormalizeExpansionID(select(15, C_Item.GetItemInfo(itemID))),
         }
     end
     function store.remove(itemID)
@@ -496,10 +496,16 @@ function ns.SetAHExpansionEnabled(expID, enabled)
     NightsFarmtrackerAccountDB.ahExpansions[expID] = enabled and true or nil
 end
 
--- True if any expansion is selected (the filter is active).
+-- True if any listed expansion is selected (the filter is active). Only the
+-- expansions of ns.EXPANSION_ORDER count: the account table is shared with
+-- clients that list more (Forever shows one), so stale IDs must not keep it on.
 function ns.HasAHExpansionSelection()
     local sel = NightsFarmtrackerAccountDB and NightsFarmtrackerAccountDB.ahExpansions
-    return sel ~= nil and next(sel) ~= nil
+    if not sel then return false end
+    for _, expID in ipairs(ns.EXPANSION_ORDER) do
+        if sel[expID] then return true end
+    end
+    return false
 end
 
 -- True if the filter forces this item's expansion to vendor price.
