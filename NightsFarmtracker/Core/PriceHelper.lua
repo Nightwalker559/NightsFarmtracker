@@ -29,11 +29,8 @@ end
 -- Expansion lookup (for the AH Price by Expansion filter)
 -- Enum.ExpansionLevel values, per Blizzard's C_Item.GetItemInfo expacID.
 ------------------------------------------------------------------------
--- WoW Forever (TOC 16xxx) has no expansions: every item, old or newly added,
--- belongs to the single group 0, whatever expacID the client reports.
-local build = select(4, GetBuildInfo())
-ns.IS_FOREVER = type(build) == "number" and build >= 16000 and build < 20000
-
+-- Forever has no expansions: every item, old or newly added, belongs to the
+-- single group 0, whatever expacID the client reports.
 if ns.IS_FOREVER then
     ns.EXPANSION_NAMES = { [0] = "Forever" }
     ns.EXPANSION_ORDER = { 0 }

@@ -2,7 +2,13 @@
 
 ## 1.8.9
 
+### New
+
+- Sell List: option "Keep BoE items, by quality" (Common to Epic, none ticked by default): unbound Bind on Equip items of a ticked quality are not offered
+
 ### Changed
+
+- WoW Forever: the Sell List options show only what exists there (soulbound, BoE quality, protection); Warband and upgrade tracks are hidden and ignored
 
 - WoW Forever: the AH price by expansion filter lists a single group "Forever" (Forever has no expansions); every item, old or new, belongs to it, also in the Drop List groups
 
