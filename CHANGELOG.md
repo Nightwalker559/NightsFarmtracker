@@ -9,7 +9,7 @@
 ### Changed
 
 - WoW Forever: the Coiled Huntress Venom Tracker is not loaded (no setting, no `/nft venom`, shorter help)
-- WoW Forever: the Lure Bar finds the fishing rod in the main hand slot (Forever has no fishing tool slot) and reads the active lure from it
+- WoW Forever: the Lure Bar finds the fishing rod in the main hand slot (Forever has no fishing tool slot) and reads the active lure from its tooltip (Forever words the line "Lure +75 (10 Min.)")
 - WoW Forever: the Sell List options show only what exists there (soulbound, BoE quality, protection); Warband and upgrade tracks are hidden and ignored
 
 - WoW Forever: the AH price by expansion filter lists a single group "Forever" (Forever has no expansions); every item, old or new, belongs to it, also in the Drop List groups

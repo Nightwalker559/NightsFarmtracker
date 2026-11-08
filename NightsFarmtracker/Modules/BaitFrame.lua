@@ -100,10 +100,11 @@ end
 
 ------------------------------------------------------------------------
 -- Active lure buff (reads it straight off the pole's tooltip, same
--- approach as the Venom Tracker). The line has the shape
--- "Angelköder (+20 Angelfertigkeit) (10 Min.)" -- a label followed by
--- two parenthesised groups (bonus, then duration) -- distinct enough to
--- match locale-independently without needing the exact label text.
+-- approach as the Venom Tracker). Retail shows the line as
+-- "Lure (+20 Fishing Skill) (10 Min.)" (a label, then two parenthesised
+-- groups: bonus, duration), Forever as "Lure +75 (10 Min.)". Both are
+-- distinct enough to match locale-independently without needing the
+-- exact label text.
 ------------------------------------------------------------------------
 local poleTooltipID  -- dataInstanceID of the last pole tooltip, see TOOLTIP_DATA_UPDATE in the watcher
 
@@ -114,7 +115,8 @@ local function ScanActiveLureBuff()
     if not tooltipData then return nil end
     poleTooltipID = tooltipData.dataInstanceID
     for _, line in ipairs(tooltipData.lines) do
-        if line.leftText and line.leftText:match("%(%+%d+.-%)%s*%(.-%)%s*$") then
+        if line.leftText and (line.leftText:match("%(%+%d+.-%)%s*%(.-%)%s*$")
+                              or line.leftText:match("%+%d+%s*%(.-%)%s*$")) then
             return line.leftText
         end
     end
