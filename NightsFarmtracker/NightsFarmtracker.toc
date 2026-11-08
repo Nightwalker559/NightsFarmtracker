@@ -3,7 +3,7 @@
 ## Notes: Tracks items gathered while farming
 ## Author: Nightwalker559
 ## X-Curse-Project-ID: 1576135
-## Version: 1.8.8
+## Version: 1.8.9
 ## SavedVariables: NightsFarmtrackerAccountDB
 ## SavedVariablesPerCharacter: NightsFarmtrackerDB
 ## IconTexture: Interface\AddOns\NightsFarmtracker\Media\Icon

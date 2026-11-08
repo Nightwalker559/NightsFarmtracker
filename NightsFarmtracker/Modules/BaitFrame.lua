@@ -10,8 +10,11 @@
 local _, ns = ...
 
 -- Since profession equipment slots (Dragonflight+), the fishing rod sits
--- in its own dedicated tool slot instead of Main Hand.
-local FISHING_POLE_SLOT = GetInventorySlotInfo("FISHINGTOOLSLOT")
+-- in its own dedicated tool slot instead of Main Hand. Forever has no such
+-- slot: the rod is equipped as the main hand weapon.
+local FISHING_POLE_SLOT = GetInventorySlotInfo(ns.IS_FOREVER and "MAINHANDSLOT" or "FISHINGTOOLSLOT")
+local WEAPON_CLASS = Enum.ItemClass.Weapon
+local FISHING_POLE_SUBCLASS = Enum.ItemWeaponSubclass and Enum.ItemWeaponSubclass.Fishingpole or 20
 
 -- Rough "does this look like a fishing lure" tooltip gate, so dragging in
 -- an unrelated item gets rejected instead of silently accepted. Covers
@@ -84,18 +87,24 @@ end
 -- Fishing pole check
 ------------------------------------------------------------------------
 -- Anything sitting in the Fishing Rod tool slot is, by definition, the
--- equipped fishing pole (profession equipment slot, see FISHINGTOOLSLOT).
+-- equipped fishing pole (profession equipment slot, see FISHINGTOOLSLOT). In
+-- Forever that slot is Main Hand, so the item has to be a fishing pole.
 local function HasFishingPoleEquipped()
     if not FISHING_POLE_SLOT then return false end
-    return GetInventoryItemLink("player", FISHING_POLE_SLOT) ~= nil
+    local link = GetInventoryItemLink("player", FISHING_POLE_SLOT)
+    if not link then return false end
+    if not ns.IS_FOREVER then return true end
+    local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(link)
+    return classID == WEAPON_CLASS and subClassID == FISHING_POLE_SUBCLASS
 end
 
 ------------------------------------------------------------------------
 -- Active lure buff (reads it straight off the pole's tooltip, same
--- approach as the Venom Tracker). The line has the shape
--- "Angelköder (+20 Angelfertigkeit) (10 Min.)" -- a label followed by
--- two parenthesised groups (bonus, then duration) -- distinct enough to
--- match locale-independently without needing the exact label text.
+-- approach as the Venom Tracker). Retail shows the line as
+-- "Lure (+20 Fishing Skill) (10 Min.)" (a label, then two parenthesised
+-- groups: bonus, duration), Forever as "Lure +75 (10 Min.)". Both are
+-- distinct enough to match locale-independently without needing the
+-- exact label text.
 ------------------------------------------------------------------------
 local poleTooltipID  -- dataInstanceID of the last pole tooltip, see TOOLTIP_DATA_UPDATE in the watcher
 
@@ -106,7 +115,8 @@ local function ScanActiveLureBuff()
     if not tooltipData then return nil end
     poleTooltipID = tooltipData.dataInstanceID
     for _, line in ipairs(tooltipData.lines) do
-        if line.leftText and line.leftText:match("%(%+%d+.-%)%s*%(.-%)%s*$") then
+        if line.leftText and (line.leftText:match("%(%+%d+.-%)%s*%(.-%)%s*$")
+                              or line.leftText:match("%+%d+%s*%(.-%)%s*$")) then
             return line.leftText
         end
     end

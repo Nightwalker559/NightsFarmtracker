@@ -294,9 +294,9 @@ function ns.RebuildDropItemList(cfg)
     -- is requested for next time.
     local groups, count = {}, 0
     for itemID, entry in pairs(cfg.items or {}) do
-        local exp = entry.expansionID
+        local exp = ns.NormalizeExpansionID(entry.expansionID)
         if exp == nil then
-            exp = select(15, C_Item.GetItemInfo(itemID))
+            exp = ns.NormalizeExpansionID(select(15, C_Item.GetItemInfo(itemID)))
             if exp ~= nil then entry.expansionID = exp
             else C_Item.RequestLoadItemDataByID(itemID) end
         end

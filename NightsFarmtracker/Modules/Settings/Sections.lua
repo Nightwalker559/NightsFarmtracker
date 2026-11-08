@@ -329,9 +329,11 @@ K.AddSection("sec_fishing", function(y, ui)
     local sectionTitle, checkbox, db = ui.sectionTitle, ui.checkbox, ui.db
     y = sectionTitle(y, "sec_fishing", TITLE_STEP_CTRL)
 
-    y = checkbox(y, "venom_tracker_enabled",
-        function() return db.venomTrackerEnabled == true end,
-        function(v) ns.SetVenomTrackerEnabled(v) end)
+    if not ns.IS_FOREVER then   -- the Coiled Huntress rod does not exist in Forever
+        y = checkbox(y, "venom_tracker_enabled",
+            function() return db.venomTrackerEnabled == true end,
+            function(v) ns.SetVenomTrackerEnabled(v) end)
+    end
     y = checkbox(y, "bait_frame_enabled",
         function() return db.baitFrameEnabled == true end,
         function(v) ns.SetBaitFrameEnabled(v) end)

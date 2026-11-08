@@ -9,6 +9,10 @@ local ADDON_NAME, ns = ...
 ns.ADDON_NAME     = ADDON_NAME
 ns.ART            = "Interface\\AddOns\\NightsFarmtracker\\Media\\"
 
+-- WoW Forever (TOC 16xxx): no expansions, no Warband, no upgrade tracks.
+local build = select(4, GetBuildInfo())
+ns.IS_FOREVER = type(build) == "number" and build >= 16000 and build < 20000
+
 ------------------------------------------------------------------------
 -- Combat-safe deferral for popup windows. Frame:Show/Hide/SetPoint calls
 -- can throw ADDON_ACTION_BLOCKED in combat lockdown (BaitFrame's

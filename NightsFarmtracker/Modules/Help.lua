@@ -22,9 +22,9 @@ local helpSections = {
     { title = ns.L["help_reset"],      lines = { ns.L["help_reset_shift"] } },
     { title = ns.L["help_histlog"],    lines = { ns.L["help_histlog_left"], ns.L["help_histlog_right"] } },
     { title = ns.L["help_filter"],     lines = { ns.L["help_filter_left"], ns.L["help_filter_right"], ns.L["help_filter_sell"] } },
-    { title = ns.L["help_fishing"],    lines = { ns.L["help_fishing_hint"] } },
+    { title = ns.L["help_fishing"],    lines = { ns.L[ns.IS_FOREVER and "help_fishing_hint_forever" or "help_fishing_hint"] } },
     { title = ns.L["help_export"],     lines = { ns.L["help_export_hint"] } },
-    { title = ns.L["help_commands"],   lines = { ns.L["help_cmd_nft"], ns.L["help_cmd_filter"], ns.L["help_cmd_hud"], ns.L["help_cmd_export"], ns.L["help_cmd_fishing"] } },
+    { title = ns.L["help_commands"],   lines = { ns.L["help_cmd_nft"], ns.L["help_cmd_filter"], ns.L["help_cmd_hud"], ns.L["help_cmd_export"], ns.L[ns.IS_FOREVER and "help_cmd_fishing_forever" or "help_cmd_fishing"] } },
     -- Explanations the settings window leaves out; its "?" buttons open them (ns.OpenHelpTopic)
     { key = "limit",  title = ns.L["help_set_limit"], lines = { ns.L["help_set_limit_length"], ns.L["help_set_limit_goals"],
                                                                 ns.L["help_set_limit_general"], ns.L["help_set_limit_vendor"] } },

@@ -7,7 +7,8 @@
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
 -- ticked there; soulbound items stay too once "Keep soulbound items" is on, with
--- the same track exception. The options live in a window
+-- the same track exception; unbound Bind on Equip items stay when their quality is
+-- ticked. Forever has no Warband and no tracks. The options live in a window
 -- (ns.ToggleVendorSellConfig, Settings\SellConfig.lua) that the gear icon of this
 -- window and the one in Settings open. Below the sale list come the bag items of
 -- the Delete List, deleted one per click by a second button.
@@ -103,6 +104,10 @@ ns.WARBAND_SELL_TRACKS = {
     { key = "myth",       locKey = "track_myth",       en = "Myth"       },
 }
 
+-- Qualities offered for "keep Bind on Equip items" (Common to Epic; gray ones
+-- are junk, Legendary and above are never loose BoE drops).
+ns.BOE_KEEP_QUALITIES = { 1, 2, 3, 4 }
+
 local trackByName
 local function BuildTrackNames()
     trackByName = {}
@@ -116,7 +121,7 @@ end
 -- track, or with a name we do not know, stays in the bags.
 local function IsSellableTrack(link)
     local tracks = NightsFarmtrackerDB.vendorSellWarbandTracks
-    if not (tracks and next(tracks) and C_Item.GetItemUpgradeInfo) then return false end
+    if ns.IS_FOREVER or not (tracks and next(tracks) and C_Item.GetItemUpgradeInfo) then return false end
     local info = C_Item.GetItemUpgradeInfo(link)
     if not (info and info.trackString) then return false end
     if not trackByName then BuildTrackNames() end
@@ -130,6 +135,15 @@ local function IsKeptBound(data, bag, slot)
         or (NightsFarmtrackerDB.vendorSellKeepSoulbound == true and IsSoulbound(data, bag, slot))
 end
 
+-- Bind on Equip item that is not bound yet and whose quality is ticked in the
+-- options (db.vendorSellKeepBoEQualities[quality] = true). No track exception:
+-- an unbound item has no upgrade track to sell by.
+local function IsKeptBoE(data, bag, slot)
+    local qualities = NightsFarmtrackerDB.vendorSellKeepBoEQualities
+    return data.isBoE == true and qualities ~= nil and qualities[data.quality] == true
+        and not IsWarband(data, bag, slot) and not IsSoulbound(data, bag, slot)
+end
+
 local function InEquipmentSet(bag, slot)
     return C_Container.GetContainerItemEquipmentSetInfo(bag, slot) == true
 end
@@ -141,7 +155,8 @@ local function CollectItems()
             local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
             if data and IsVendorGood(data, info.stackCount, bag, slot) and not InEquipmentSet(bag, slot)
                and not ns.IsOnDeleteList(info.itemID)
-               and not (IsKeptBound(data, bag, slot) and not IsSellableTrack(info.hyperlink)) then
+               and not (IsKeptBound(data, bag, slot) and not IsSellableTrack(info.hyperlink))
+               and not IsKeptBoE(data, bag, slot) then
                 list[#list + 1] = {
                     bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink, name = data.name,
                     count = info.stackCount, value = sellPrice * info.stackCount,
