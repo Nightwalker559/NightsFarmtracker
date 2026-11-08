@@ -4,9 +4,11 @@
 -- "The Coiled Huntress" fishing rod (item 244790) and the Coiled
 -- Filament currency (id 3546). Blizzard only exposes the venom value
 -- inside the item tooltip, so it's scanned and mirrored here.
--- Off by default; toggled via Settings -> Fishing.
+-- Off by default; toggled via Settings -> Fishing. Not loaded in Forever
+-- (the rod does not exist there; Settings and /nft skip the feature).
 ------------------------------------------------------------------------
 local _, ns = ...
+if ns.IS_FOREVER then return end
 
 local ITEM_ID     = 244790 -- The Coiled Huntress
 local CURRENCY_ID = 3546   -- Coiled Filament

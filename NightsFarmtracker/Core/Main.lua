@@ -457,6 +457,12 @@ local SLASH_COMMANDS = {
     sessionsdump = function() ns.DebugSessionsDump() end,
 }
 
+local USAGE = "/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump"
+if ns.IS_FOREVER then   -- the Venom Tracker is not loaded in Forever
+    SLASH_COMMANDS.venom, SLASH_COMMANDS.venomdump = nil, nil
+    USAGE = USAGE:gsub(" · /nft venom · /nft venomdump", "")
+end
+
 SLASH_FARMTRACK1 = "/nft"
 SlashCmdList["FARMTRACK"] = function(msg)
     local cmd, args = (msg or ""):match("^%s*(%S*)%s*(.*)$")
@@ -466,7 +472,7 @@ SlashCmdList["FARMTRACK"] = function(msg)
     elseif SLASH_COMMANDS[cmd] then
         SLASH_COMMANDS[cmd](args)
     else
-        ns.Print("/nft · /nft debug · /nft filter · /nft venom · /nft venomdump · /nft bait · /nft hud · /nft export · /nft test · /nft itemdb · /nft monthdump [itemID] · /nft sessionsdump")
+        ns.Print(USAGE)
     end
 end
 

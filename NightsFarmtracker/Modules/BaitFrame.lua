@@ -10,8 +10,11 @@
 local _, ns = ...
 
 -- Since profession equipment slots (Dragonflight+), the fishing rod sits
--- in its own dedicated tool slot instead of Main Hand.
-local FISHING_POLE_SLOT = GetInventorySlotInfo("FISHINGTOOLSLOT")
+-- in its own dedicated tool slot instead of Main Hand. Forever has no such
+-- slot: the rod is equipped as the main hand weapon.
+local FISHING_POLE_SLOT = GetInventorySlotInfo(ns.IS_FOREVER and "MAINHANDSLOT" or "FISHINGTOOLSLOT")
+local WEAPON_CLASS = Enum.ItemClass.Weapon
+local FISHING_POLE_SUBCLASS = Enum.ItemWeaponSubclass and Enum.ItemWeaponSubclass.Fishingpole or 20
 
 -- Rough "does this look like a fishing lure" tooltip gate, so dragging in
 -- an unrelated item gets rejected instead of silently accepted. Covers
@@ -84,10 +87,15 @@ end
 -- Fishing pole check
 ------------------------------------------------------------------------
 -- Anything sitting in the Fishing Rod tool slot is, by definition, the
--- equipped fishing pole (profession equipment slot, see FISHINGTOOLSLOT).
+-- equipped fishing pole (profession equipment slot, see FISHINGTOOLSLOT). In
+-- Forever that slot is Main Hand, so the item has to be a fishing pole.
 local function HasFishingPoleEquipped()
     if not FISHING_POLE_SLOT then return false end
-    return GetInventoryItemLink("player", FISHING_POLE_SLOT) ~= nil
+    local link = GetInventoryItemLink("player", FISHING_POLE_SLOT)
+    if not link then return false end
+    if not ns.IS_FOREVER then return true end
+    local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(link)
+    return classID == WEAPON_CLASS and subClassID == FISHING_POLE_SUBCLASS
 end
 
 ------------------------------------------------------------------------
