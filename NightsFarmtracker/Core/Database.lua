@@ -77,7 +77,7 @@ end
 -- no other file needs to change.
 ns.PROFILE_KEYS = {
     goldRateMode=true, sessionLength=true, sessionHistoryEnabled=true, logWindowEnabled=true,
-    vendorFilterEnabled=true, blacklistEnabled=true, vendorSellEnabled=true, vendorSellProtect=true, vendorSellKeepWarband=true, vendorSellKeepSoulbound=true, vendorSellWarbandTracks=true, vendorSellKeepBoEQualities=true, deleteListEnabled=true, mergeDaily=true,
+    vendorFilterEnabled=true, blacklistEnabled=true, vendorSellEnabled=true, vendorSellProtect=true, vendorSellKeepWarband=true, vendorSellKeepSoulbound=true, vendorSellWarbandTracks=true, vendorSellSoulboundTracks=true, vendorSellKeepBoE=true, vendorSellKeepBoEQualities=true, deleteListEnabled=true, mergeDaily=true,
     splitTradeGoods=true, splitGearByBinding=true, ahSource=true,
     gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
     tsmCustomSource=true, colorTheme=true, customAccent=true, headerGradient=true, themedButtons=true,
@@ -104,6 +104,8 @@ local function NewProfileDefaults()
         vendorSellKeepWarband = true,
         vendorSellKeepSoulbound = false,
         vendorSellWarbandTracks = {},
+        vendorSellSoulboundTracks = {},
+        vendorSellKeepBoE     = false,
         vendorSellKeepBoEQualities = {},
         deleteListEnabled     = true,
         mergeDaily            = true,
@@ -186,7 +188,7 @@ function ns.CopyProfile(name, sourceName)
     local copy = {}
     for k, v in pairs(src) do copy[k] = v end
     -- these are tables - copy them so the two profiles don't share them
-    for _, key in ipairs({ "gearThresholdOff", "vendorSellWarbandTracks", "vendorSellKeepBoEQualities", "pos" }) do
+    for _, key in ipairs({ "gearThresholdOff", "vendorSellWarbandTracks", "vendorSellSoulboundTracks", "vendorSellKeepBoEQualities", "pos" }) do
         if type(src[key]) == "table" then
             copy[key] = {}
             for k, v in pairs(src[key]) do copy[key][k] = v end
@@ -254,14 +256,30 @@ function ns.InitDB()
         rawset(NightsFarmtrackerDB, "profileKey", ns.DEFAULT_PROFILE)
     end
 
-    -- limitMode ("session" | "goal" | "off") picks which of sessionLength /
-    -- itemGoal / itemGoals is active. Profiles saved before it existed keep
-    -- whichever value was set (an item goal used to win over a session length).
+    -- Settings that older profiles lack and that cannot simply take their
+    -- default, because the default depends on what the profile already holds:
     for _, profile in pairs(NightsFarmtrackerAccountDB.profiles) do
+        -- limitMode ("session" | "goal" | "off") picks which of sessionLength /
+        -- itemGoal / itemGoals is active. Profiles saved before it existed keep
+        -- whichever value was set (an item goal used to win over a session length).
         if profile.limitMode == nil then
             if (tonumber(profile.itemGoal) or 0) > 0 then profile.limitMode = "goal"
             elseif (tonumber(profile.sessionLength) or 0) > 0 then profile.limitMode = "session"
             else profile.limitMode = "off" end
+        end
+        -- The sell list's upgrade track list used to cover Warband and soulbound
+        -- items together; the soulbound list starts as a copy of it, so nothing
+        -- that was offered before stays behind.
+        if profile.vendorSellSoulboundTracks == nil then
+            profile.vendorSellSoulboundTracks = {}
+            for key, ticked in pairs(profile.vendorSellWarbandTracks or {}) do
+                profile.vendorSellSoulboundTracks[key] = ticked
+            end
+        end
+        -- "Keep BoE items" has an on/off switch of its own: on for a profile
+        -- that had qualities ticked.
+        if profile.vendorSellKeepBoE == nil then
+            profile.vendorSellKeepBoE = next(profile.vendorSellKeepBoEQualities or {}) ~= nil
         end
     end
 

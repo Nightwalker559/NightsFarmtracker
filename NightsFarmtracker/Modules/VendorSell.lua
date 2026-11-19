@@ -6,9 +6,9 @@
 -- as many as the merchant's buyback list holds, so a wrong click can still be
 -- undone. Off, one click sells the whole list. Warband items stay in the bags
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
--- ticked there; soulbound items stay too once "Keep soulbound items" is on, with
--- the same track exception; unbound Bind on Equip items stay when their quality is
--- ticked. Forever has no Warband and no tracks. The options live in a window
+-- ticked in the Warband track list; soulbound items stay too once "Keep soulbound
+-- items" is on, with a track list of their own; unbound Bind on Equip items stay
+-- when "Keep BoE items" is on and their quality is ticked. Forever has no Warband and no tracks. The options live in a window
 -- (ns.ToggleVendorSellConfig, Settings\SellConfig.lua) that the gear icon of this
 -- window and the one in Settings open. Below the sale list come the bag items of
 -- the Delete List, deleted one per click by a second button.
@@ -92,10 +92,11 @@ local function IsVendorGood(data, count, bag, slot)
     return ns.IsGearThresholdVendorOnly(data, ahPrice and ahPrice * count, count)
 end
 
--- Upgrade tracks of gear that may be sold although Warband or soulbound items
--- are kept (db.vendorSellWarbandTracks[key] = true, one list for both). Matched
--- by the track name the game shows, in the client language or in English.
-ns.WARBAND_SELL_TRACKS = {
+-- Upgrade tracks of gear that may be sold although its binding is kept: one list
+-- per binding (db.vendorSellWarbandTracks / db.vendorSellSoulboundTracks[key] =
+-- true). Matched by the track name the game shows, in the client language or in
+-- English.
+ns.SELL_TRACKS = {
     { key = "explorer",   locKey = "track_explorer",   en = "Explorer"   },
     { key = "adventurer", locKey = "track_adventurer", en = "Adventurer" },
     { key = "veteran",    locKey = "track_veteran",    en = "Veteran"    },
@@ -111,16 +112,16 @@ ns.BOE_KEEP_QUALITIES = { 1, 2, 3, 4 }
 local trackByName
 local function BuildTrackNames()
     trackByName = {}
-    for _, t in ipairs(ns.WARBAND_SELL_TRACKS) do
+    for _, t in ipairs(ns.SELL_TRACKS) do
         trackByName[t.en:lower()] = t.key
         trackByName[ns.L[t.locKey]:lower()] = t.key
     end
 end
 
--- Gear whose upgrade track is ticked in Settings. Gear without a
+-- Gear whose upgrade track is ticked in the list `dbKey` names. Gear without a
 -- track, or with a name we do not know, stays in the bags.
-local function IsSellableTrack(link)
-    local tracks = NightsFarmtrackerDB.vendorSellWarbandTracks
+local function IsSellableTrack(link, dbKey)
+    local tracks = NightsFarmtrackerDB[dbKey]
     if ns.IS_FOREVER or not (tracks and next(tracks) and C_Item.GetItemUpgradeInfo) then return false end
     local info = C_Item.GetItemUpgradeInfo(link)
     if not (info and info.trackString) then return false end
@@ -129,18 +130,24 @@ local function IsSellableTrack(link)
     return key ~= nil and tracks[key] == true
 end
 
--- Warband or soulbound item the options say to keep (before the track exception).
-local function IsKeptBound(data, bag, slot)
-    return (IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot))
-        or (NightsFarmtrackerDB.vendorSellKeepSoulbound == true and IsSoulbound(data, bag, slot))
+-- Warband or soulbound item the options say to keep, unless its upgrade track is
+-- ticked in the list of its binding (an item is never both).
+local function IsKeptBound(data, bag, slot, link)
+    if IsOn("vendorSellKeepWarband") and IsWarband(data, bag, slot) then
+        return not IsSellableTrack(link, "vendorSellWarbandTracks")
+    end
+    if NightsFarmtrackerDB.vendorSellKeepSoulbound == true and IsSoulbound(data, bag, slot) then
+        return not IsSellableTrack(link, "vendorSellSoulboundTracks")
+    end
+    return false
 end
 
--- Bind on Equip item that is not bound yet and whose quality is ticked in the
--- options (db.vendorSellKeepBoEQualities[quality] = true). No track exception:
+-- Bind on Equip item that is not bound yet, with "Keep BoE items" on and its
+-- quality ticked (db.vendorSellKeepBoEQualities[quality] = true). No track exception:
 -- an unbound item has no upgrade track to sell by.
 local function IsKeptBoE(data, bag, slot)
     local qualities = NightsFarmtrackerDB.vendorSellKeepBoEQualities
-    return data.isBoE == true and qualities ~= nil and qualities[data.quality] == true
+    return NightsFarmtrackerDB.vendorSellKeepBoE == true and data.isBoE == true and qualities ~= nil and qualities[data.quality] == true
         and not IsWarband(data, bag, slot) and not IsSoulbound(data, bag, slot)
 end
 
@@ -155,7 +162,7 @@ local function CollectItems()
             local data, sellPrice = BagItemData(info.itemID, info.hyperlink)
             if data and IsVendorGood(data, info.stackCount, bag, slot) and not InEquipmentSet(bag, slot)
                and not ns.IsOnDeleteList(info.itemID)
-               and not (IsKeptBound(data, bag, slot) and not IsSellableTrack(info.hyperlink))
+               and not IsKeptBound(data, bag, slot, info.hyperlink)
                and not IsKeptBoE(data, bag, slot) then
                 list[#list + 1] = {
                     bag = bag, slot = slot, itemID = info.itemID, link = info.hyperlink, name = data.name,

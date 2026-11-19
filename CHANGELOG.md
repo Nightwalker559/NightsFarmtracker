@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.0
+
+### Changed
+
+- Sell List: Warband and soulbound items each get their own upgrade track list (one shared list before), opened by a gear icon behind the option; a list saved earlier is kept for both
+- Sell List: "Keep BoE items" is a checkbox with a gear icon like the other two; the qualities are picked in a window of their own (switching it on with none ticked ticks all four, profiles that had qualities ticked keep it on)
+
+### Fixed
+
+- Loot Log: closing it with Esc counts as closed, so it no longer comes back after a relog or reload
+- Docking: windows that have to stack (no room at the side of the screen) keep growing in the direction of the window before, so a third window no longer lands on top of the second
+
 ## 1.8.9
 
 ### New

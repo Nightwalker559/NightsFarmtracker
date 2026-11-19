@@ -175,8 +175,10 @@ local function EnsureLogFrame()
     LogFrame = ns.CreateWindowFrame("NightsFarmtrackerLogWnd", ns.L["log_title"], {width = LOG_W, dockChain = "right"})
     LogFrame:SetPoint("TOPLEFT", ns.MainFrame, "TOPRIGHT", ns.WINDOW_GAP, 0)
     ns.LogFrame = LogFrame  -- exposed so other windows (e.g. Filter) can anchor next to it
-    LogFrame.closeBtn:HookScript("OnClick", function()
-        NightsFarmtrackerDB.logWindowShown = false
+    -- Closed by the player (X, Esc, the toggle): do not bring it back at the next
+    -- login. Hidden only through its parent (hide UI) the window is still shown.
+    LogFrame:HookScript("OnHide", function(self)
+        if not self:IsShown() then NightsFarmtrackerDB.logWindowShown = false end
     end)
 
     ns.AddHLine(LogFrame, "TOP", LOG_PAD, -(LOG_HDR_H-1))
@@ -229,7 +231,6 @@ function ns.ToggleLogWindow()
     EnsureLogFrame()
     if LogFrame:IsShown() then
         LogFrame:Hide()
-        NightsFarmtrackerDB.logWindowShown = false
     else
         RebuildLogList()
         LogFrame:Show()
