@@ -293,7 +293,9 @@ end
 local POPOUT_FRAMES = { "LogFrame", "FilterFrame", "SettingsFrame", "GoalsFrame",
                          "HistFrame", "DetailFrame", "VenomFrame" }
 
-MainFrame:HookScript("OnHide", function()
+MainFrame:HookScript("OnHide", function(self)
+    -- Hidden only because UIParent is (Alt+Z): the popouts go with it and come back with it
+    if self:IsShown() then return end
     GoldFrame:Hide()
     for _, key in ipairs(POPOUT_FRAMES) do
         local f = ns[key]
