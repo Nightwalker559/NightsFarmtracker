@@ -20,7 +20,11 @@ function ns.AnchorToTop(frame)
     return x, y
 end
 
-local function DockStacked(frame, anchor, edge)
+-- Docks below the anchor, or above it when the screen bottom is too close.
+-- `preferred` ("above" / "below": where the anchor itself was stacked, so a
+-- column keeps growing the same way instead of running into the window it was
+-- stacked beside) wins while it has room. Returns the side it took.
+local function DockStacked(frame, anchor, edge, preferred)
     local height       = frame:GetHeight() or 0
     local screenTop    = UIParent:GetTop()
     local anchorBottom = anchor:GetBottom()
@@ -28,19 +32,25 @@ local function DockStacked(frame, anchor, edge)
     local gap          = ns.WINDOW_GAP
     local noRoomBelow  = anchorBottom and UIParent:GetBottom() and (anchorBottom - gap - height) < UIParent:GetBottom()
     local roomAbove    = anchorTop and screenTop and (anchorTop + gap + height) <= screenTop
-    if noRoomBelow and roomAbove then
+    local above
+    if preferred == "above" and roomAbove then above = true
+    elseif preferred == "below" and not noRoomBelow then above = false
+    else above = (noRoomBelow and roomAbove) and true or false end
+    if above then
         frame:SetPoint("BOTTOM" .. edge, anchor, "TOP" .. edge, 0, gap)
-    else
-        frame:SetPoint("TOP" .. edge, anchor, "BOTTOM" .. edge, 0, -gap)
+        return "above"
     end
+    frame:SetPoint("TOP" .. edge, anchor, "BOTTOM" .. edge, 0, -gap)
+    return "below"
 end
 
 -- Docks `frame` to the left or right of `anchor`. Without room on screen in
 -- that direction it docks below the anchor, or above it when the screen bottom
 -- is too close (windows are clamped to the screen, so a "below" without room
--- would slide up over the anchor). Call it after the frame has its final
--- height.
-function ns.DockFrame(frame, anchor, side)
+-- would slide up over the anchor); `preferred` is passed on to DockStacked.
+-- Returns "above" / "below" when it had to stack, nil when it sits at the side.
+-- Call it after the frame has its final height.
+function ns.DockFrame(frame, anchor, side, preferred)
     frame:ClearAllPoints()
     local width       = frame:GetWidth() or ns.FRAME_W
     local screenLeft  = UIParent:GetLeft()
@@ -48,17 +58,15 @@ function ns.DockFrame(frame, anchor, side)
     if side == "left" then
         local anchorLeft = anchor:GetLeft()
         if anchorLeft and screenLeft and (anchorLeft - ns.WINDOW_GAP - width) < screenLeft then
-            DockStacked(frame, anchor, "RIGHT")
-        else
-            frame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -ns.WINDOW_GAP, 0)
+            return DockStacked(frame, anchor, "RIGHT", preferred)
         end
+        frame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -ns.WINDOW_GAP, 0)
     else
         local anchorRight = anchor:GetRight()
         if anchorRight and screenRight and (anchorRight + ns.WINDOW_GAP + width) > screenRight then
-            DockStacked(frame, anchor, "LEFT")
-        else
-            frame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", ns.WINDOW_GAP, 0)
+            return DockStacked(frame, anchor, "LEFT", preferred)
         end
+        frame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", ns.WINDOW_GAP, 0)
     end
 end
 
@@ -81,14 +89,14 @@ ns.WINDOW_CHAINS = {
 function ns.RefreshWindowChain(side)
     local order = ns.WINDOW_CHAINS[side]
     if not order then return end
-    local prev = ns.MainFrame
+    local prev, stacked = ns.MainFrame, nil
     for _, key in ipairs(order) do
         local f = ns[key]
         -- Log docks BELOW MainFrame while collapsed - it sits outside the
         -- horizontal chain in that state, so it is skipped as a link.
         local collapsedLog = key == "LogFrame" and NightsFarmtrackerDB and NightsFarmtrackerDB.expanded == false
         if f and f:IsShown() and not collapsedLog then
-            ns.DockFrame(f, prev, side)
+            stacked = ns.DockFrame(f, prev, side, stacked)
             prev = f
         end
     end

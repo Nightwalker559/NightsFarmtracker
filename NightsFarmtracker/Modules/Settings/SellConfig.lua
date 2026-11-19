@@ -145,16 +145,8 @@ local function BuildTracks()
     local off = SellListOff() or not kind.keeps()
 
     pop.titleFS:SetText(ns.L[kind.titleKey])
-    pop.hint:SetText(ns.L[kind.tipKey])
-    local gray = off and 0.3 or 0.5
-    pop.hint:SetTextColor(gray, gray, gray)
 
     local y = -(S_HDR_H + 6)
-    local hintH = math.ceil(pop.hint:GetStringHeight())
-    pop.hint:ClearAllPoints()
-    pop.hint:SetPoint("TOPLEFT", S_PAD, y)
-    y = y - hintH - 10
-
     for _, t in ipairs(ns.SELL_TRACKS) do
         local row = checkboxPool.acquire(pop)
         tracksRows[#tracksRows + 1] = row
@@ -181,10 +173,6 @@ local function ToggleTracks(kindKey)
         tracksPop = ns.CreateWindowFrame("NightsFarmtrackerSellTracksWnd", "", { width = S_W, pad = S_PAD, dockChain = "left", noEsc = true })
         K.RegisterPopup(tracksPop)
         ns.AddHLine(tracksPop, "TOP", S_PAD, -(S_HDR_H - 1))
-        tracksPop.hint = tracksPop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        tracksPop.hint:SetWidth(S_W - S_PAD*2)   -- fixed width: GetStringHeight of a wrapped text is exact
-        tracksPop.hint:SetJustifyH("LEFT")
-        tracksPop.hint:SetWordWrap(true)
     end
 
     tracksKind = kindKey
@@ -277,9 +265,9 @@ function ns.ToggleVendorSellConfig(owner)
         ns.AddHLine(pop, "TOP", S_PAD, -(S_HDR_H - 1))
 
         if not ns.IS_FOREVER then
-            pop.warbandTracksBtn = ns.CreateConfigButton(pop, ns.L["vendor_sell_tracks_warband"])
+            pop.warbandTracksBtn = ns.CreateConfigButton(pop, ns.L["vendor_sell_tracks_warband"], ns.L[TRACK_KINDS.warband.tipKey])
             pop.warbandTracksBtn:SetScript("OnClick", function() ToggleTracks("warband") end)
-            pop.soulboundTracksBtn = ns.CreateConfigButton(pop, ns.L["vendor_sell_tracks_soulbound"])
+            pop.soulboundTracksBtn = ns.CreateConfigButton(pop, ns.L["vendor_sell_tracks_soulbound"], ns.L[TRACK_KINDS.soulbound.tipKey])
             pop.soulboundTracksBtn:SetScript("OnClick", function() ToggleTracks("soulbound") end)
         end
         pop.boeHint = pop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

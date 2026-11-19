@@ -6,6 +6,10 @@
 
 - Sell List: Warband and soulbound items each get their own upgrade track list (one shared list before), opened by a gear icon behind the option; a list saved earlier is kept for both
 
+### Fixed
+
+- Docking: windows that have to stack (no room at the side of the screen) keep growing in the direction of the window before, so a third window no longer lands on top of the second
+
 ## 1.8.9
 
 ### New
