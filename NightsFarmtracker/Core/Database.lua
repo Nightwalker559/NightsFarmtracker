@@ -77,7 +77,7 @@ end
 -- no other file needs to change.
 ns.PROFILE_KEYS = {
     goldRateMode=true, sessionLength=true, sessionHistoryEnabled=true, logWindowEnabled=true,
-    vendorFilterEnabled=true, blacklistEnabled=true, vendorSellEnabled=true, vendorSellProtect=true, vendorSellKeepWarband=true, vendorSellKeepSoulbound=true, vendorSellWarbandTracks=true, vendorSellSoulboundTracks=true, vendorSellKeepBoEQualities=true, deleteListEnabled=true, mergeDaily=true,
+    vendorFilterEnabled=true, blacklistEnabled=true, vendorSellEnabled=true, vendorSellProtect=true, vendorSellKeepWarband=true, vendorSellKeepSoulbound=true, vendorSellWarbandTracks=true, vendorSellSoulboundTracks=true, vendorSellKeepBoE=true, vendorSellKeepBoEQualities=true, deleteListEnabled=true, mergeDaily=true,
     splitTradeGoods=true, splitGearByBinding=true, ahSource=true,
     gearAHThreshold=true, gearThresholdOff=true, goldDisplayMode=true, tsmPriceSource=true,
     tsmCustomSource=true, colorTheme=true, customAccent=true, headerGradient=true, themedButtons=true,
@@ -105,6 +105,7 @@ local function NewProfileDefaults()
         vendorSellKeepSoulbound = false,
         vendorSellWarbandTracks = {},
         vendorSellSoulboundTracks = {},
+        vendorSellKeepBoE     = false,
         vendorSellKeepBoEQualities = {},
         deleteListEnabled     = true,
         mergeDaily            = true,
@@ -275,6 +276,14 @@ function ns.InitDB()
             for key, ticked in pairs(profile.vendorSellWarbandTracks or {}) do
                 profile.vendorSellSoulboundTracks[key] = ticked
             end
+        end
+    end
+
+    -- "Keep BoE items" got an on/off switch of its own: a profile that had
+    -- qualities ticked has it on.
+    for _, profile in pairs(NightsFarmtrackerAccountDB.profiles) do
+        if profile.vendorSellKeepBoE == nil then
+            profile.vendorSellKeepBoE = next(profile.vendorSellKeepBoEQualities or {}) ~= nil
         end
     end
 

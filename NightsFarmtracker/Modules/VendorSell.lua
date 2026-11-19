@@ -8,7 +8,7 @@
 -- unless that option is switched off or their upgrade track (Adventurer, ...) is
 -- ticked in the Warband track list; soulbound items stay too once "Keep soulbound
 -- items" is on, with a track list of their own; unbound Bind on Equip items stay
--- when their quality is ticked. Forever has no Warband and no tracks. The options live in a window
+-- when "Keep BoE items" is on and their quality is ticked. Forever has no Warband and no tracks. The options live in a window
 -- (ns.ToggleVendorSellConfig, Settings\SellConfig.lua) that the gear icon of this
 -- window and the one in Settings open. Below the sale list come the bag items of
 -- the Delete List, deleted one per click by a second button.
@@ -142,12 +142,12 @@ local function IsKeptBound(data, bag, slot, link)
     return false
 end
 
--- Bind on Equip item that is not bound yet and whose quality is ticked in the
--- options (db.vendorSellKeepBoEQualities[quality] = true). No track exception:
+-- Bind on Equip item that is not bound yet, with "Keep BoE items" on and its
+-- quality ticked (db.vendorSellKeepBoEQualities[quality] = true). No track exception:
 -- an unbound item has no upgrade track to sell by.
 local function IsKeptBoE(data, bag, slot)
     local qualities = NightsFarmtrackerDB.vendorSellKeepBoEQualities
-    return data.isBoE == true and qualities ~= nil and qualities[data.quality] == true
+    return NightsFarmtrackerDB.vendorSellKeepBoE == true and data.isBoE == true and qualities ~= nil and qualities[data.quality] == true
         and not IsWarband(data, bag, slot) and not IsSoulbound(data, bag, slot)
 end
 

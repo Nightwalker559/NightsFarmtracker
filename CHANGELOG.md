@@ -5,6 +5,7 @@
 ### Changed
 
 - Sell List: Warband and soulbound items each get their own upgrade track list (one shared list before), opened by a gear icon behind the option; a list saved earlier is kept for both
+- Sell List: "Keep BoE items" is a checkbox with a gear icon like the other two; the qualities are picked in a window of their own (switching it on with none ticked ticks all four, profiles that had qualities ticked keep it on)
 
 ### Fixed
 
