@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.10
+
+### Changed
+
+- Sell List: Warband and soulbound items each get their own upgrade track list (one shared list before), opened by a gear icon behind the option; a list saved earlier is kept for both
+
 ## 1.8.9
 
 ### New
