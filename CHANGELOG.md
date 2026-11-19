@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- Loot Log: closing it with Esc counts as closed, so it no longer comes back after a relog or reload
 - Docking: windows that have to stack (no room at the side of the screen) keep growing in the direction of the window before, so a third window no longer lands on top of the second
 
 ## 1.8.9

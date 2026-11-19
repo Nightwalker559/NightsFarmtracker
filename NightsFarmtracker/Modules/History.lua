@@ -470,6 +470,18 @@ local function ShowMonthTooltip(row, month, mKey, combined, withHint)
     if withHint or combined>0 then GameTooltip:Show() end
 end
 
+-- Name, duration and gold of a month row, the text starting textX from the left;
+-- returns the month's gold in total (items plus looted gold) for its tooltip.
+local function FillMonthRow(mrow, month, textX)
+    mrow.nameText:ClearAllPoints()
+    mrow.nameText:SetPoint("LEFT", textX, 0)
+    mrow.nameText:SetText(month.label)
+    mrow.infoText:SetText(month.duration>0 and ns.FormatTime(month.duration) or "")
+    local combined = (month.totalGold or 0) + (month.lootedGold or 0)
+    mrow.goldText:SetText(combined>0 and ns.FormatGold(combined) or "")
+    return combined
+end
+
 -- Day header (with the Merge button) and session rows of one day; returns the
 -- new y offset. Shared by the Sessions tab and the expanded months of the
 -- History tab.
@@ -616,11 +628,7 @@ function ns.RebuildHistory()
             flow.header(mrow)
             ns.SetHeaderArrow(mrow, false); mrow.headerArrow:Hide()
             mrow.delBtn:Hide()
-            mrow.nameText:ClearAllPoints(); mrow.nameText:SetPoint("LEFT",4,0)
-            mrow.nameText:SetText(month.label)
-            mrow.infoText:SetText(month.duration>0 and ns.FormatTime(month.duration) or "")
-            local monthCombined = (month.totalGold or 0) + (month.lootedGold or 0)
-            mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
+            local monthCombined = FillMonthRow(mrow, month, 4)
             mrow:SetScript("OnEnter",function(self)
                 self.nameText:SetTextColor(1,1,1)
                 ShowMonthTooltip(self, month, currentMonthKey, monthCombined, false)
@@ -652,12 +660,7 @@ function ns.RebuildHistory()
             flow.header(mrow)
             ns.SetHeaderArrow(mrow, collapsed)
             mrow.headerArrow:SetShown(not flat)
-            mrow.nameText:ClearAllPoints()
-            mrow.nameText:SetPoint("LEFT",flat and 4 or ns.HEADER_TEXT_X,0)
-            mrow.nameText:SetText(month.label)
-            mrow.infoText:SetText(month.duration>0 and ns.FormatTime(month.duration) or "")
-            local monthCombined = (month.totalGold or 0) + (month.lootedGold or 0)
-            mrow.goldText:SetText(monthCombined>0 and ns.FormatGold(monthCombined) or "")
+            local monthCombined = FillMonthRow(mrow, month, flat and 4 or ns.HEADER_TEXT_X)
             mrow:SetScript("OnEnter",function(self)
                 self.nameText:SetTextColor(1,1,1)
                 ShowMonthTooltip(self, month, mKey, monthCombined, not flat)
