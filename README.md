@@ -2,143 +2,82 @@
 
 Track what you farm. See what it's worth.
 
-Night's Farmtracker counts everything you loot while you grind, groups it by category, sorts it by value and prices it against your AH addon or the vendor. When the session is over, reset it to save it to the history and start fresh.
+Counts everything you loot while you grind, groups it by category, sorts it by value and prices it against your AH addon or the vendor. Reset to save the session to the history and start fresh.
 
-For World of Warcraft: Midnight (game versions 12.1 and 12.1.5). English and German. Optional: Auctionator, Oribos Exchange or TradeSkillMaster for AH prices.
+For World of Warcraft: Midnight (12.1 and 12.1.5). English and German. Optional: Auctionator, Oribos Exchange or TradeSkillMaster for AH prices.
 
 **Author:** Nightwalker559 · **License:** MIT with AI restriction
 
 ---
 
-## At a glance
+## Features
 
-- **No setup.** Loot is detected automatically, just start farming.
-- **One compact window.** `/nft` or the minimap button opens it; a toolbar on top, the total, timer and gold rate below.
-- **Real values.** Every item is worth the higher of its AH and vendor price, with filters for everything that should only count at vendor price.
-- **History and export.** Sessions are saved per day and month, and can be exported as JSON.
-- **Profiles and themes.** Settings live in switchable profiles; 16 color themes plus your own color.
-- **Optional extras** (Minimap HUD, fishing helpers, lockout counter) are all off by default.
+- **No setup.** Loot is detected automatically. `/nft` or the minimap button opens one compact window with the total, session timer and gold rate.
+- **Real values.** Every item is worth the higher of its AH and vendor price. Bind-on-Pickup, Warbound and filtered items always use the vendor price.
+- **Clear lists.** Categories you can collapse, sorted by value, with reagent quality tiers, scaling gear per item level and directly looted gold shown separately. Optional split of trade goods and equipment, or all junk merged into one row.
+- **Session limit or item goals.** Count down a fixed time, or set goals per item; the bars show progress and the session pauses when a goal is reached.
+- **History and export.** Sessions are saved per day and month, account-wide, and can be exported as JSON (`/nft export`). *Compact mode* folds old months to keep the saved data small.
+- **Profiles and themes.** Switchable profiles, 16 color themes plus your own color.
 
----
+## Window
 
-## The window
-
-The toolbar, left to right:
-
-| Button | What it does |
+| Button | Action |
 | --- | --- |
-| Play / pause | Starts and pauses tracking and the timer |
-| Reset | Saves the session to the history and clears the list and timer. **Shift+click** resets without saving |
-| History | **Left-click** the Sessions & History window, **right-click** the Loot Log (if enabled) |
-| Filter | **Left-click** the Filter window on the Vendor-Only tab, **right-click** on the Blacklist tab |
-| Settings, Help, Collapse, Close | On the right. Collapse folds the window down to toolbar and footer |
-
-The footer shows the total gold, the session timer and the gold rate. Click the total for a breakdown of item value and directly looted gold. The Help button shows the essentials on hover and the full list of shortcuts and commands on click.
-
-Rows show icon, name, amount and value, colored by item quality. Hover an item for its tooltip. With *Show price source*, a small tag tells whether a value comes from the AH (`AH`) or the vendor (`V`).
-
-## Tracking
-
-- Items are grouped by WoW item class into collapsible categories, sorted by their value. Optional: split trade goods by subtype, split equipment by binding (BoE / BoA / Soulbound), or merge all junk into a single "Trash" row.
-- Transmog-only weapons and armor get their own "Equipment (Cosmetic)" category. Mounts and pets have theirs.
-- Crafting reagents show their quality tier (R1/R2/R3) with a price per tier.
-- Scaling gear is listed per item level and quality, so rolls of different value never mix.
-- Gold dropped directly by mobs is tracked separately.
-- Every item row has a thin value bar showing its share of the most valuable item, in the theme color (can be switched off in the settings).
-- The session timer can run for a fixed length: it counts down and pauses itself at 0 (Settings → Session Limit).
-- Alternatively set **item goals**: one amount for every item, plus own amounts for single items in the Item Goals window. The bars then show the progress, turn green when an item reaches its goal, and the session pauses. Items in the Vendor-Only Filter (or Warband/BoP) show their progress but never reach a goal, only items with an AH price do. The timer counts up in that case, so the fixed length is not available.
-- `/reload` pauses the session; a relog saves it to the history and starts fresh.
-- Gold per hour or per minute, shown in classic (coin icons) or modern (colored text) format.
+| Play / pause | Start and pause tracking and the timer |
+| Reset | Save the session to the history and clear it. **Shift+click** resets without saving |
+| History | **Left-click** Sessions & History, **right-click** Loot Log (if enabled) |
+| Filter | **Left-click** Vendor-Only tab, **right-click** Blacklist tab |
+| Settings, Help, Collapse, Close | The Help button lists all shortcuts and commands |
 
 ## Pricing
 
-Every item is valued at the higher of its AH and vendor price. Vendor-only items (Bind-on-Pickup, Warbound, filtered items or categories) always use the vendor price.
-
-- **Price sources:** Auctionator, Oribos Exchange or TradeSkillMaster, with an *Auto* mode that prefers them in that order. TSM can use one of its price sources or a custom expression. Without an AH addon the vendor price is used.
-- **AH Price by Expansion:** limit AH pricing to the expansions you pick; everything else uses the vendor price.
-- **Gear AH Threshold:** equipment uses its AH price only once one item reaches a gold amount you set, otherwise the vendor price. A gear icon next to the field chooses which equipment groups it applies to (Equipment, BoE, BoA, Cosmetic). An optional sound plays when a drop reaches the threshold.
+- **Sources:** Auctionator, Oribos Exchange or TradeSkillMaster (*Auto* prefers them in that order; TSM can use a price source or a custom expression). Without an AH addon the vendor price is used.
+- **AH Price by Expansion:** use AH prices only for the expansions you pick.
+- **Gear AH Threshold:** equipment uses its AH price only once one item reaches a gold amount you set, with an optional sound.
 
 ## Filters
 
-- **Vendor-Only Filter:** drop items from your bags onto it, or tick whole categories, to value them at vendor price. Account-wide.
-- **Blacklist:** items and categories on it are never tracked. Account-wide, and it wins over everything else.
-- **Delete List:** items that can be neither sold nor auctioned (e.g. Warband-bound potions). At a vendor the Sell List offers them for deletion, one item per click (the game allows one deletion per click). Items only, no categories. Account-wide.
-- The three lists are the tabs of one Filter window. They group their items by expansion, can be cleared per expansion or completely, and can each be switched off in the settings (a tab whose list is off is not shown).
-- **Sell List:** at a vendor, a window next to the merchant window lists the bag items the Vendor-Only Filter and the Gear AH Threshold mark as vendor goods (most gold first) and sells them with one button. Equipment-set items and Warband items are left out (the latter can be switched off, or limited to the upgrade tracks you tick), and a protection limits one click to 12 items, the size of the vendor's buyback list. Options: the gear icon in the Sell List window or in Settings, Windows & Buttons.
-- **Ctrl+left-click** an item adds it to the Vendor-Only Filter, **Ctrl+right-click** blacklists it, **Shift+right-click** stops tracking it. On a category header, Shift+right-click excludes the whole category.
+One Filter window, three account-wide lists:
 
-## History, Loot Log and export
+- **Vendor-Only:** items and categories valued at vendor price.
+- **Blacklist:** never tracked; wins over everything else.
+- **Delete List:** items that cannot be sold or auctioned; the Sell List offers them for deletion at a vendor, one per click.
 
-- **Sessions & History** is account-wide and has no session limit. It has two tabs: *Sessions* shows the running month day by day under a header with the month's total, *History* lists the past months with their farm time. Same-day sessions are merged automatically (can be switched off, or merged by hand per day). Click a session for its detail window (title: date and farm time), Shift+click a month for a month summary. Hover a month for its gold, and optionally the average per day.
-- **Full mode** (default) keeps every session: a past month opens up to its days and sessions, and single sessions or whole months can be deleted.
-- **Compact mode** folds all past months into one entry each to keep the saved data small. A month is then a plain row, a click opens its summary, and only whole months can be deleted. The data export still contains what was saved.
-- **Loot Log:** a chronological, quality-colored list of the last 100 drops, kept per character across reloads (off by default).
-- **Data export** (`/nft export`): copy the saved history, all months or a single one, as JSON for use outside the game.
+**Sell List:** at a vendor, one button sells everything the Vendor-Only Filter and the Gear AH Threshold mark as vendor goods (equipment-set items are left out, one click sells at most 12 items).
 
-## Look and feel
-
-- 16 color themes plus a custom color with live preview (Settings → Colors), an optional gradient on section headers and optional theme-colored toolbar icons. Window titles follow the theme; gold is kept for gold amounts and checked options.
-- Windows dock next to each other without overlapping (below or above when there is no room beside) and can be dragged. The maximum window height is adjustable; longer lists scroll.
-- A minimap button (movable) and an entry in the minimap addon menu, both optional.
-
-## Settings
-
-Everything is in one window (Settings button or right-click on the minimap button), with a sidebar to jump between sections: AH Price Source, Categories & Grouping, Colors, Data Export, Display, Filters, Fishing, Minimap HUD, Session History, Session Limit, Windows & Buttons and Profiles.
-
-Most settings belong to a **profile**: create, copy, rename and delete profiles, and switch between them at any time. Window positions and the current session are stored per character. *Reset all* at the bottom wipes every saved setting and list.
-
----
+Shortcuts on an item: **Ctrl+left-click** Vendor-Only, **Ctrl+right-click** Blacklist, **Shift+right-click** stop tracking (also on category headers).
 
 ## Optional modules
 
 All off by default.
 
-### Minimap HUD
+- **Loot Log:** the last 100 drops, per character.
+- **Minimap HUD:** stretches the minimap over the screen so gathering nodes are readable all around you. Enable it in Settings → Minimap HUD, bind a key under Options → Keybindings → Night's Farmtracker (or use `/nft hud`). It cannot be opened in combat. Pins of HereBeDragons addons (GatherMate2, HandyNotes) and Routes move along.
+- **Venom Tracker:** Venom/Toxin stack and Coiled Filament currency while [The Coiled Huntress](https://www.curseforge.com/wow/addons/the-coiled-huntress-venom-tracker) rod is equipped.
+- **Fishing Lure Bar:** drag lures onto the bar, click to apply, right-click to remove, with the active buff and its time. Pairs well with [Better Fishing](https://www.curseforge.com/wow/addons/better-fishing).
+- **Lockout counter:** instance resets in the last hour (x/9) and the time until the oldest expires.
 
-Stretches the minimap over the screen so gathering nodes and tracking blips are readable all around your character. While it is disabled, the addon does not touch the minimap and the key binding does nothing.
+## Settings
 
-1. Enable it under **Settings → Minimap HUD**.
-2. Set a key under **Options → Keybindings → Night's Farmtracker** (there is no default key), or use `/nft hud`.
-3. Press the key to open and close the HUD.
-
-Notes:
-
-- Pins of HereBeDragons-based addons (GatherMate2, HandyNotes) and Routes move along with the minimap. Minimap buttons and UI panels attached to the minimap (built with ElvUI in mind) stay in the old spot on a placeholder and return when the HUD closes.
-- Mouse clicks pass through to the 3D world. The HUD cannot be opened in combat; a close request in combat is carried out afterwards.
-- Minimap rotation follows the HUD setting (on by default) while it is open and is restored to your own setting afterwards.
-- Tuning: `/nft hud size <20-100>` (percent of the screen height), `/nft hud scale <1-2.5>` (size of the symbols), `/nft hud alpha <0-100>` (opacity of the map background, 0 hides the map and keeps pins and blips), `/nft hud rotate` (toggle rotation).
-
-### Fishing
-
-- **Coiled Huntress Venom Tracker:** shows the Venom/Toxin stack and the Coiled Filament currency while the [The Coiled Huntress](https://www.curseforge.com/wow/addons/the-coiled-huntress-venom-tracker) fishing rod is equipped. Docked above the main window, movable, with a close button. `/nft venom` hides or shows it.
-- **Fishing Lure Bar:** drag lures from your bags onto the bar, click one to apply it to your fishing pole, right-click removes it. Shows the active lure buff and its remaining time. `/nft bait` hides or shows it.
-
-Tip: pair with [Better Fishing](https://www.curseforge.com/wow/addons/better-fishing) for double-click or keybind casting while you farm.
-
-### Instance lockout counter
-
-A small frame below the main window with the resets in the last hour (x/9), the time until the oldest one expires, and a button to reset instances. Settings → Windows & Buttons.
-
----
+One window (Settings button or right-click on the minimap button) with a sidebar. Most settings belong to a **profile** you can create, copy, rename and switch. Window positions and the current session are stored per character.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `/nft` | Open or close the window |
-| `/nft filter` | Open or close the Filter window (Vendor-Only, Blacklist, Delete List) |
-| `/nft export` | Open the data export (JSON) |
-| `/nft hud` | Toggle the Minimap HUD (if enabled) |
-| `/nft hud size\|scale\|alpha <n>` | Adjust the Minimap HUD |
+| `/nft filter` | Filter window |
+| `/nft export` | Data export (JSON) |
+| `/nft hud` | Toggle the Minimap HUD |
+| `/nft hud size\|scale\|alpha <n>` | Adjust the HUD (size 20-100, scale 1-2.5, alpha 0-100) |
 | `/nft hud rotate` | Toggle minimap rotation of the HUD |
-| `/nft venom` | Show or hide the Venom Tracker (if enabled) |
-| `/nft bait` | Show or hide the Fishing Lure Bar (if enabled) |
+| `/nft venom`, `/nft bait` | Show or hide the Venom Tracker / Lure Bar |
 
-Debug commands for bug reports: `/nft debug` opens a live debug log window (copyable, no chat output). `/nft venomdump`, `/nft test`, `/nft itemdb`, `/nft monthdump [itemID]` and `/nft sessionsdump` write their output into the same window.
+For bug reports: `/nft debug` opens a copyable debug log window.
 
 ---
 
-The full version history is in the [changelog](https://github.com/Nightwalker559/NightsFarmtracker/blob/main/CHANGELOG.md).
+See the [changelog](https://github.com/Nightwalker559/NightsFarmtracker/blob/main/CHANGELOG.md) for the version history.
 
 ## Feedback
 
