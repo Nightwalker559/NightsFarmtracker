@@ -18,6 +18,7 @@ jobs:
     env:
       CF_API_KEY: ${{ secrets.NIGHTSFARMTRACKER }}
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_RELEASES }}
     steps:
       - name: Clone project
         uses: actions/checkout@v7
@@ -49,3 +50,20 @@ jobs:
         with:
           # File name and CurseForge label: NightsFarmtracker_<tag> (e.g. NightsFarmtracker_1.7.6).
           args: -n "{package-name}_{project-version}:{package-name}_{project-version}"
+
+      - name: Post changelog to Discord
+        # Posts this version's changelog section to #releases. Skipped while the repository
+        # secret DISCORD_RELEASES (Discord webhook URL) is not set; a failed post does not fail the release.
+        if: env.DISCORD_WEBHOOK != ''
+        continue-on-error: true
+        run: |
+          # CHANGELOG.md was cut down to this tag's section above; drop its heading and leading blank lines.
+          body=$(tail -n +2 CHANGELOG.md | sed '/./,$!d')
+          # Embed descriptions are limited to 4096 characters.
+          if [ ${#body} -gt 3800 ]; then body="${body:0:3800}"$'\n…'; fi
+          jq -n \
+            --arg title "${GITHUB_REPOSITORY#*/} ${GITHUB_REF_NAME}" \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}" \
+            --arg desc "$body" \
+            '{embeds: [{title: $title, url: $url, description: $desc, color: 5793266}]}' > discord.json
+          curl -fsS -H "Content-Type: application/json" -d @discord.json "$DISCORD_WEBHOOK"
